@@ -91,6 +91,11 @@ tfoot td { font-weight: 700; border-bottom: none; font-variant-numeric: tabular-
 .pts { font-family: var(--display); font-variant-numeric: tabular-nums; }
 .done { color: var(--good); font-size: 12px; font-weight: 700; margin-left: 6px; }
 .invite { display: flex; gap: 6px; }
+.winner { font-family: var(--display); font-size: clamp(22px, 5vw, 32px); line-height: 1.3; padding: 14px 16px; border: 2px solid var(--fg); border-radius: 6px; background: var(--tS); color: var(--tier-ink); overflow-wrap: anywhere; }
+.final { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.final li { display: grid; grid-template-columns: 3.5em 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 6px; font-size: 16px; }
+.final li.first { border: 2px solid var(--fg); background: color-mix(in srgb, var(--tS) 35%, var(--surface)); }
+.final .place { font-family: var(--display); }
 .invite input { font-size: 13px; }
 
 /* 入力・ボタン */
@@ -376,8 +381,9 @@ document.addEventListener("focusout", () => setTimeout(() => { if (local.mainSta
 
 function renderMeta() {
   const m = $("meta"); m.replaceChildren();
-  const label = { lobby: "待機中", ranking: "親が並べ中", guessing: "予想タイム", reveal: "答え合わせ" }[S.phase] || "";
+  const label = { lobby: "待機中", ranking: "親が並べ中", guessing: "予想タイム", reveal: "答え合わせ", finished: "ゲーム終了" }[S.phase] || "";
   m.append(h("span", { class: "pill code" }, "部屋 " + S.code));
+  if (S.goal) m.append(h("span", { class: "pill" }, `${S.goal}点で優勝`));
   if (S.round) m.append(h("span", { class: "pill" }, `ラウンド ${S.round}`));
   m.append(h("span", { class: "pill" }, label));
   if (S.hostId && S.phase !== "lobby") m.append(h("span", { class: "pill" }, "親: " + nameOf(S.hostId)));
@@ -439,6 +445,9 @@ function renderMain() {
       h("label", { class: "field" }, "制限時間",
         h("select", { id: "dur", onchange: (e) => send({ t: "setDuration", sec: +e.target.value }) },
           ...[30, 60, 90, 120].map((s) => h("option", { value: s, selected: S.duration === s }, s + "秒")))),
+      h("label", { class: "field" }, "何点取ったら終わり？",
+        h("select", { id: "goal", onchange: (e) => send({ t: "setGoal", pts: +e.target.value }) },
+          ...[0, 20, 30, 50, 80].map((g) => h("option", { value: g, selected: S.goal === g }, g ? `${g}点で優勝` : "決めない(好きなだけ遊ぶ)")))),
       h("div", { class: "btns" },
         h("button", { class: "primary", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "ゲーム開始(自分が最初の親)"),
         h("span", { class: "muted small" }, live < 2 ? "右の招待リンクを友達に送ってください。2人以上でスタートできます" : `${live}人で開始できます`)));
@@ -513,7 +522,30 @@ function renderMain() {
         tbody,
         h("tfoot", {}, h("tr", {}, h("td", {}), h("td", {}, "このラウンド"), ...rd.rows.map((r) => h("td", {}, r.score + "点")))))));
     }
-    main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "次のラウンドへ")));
+    if (rd.winners?.length) {
+      main.append(h("div", { class: "winner" }, rd.winners.map((w) => w.name).join("・") + " さんが " + S.goal + "点に到達！"),
+        h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "最終結果を見る")));
+    } else {
+      main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "次のラウンドへ")));
+    }
+    return;
+  }
+
+  if (P === "finished") {
+    const ranked = [...S.players].sort((a, b) => b.score - a.score);
+    const winners = S.result?.winners || [];
+    main.append(h("div", { class: "eyebrow" }, `${S.round}ラウンドで決着`),
+      h("div", { class: "winner" }, "優勝 " + winners.map((w) => w.name).join("・") + " さん"));
+    const ol = h("ol", { class: "final" });
+    let place = 0, prev = null;
+    ranked.forEach((p, i) => {
+      if (p.score !== prev) { place = i + 1; prev = p.score; }
+      ol.append(h("li", { class: place === 1 ? "first" : "" }, h("span", { class: "place" }, place + "位"),
+        h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : "")), h("span", { class: "pts" }, p.score + "点")));
+    });
+    main.append(ol, h("div", { class: "btns" },
+      h("button", { class: "primary", type: "button", onclick: () => send({ t: "reset" }) }, "もう一度遊ぶ(得点をリセット)"),
+      h("span", { class: "muted small" }, "待機画面に戻ります。同じメンバーのまま始められます")));
   }
 }
 

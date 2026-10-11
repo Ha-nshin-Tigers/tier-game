@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const TIERS = ["S", "A", "B", "C", "D"];
 const PTS_EXACT = 3, PTS_NEAR = 1, PTS_PERFECT = 5;
 const DURATIONS = [30, 60, 90, 120];
+const GOALS = [0, 20, 30, 50, 80]; // 0 = 終了点なし(好きなだけ遊ぶ)
 const MAX_PLAYERS = 12, MAX_ROOMS = 500, MAX_TOPICS = 300;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 
@@ -125,7 +126,7 @@ const rooms = new Map();
 
 function newRoom(code) {
   return {
-    code, phase: "lobby", round: 0, hostId: null, topic: "", words: [], deadline: 0, duration: 60,
+    code, phase: "lobby", round: 0, hostId: null, topic: "", words: [], deadline: 0, duration: 60, goal: 0,
     players: new Map(), answer: null, guesses: new Map(), result: null, timer: null, emptySince: null,
   };
 }
@@ -172,7 +173,13 @@ function reveal(room) {
     rows.push({ id: p.id, name: p.name, guess: g, score: s });
   }
   const host = room.players.get(room.hostId);
-  room.result = { round: room.round, topic: room.topic, words: room.words, answer: room.answer, hostId: room.hostId, hostName: host ? host.name : "(退出した親)", rows };
+  // 終了点に届いた人がいればゲーム終了(同点なら全員優勝)
+  let winners = [];
+  if (room.goal) {
+    const top = Math.max(...[...room.players.values()].map((p) => p.score));
+    if (top >= room.goal) winners = order(room).filter((p) => p.score === top).map((p) => ({ id: p.id, name: p.name }));
+  }
+  room.result = { round: room.round, topic: room.topic, words: room.words, answer: room.answer, hostId: room.hostId, hostName: host ? host.name : "(退出した親)", rows, winners };
   room.phase = "reveal";
   broadcast(room);
 }
@@ -190,9 +197,9 @@ function view(room, me) {
     t: "state", now: Date.now(), me,
     room: {
       code: room.code, phase: room.phase, round: room.round, hostId: room.hostId, topic: room.topic,
-      words: room.words, deadline: room.deadline, duration: room.duration,
+      words: room.words, deadline: room.deadline, duration: room.duration, goal: room.goal,
       players: order(room).map((p) => ({ id: p.id, name: p.name, score: p.score, connected: connected(p), submitted: room.phase === "guessing" && room.guesses.has(p.id) })),
-      result: room.phase === "reveal" ? room.result : null,
+      result: room.phase === "reveal" || room.phase === "finished" ? room.result : null,
       myGuess: room.phase === "guessing" ? room.guesses.get(me) || null : null,
     },
   };
@@ -301,6 +308,9 @@ function handle(ws, m) {
     case "setDuration":
       if (room.phase === "lobby" && DURATIONS.includes(m.sec)) room.duration = m.sec;
       break;
+    case "setGoal":
+      if (room.phase === "lobby" && GOALS.includes(m.pts)) room.goal = m.pts;
+      break;
     case "start":
       if (room.phase !== "lobby") return;
       if (order(room).filter(connected).length < 2) return err(ws, "2人以上でスタートできます");
@@ -349,7 +359,8 @@ function handle(ws, m) {
       return;
     case "next":
       if (room.phase !== "reveal") return;
-      nextRound(room);
+      if (room.result && room.result.winners.length) { clearTimeout(room.timer); room.phase = "finished"; }
+      else nextRound(room);
       break;
     case "skip":
       // 親が接続していないまま並べる段階で止まったとき用
