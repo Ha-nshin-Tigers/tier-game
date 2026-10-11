@@ -15,6 +15,7 @@ const PTS_EXACT = 3, PTS_NEAR = 1, PTS_PERFECT = 5;
 const DURATIONS = [30, 60, 90, 120];
 const GOALS = [0, 20, 30, 50, 80]; // 0 = 終了点なし(好きなだけ遊ぶ)
 const MAX_PLAYERS = 12, MAX_ROOMS = 500, MAX_TOPICS = 300;
+const WORD_MAX = 24; // ワード1つの最大文字数
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 
 const BANK = {
@@ -370,13 +371,27 @@ function handle(ws, m) {
     return broadcastTopics();
   }
 
+  // 追加お題のワードを書き換える(作った人かホスト)
+  if (m.t === "updateTopic") {
+    if (!ws.pid || !ws.room) return err(ws, "部屋に入ってから操作してください");
+    const t = topics.find((x) => x.name === m.name);
+    if (!t) return err(ws, "そのお題は見つかりません");
+    if (t.by !== ws.pid && hostOf(ws.room) !== ws.pid) return err(ws, "書き換えられるのは作った人かホストだけです");
+    const words = [];
+    if (Array.isArray(m.words)) for (const w of m.words.map((x) => cleanStr(x, WORD_MAX))) if (w && !words.includes(w)) words.push(w);
+    if (words.length < 5 || words.length > 30) return err(ws, "ワードは5〜30個にしてください");
+    t.words = words;
+    saveTopics();
+    return broadcastTopics();
+  }
+
   // お題の追加・削除(部屋に入っていれば誰でも)
   if (m.t === "addTopic" || m.t === "delTopic") {
     if (!ws.pid) return err(ws, "部屋に入ってから操作してください");
     if (m.t === "addTopic") {
       const name = cleanStr(m.name, 20);
       const words = [];
-      if (Array.isArray(m.words)) for (const w of m.words.map((x) => cleanStr(x, 16))) if (w && !words.includes(w)) words.push(w);
+      if (Array.isArray(m.words)) for (const w of m.words.map((x) => cleanStr(x, WORD_MAX))) if (w && !words.includes(w)) words.push(w);
       if (!name) return err(ws, "お題の名前を入れてください");
       if (name in allTopics()) return err(ws, "同じ名前のお題がもうあります");
       if (words.length < 5) return err(ws, "ワードは5個以上必要です");

@@ -227,7 +227,7 @@ button.tiny { padding: 3px 9px; font-size: 12px; }
       <label class="field">お題<input type="text" id="tName" maxlength="20" placeholder="例: 行ってみたい国" autocomplete="off"></label>
       <label class="field">ジャンル(候補から選ぶか、新しく入力)<input type="text" id="tGenre" maxlength="12" list="genreList" placeholder="例: 日常" autocomplete="off"></label>
       <datalist id="genreList"></datalist>
-      <label class="field">ワード(5〜30個。改行かカンマで区切る)<textarea id="tWords" rows="4" placeholder="ハワイ、フランス、エジプト、アイスランド、ペルー"></textarea></label>
+      <label class="field">ワード(5〜30個・1つ24文字まで。1行に1つずつ書くと「、」入りのワードも使えます。1行に並べるときはカンマか「、」で区切る)<textarea id="tWords" rows="4" placeholder="ハワイ、フランス、エジプト、アイスランド、ペルー"></textarea></label>
       <div class="btns"><button class="primary" type="submit" id="tSave">お題を保存</button><span class="status" id="tMsg" aria-live="polite"></span></div>
     </form>
   </section>
@@ -811,7 +811,9 @@ function genreOfTopic(name) {
 }
 function parseWords(s) {
   const out = [];
-  for (const w of s.split(/[,、，\n]/).map((x) => x.trim().slice(0, 16))) if (w && !out.includes(w)) out.push(w);
+  // 改行があれば改行だけで区切る(ワードの中の「、」を守るため)。1行ならカンマ・読点で区切る
+  const parts = s.includes("\n") ? s.split(/\n/) : s.split(/[,、，]/);
+  for (const w of parts.map((x) => x.trim().slice(0, 24))) if (w && !out.includes(w)) out.push(w);
   return out;
 }
 $("tWords").addEventListener("input", () => {
