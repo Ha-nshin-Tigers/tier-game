@@ -33,6 +33,14 @@ const BANK = {
   "好きな女の子の髪型": ["ショートヘア","ツインテール","ハーフアップ","ポニーテール","ロングヘア","ウルフカット","お団子"],
 };
 
+// 標準お題のジャンル(載っていないものは「その他」)
+const GENRE = {
+  "好きな食べ物": "日常", "理想の休日": "日常", "人生で大事なもの": "日常", "好きな季節イベント": "日常", "飼ってみたい動物": "日常",
+  "恋人に求める条件": "恋愛", "恋人にされたら冷める行動": "恋愛", "恋人にされてうれしいこと": "恋愛", "許せる異性との関わり": "恋愛",
+  "理想の告白": "恋愛", "好きな女の子の服装": "恋愛", "好きな女の子の髪型": "恋愛",
+  "アニメの世界に転生": "アニメ・エンタメ",
+};
+
 // ---------------------------------------------------------------
 // お題の保存(Upstash Redis があればそこへ、無ければローカルファイル)
 // ---------------------------------------------------------------
@@ -81,6 +89,11 @@ function allTopics() {
   const o = { ...BANK };
   for (const t of topics) if (!(t.name in o)) o[t.name] = t.words;
   return o;
+}
+function genreOf(name) {
+  if (name in BANK) return GENRE[name] || "その他";
+  const t = topics.find((x) => x.name === name);
+  return (t && t.genre) || "その他";
 }
 
 // ---------------------------------------------------------------
@@ -138,6 +151,8 @@ function newRoom(code) {
 }
 const connected = (p) => p && p.sockets.size > 0;
 const order = (room) => [...room.players.values()].sort((a, b) => a.joinedAt - b.joinedAt);
+// ゲームのホスト(親とは別): いちばん早く入った、接続中の人。抜けたら次の人に自動で移る
+const hostOf = (room) => (order(room).find(connected) || {}).id || null;
 
 function startRound(room, hostId) {
   clearTimeout(room.timer);
@@ -251,7 +266,7 @@ function view(room, me) {
     t: "state", now: Date.now(), me,
     room: {
       code: room.code, phase: room.phase, round: room.round, hostId: room.hostId, topic: room.topic,
-      words: room.words, deadline: room.deadline, duration: room.duration, goal: room.goal,
+      words: room.words, deadline: room.deadline, duration: room.duration, goal: room.goal, gameHostId: hostOf(room),
       players: order(room).map((p) => ({ id: p.id, name: p.name, score: p.score, connected: connected(p), submitted: room.phase === "guessing" && room.guesses.has(p.id) })),
       result: room.phase === "reveal" || room.phase === "finished" ? room.result : null,
       awards: room.phase === "finished" ? room.awards : null,
@@ -264,7 +279,7 @@ function broadcast(room) {
   for (const p of room.players.values()) for (const ws of p.sockets) send(ws, view(room, p.id));
 }
 function topicsMsg(ws) {
-  return { t: "topics", builtin: BANK, list: topics.map((t) => ({ id: t.id, name: t.name, words: t.words, byName: t.byName, mine: !!ws.pid && t.by === ws.pid })) };
+  return { t: "topics", builtin: BANK, genres: GENRE, list: topics.map((t) => ({ id: t.id, name: t.name, words: t.words, genre: t.genre || "その他", byName: t.byName, mine: !!ws.pid && t.by === ws.pid })) };
 }
 function broadcastTopics() { for (const ws of wss.clients) send(ws, topicsMsg(ws)); }
 const err = (ws, msg) => send(ws, { t: "error", msg });
@@ -339,7 +354,8 @@ function handle(ws, m) {
       if (words.length > 30) return err(ws, "ワードは30個までです");
       if (topics.length >= MAX_TOPICS) return err(ws, `お題は${MAX_TOPICS}件までです。使わないものを削除してください`);
       const me = ws.room && ws.room.players.get(ws.pid);
-      topics.push({ id: rid(10), name, words, by: ws.pid, byName: me ? me.name : "", at: Date.now() });
+      const genre = cleanStr(m.genre, 12) || "その他";
+      topics.push({ id: rid(10), name, words, genre, by: ws.pid, byName: me ? me.name : "", at: Date.now() });
       send(ws, { t: "info", msg: `「${name}」を保存しました` });
     } else {
       const i = topics.findIndex((t) => t.id === m.id);
@@ -354,7 +370,11 @@ function handle(ws, m) {
   const room = ws.room;
   const p = room && room.players.get(ws.pid);
   if (!p) return err(ws, "部屋に入っていません");
-  const isHost = p.id === room.hostId;
+  const isHost = p.id === room.hostId;   // そのラウンドの親
+  const isGM = p.id === hostOf(room);    // ゲームのホスト
+  // 設定・進行の管理系はホストだけ
+  if (["setDuration", "setGoal", "toggleTopic", "toggleAll", "toggleGenre", "reset", "endGame"].includes(m.t) && !isGM)
+    return err(ws, "この操作はホストだけができます");
 
   switch (m.t) {
     case "leave":
@@ -367,30 +387,29 @@ function handle(ws, m) {
     case "setGoal":
       if (room.phase === "lobby" && GOALS.includes(m.pts)) room.goal = m.pts;
       break;
-    case "start":
+    case "start": {
       if (room.phase !== "lobby") return;
-      if (order(room).filter(connected).length < 2) return err(ws, "2人以上でスタートできます");
-      startRound(room, p.id);
+      if (!isGM) return err(ws, "ゲームを始められるのはホストだけです");
+      const live = order(room).filter(connected);
+      if (live.length < 2) return err(ws, "2人以上でスタートできます");
+      // 最初の親はランダム。以降は参加順に交代
+      startRound(room, live[Math.floor(Math.random() * live.length)].id);
       break;
-    case "pickTopic":
-      if (room.phase !== "ranking" || !isHost || !(m.name in allTopics())) return;
-      room.topic = m.name; room.words = pickWords(m.name);
-      break;
+    }
     case "reroll":
+      // 親の「お題をランダムで変える」: 別のお題とワードを引き直す
       if (room.phase !== "ranking" || !isHost) return;
-      if (!(room.topic in allTopics())) room.topic = randomTopic(null, room.off);
+      room.topic = randomTopic(room.topic, room.off);
       room.words = pickWords(room.topic);
       break;
-    case "editTopic":
-      if (room.phase !== "ranking" || !isHost) return;
-      room.topic = cleanStr(m.text, 30);
-      break;
-    case "editWord": {
-      if (room.phase !== "ranking" || !isHost) return;
-      const i = m.i, w = cleanStr(m.w, 16);
-      if (!Number.isInteger(i) || i < 0 || i >= room.words.length || !w || room.words.includes(w)) break;
-      room.words = room.words.map((x, k) => (k === i ? w : x));
-      break;
+    case "kick": {
+      // ホストがほかのプレイヤーを退出させる
+      if (!isGM || m.id === p.id) return;
+      const target = room.players.get(m.id);
+      if (!target) return;
+      for (const s of target.sockets) { send(s, { t: "kicked" }); s.room = null; }
+      target.sockets.clear();
+      return removePlayer(room, target.id);
     }
     case "submitAnswer": {
       if (room.phase !== "ranking" || !isHost) return;
@@ -419,6 +438,9 @@ function handle(ws, m) {
     }
     case "toggleAll":
       room.off = m.on ? new Set() : new Set(Object.keys(allTopics()));
+      break;
+    case "toggleGenre":
+      for (const name of Object.keys(allTopics())) if (genreOf(name) === m.genre) { if (m.on) room.off.delete(name); else room.off.add(name); }
       break;
     case "unguess":
       // 「変更する」: 締切前なら確定を取り消す
