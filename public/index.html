@@ -165,6 +165,8 @@ textarea { resize: vertical; }
 .ghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; border-bottom: 2px solid var(--fg); padding-bottom: 4px; }
 .ghead h3 { font-family: var(--display); font-weight: 400; font-size: 16px; margin: 0; }
 button.tiny { padding: 3px 9px; font-size: 12px; }
+.gform { display: flex; gap: 6px; align-items: center; }
+.gform input { font-size: 14px; padding: 4px 8px; }
 .pname .tag.gm { color: var(--accent); }
 .players li { grid-template-columns: 22px minmax(0, 1fr) auto auto; }
 .kick { grid-column: 2 / -1; justify-self: start; }
@@ -494,7 +496,7 @@ function render() {
   local.mainStale = false;
   renderMain();
 }
-document.addEventListener("focusout", () => setTimeout(() => { if (local.mainStale) render(); }, 0));
+document.addEventListener("focusout", () => setTimeout(() => { if (local.mainStale || local.topicsStale) render(); }, 0));
 
 function renderMeta() {
   const m = $("meta"); m.replaceChildren();
@@ -745,8 +747,14 @@ function compareEl(rd, view = "order") {
 
 // ---- お題コレクション ----
 let pendingTopic = false;
+let editingGenre = null; // ジャンル変更の入力欄を開いているお題名
 function renderTopics() {
-  const box = $("topicList"); box.replaceChildren();
+  const box = $("topicList");
+  // ジャンル入力中に作り直すと入力が消えるので、その間は描き直さない
+  const ae = document.activeElement;
+  if (ae && box.contains(ae) && ae.tagName === "INPUT") { local.topicsStale = true; return; }
+  local.topicsStale = false;
+  box.replaceChildren();
   const off = new Set(S?.off || []);
   const isGM = S?.gameHostId === me;
   const names = allTopicNames();
@@ -773,9 +781,23 @@ function renderTopics() {
         h("button", { type: "button", class: "toggle" + (isOn ? " on" : ""), "aria-pressed": isOn ? "true" : "false", disabled: !isGM,
           onclick: () => send({ t: "toggleTopic", name: x.name, on: !isOn }) }, isOn ? "出題する" : "おやすみ中"));
       if (x.t?.mine) row.append(twoStep("削除", () => send({ t: "delTopic", id: x.t.id }), "ghost danger tiny"));
+      // ジャンル変更: 標準お題はホスト、追加お題は作った人かホスト
+      const canGenre = isGM || x.t?.mine;
+      let genreForm = null;
+      if (canGenre && editingGenre === x.name) {
+        const inp = h("input", { type: "text", id: "g-" + x.name, value: x.genre, maxlength: 12, list: "genreList", "aria-label": "新しいジャンル" });
+        const save = () => { send({ t: "setGenre", name: x.name, genre: inp.value.trim() }); editingGenre = null; renderTopics(); };
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } if (e.key === "Escape") { editingGenre = null; renderTopics(); } });
+        genreForm = h("div", { class: "gform" }, inp,
+          h("button", { type: "button", class: "primary tiny", onclick: save }, "保存"),
+          h("button", { type: "button", class: "ghost tiny", onclick: () => { editingGenre = null; renderTopics(); } }, "やめる"));
+        setTimeout(() => inp.focus(), 0);
+      } else if (canGenre) {
+        row.append(h("button", { type: "button", class: "ghost tiny", onclick: () => { editingGenre = x.name; renderTopics(); } }, "ジャンル変更"));
+      }
       ul.append(h("li", { class: isOn ? "" : "off" },
         h("div", { class: "thead" }, h("span", { class: "tname" }, x.name), h("span", { class: "tby" }, x.by)),
-        h("div", { class: "twords" }, `${x.words.length}語: ` + x.words.join("・")), row));
+        h("div", { class: "twords" }, `${x.words.length}語: ` + x.words.join("・")), row, genreForm));
     }
     const head = h("div", { class: "ghead" }, h("h3", {}, genre), h("span", { class: "muted small" }, `出題 ${onN}/${list.length}`));
     if (isGM) head.append(h("button", { type: "button", class: "ghost tiny", onclick: () => send({ t: "toggleGenre", genre, on: onN < list.length }) },

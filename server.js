@@ -48,7 +48,8 @@ const UP_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UP_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const TOPIC_KEY = "tier-game:topics";
 const DATA_FILE = path.join(__dirname, "data", "topics.json");
-let topics = []; // {id, name, words, by(pid), byName, at}
+let topics = []; // {id, name, words, genre, by(pid), byName, at}
+let genreOverride = {}; // 標準お題のジャンルを後から変えたもの {お題名: ジャンル}
 
 async function upstash(cmd) {
   const r = await fetch(UP_URL, {
@@ -60,23 +61,28 @@ async function upstash(cmd) {
   return (await r.json()).result;
 }
 async function loadTopics() {
+  let data = null;
   try {
     if (UP_URL && UP_TOKEN) {
       const s = await upstash(["GET", TOPIC_KEY]);
-      topics = s ? JSON.parse(s) : [];
+      data = s ? JSON.parse(s) : null;
     } else if (fs.existsSync(DATA_FILE)) {
-      topics = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+      data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
     }
   } catch (e) {
     console.error("お題の読み込みに失敗:", e.message);
-    topics = [];
   }
-  if (!Array.isArray(topics)) topics = [];
+  // 旧形式(お題の配列だけ)と新形式({topics, genres})の両方を読む
+  if (Array.isArray(data)) topics = data;
+  else if (data && typeof data === "object") {
+    topics = Array.isArray(data.topics) ? data.topics : [];
+    genreOverride = data.genres && typeof data.genres === "object" ? data.genres : {};
+  }
   console.log(`お題の保存先: ${UP_URL && UP_TOKEN ? "Upstash Redis" : "ローカルファイル(再起動で消える場合あり)"} / ${topics.length}件`);
 }
 let saveChain = Promise.resolve();
 function saveTopics() {
-  const body = JSON.stringify(topics);
+  const body = JSON.stringify({ topics, genres: genreOverride });
   saveChain = saveChain.then(async () => {
     if (UP_URL && UP_TOKEN) await upstash(["SET", TOPIC_KEY, body]);
     else {
@@ -90,8 +96,13 @@ function allTopics() {
   for (const t of topics) if (!(t.name in o)) o[t.name] = t.words;
   return o;
 }
+function builtinGenres() {
+  const o = {};
+  for (const name of Object.keys(BANK)) o[name] = genreOverride[name] || GENRE[name] || "その他";
+  return o;
+}
 function genreOf(name) {
-  if (name in BANK) return GENRE[name] || "その他";
+  if (name in BANK) return builtinGenres()[name];
   const t = topics.find((x) => x.name === name);
   return (t && t.genre) || "その他";
 }
@@ -279,7 +290,7 @@ function broadcast(room) {
   for (const p of room.players.values()) for (const ws of p.sockets) send(ws, view(room, p.id));
 }
 function topicsMsg(ws) {
-  return { t: "topics", builtin: BANK, genres: GENRE, list: topics.map((t) => ({ id: t.id, name: t.name, words: t.words, genre: t.genre || "その他", byName: t.byName, mine: !!ws.pid && t.by === ws.pid })) };
+  return { t: "topics", builtin: BANK, genres: builtinGenres(), list: topics.map((t) => ({ id: t.id, name: t.name, words: t.words, genre: t.genre || "その他", byName: t.byName, mine: !!ws.pid && t.by === ws.pid })) };
 }
 function broadcastTopics() { for (const ws of wss.clients) send(ws, topicsMsg(ws)); }
 const err = (ws, msg) => send(ws, { t: "error", msg });
@@ -339,6 +350,24 @@ function handle(ws, m) {
     send(ws, { t: "joined", room: code });
     send(ws, topicsMsg(ws));
     return broadcast(room);
+  }
+
+  // お題のジャンル変更: 標準お題はホスト、追加お題は作った人かホスト
+  if (m.t === "setGenre") {
+    if (!ws.pid || !ws.room) return err(ws, "部屋に入ってから操作してください");
+    const isGM = hostOf(ws.room) === ws.pid;
+    const genre = cleanStr(m.genre, 12) || "その他";
+    if (m.name in BANK) {
+      if (!isGM) return err(ws, "標準のお題のジャンルはホストだけが変えられます");
+      genreOverride[m.name] = genre;
+    } else {
+      const t = topics.find((x) => x.name === m.name);
+      if (!t) return;
+      if (t.by !== ws.pid && !isGM) return err(ws, "ジャンルを変えられるのは作った人かホストだけです");
+      t.genre = genre;
+    }
+    saveTopics();
+    return broadcastTopics();
   }
 
   // お題の追加・削除(部屋に入っていれば誰でも)
