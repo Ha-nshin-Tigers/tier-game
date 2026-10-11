@@ -120,6 +120,19 @@ tfoot td { font-weight: 700; border-bottom: none; font-variant-numeric: tabular-
 .final li { display: grid; grid-template-columns: 3.5em 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 6px; font-size: 16px; }
 .final li.first { border: 2px solid var(--fg); background: color-mix(in srgb, var(--tS) 35%, var(--surface)); }
 .final .place { font-family: var(--display); }
+.confirmed { font-family: var(--display); font-size: 20px; color: var(--good); }
+button.big { font-size: 16px; padding: 12px 22px; }
+.award { border: 2px solid var(--fg); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.aw-title { font-size: 12px; letter-spacing: .12em; font-weight: 700; color: var(--muted); }
+.aw-name { font-family: var(--display); font-size: clamp(22px, 5vw, 30px); line-height: 1.25; overflow-wrap: anywhere; }
+.match { display: grid; grid-template-columns: 3em minmax(0, 1fr) minmax(60px, 120px) 3.5em; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.match.top .pair { font-family: var(--display); font-size: 18px; }
+.match .place { font-family: var(--display); }
+.match .pair { overflow-wrap: anywhere; font-weight: 700; }
+.match .amp { color: var(--muted); font-weight: 400; }
+.match .meter { height: 10px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.match .fill { display: block; height: 100%; background: var(--tS); }
+.match .pct { font-family: var(--display); text-align: right; font-variant-numeric: tabular-nums; }
 .invite input { font-size: 13px; }
 
 /* 入力・ボタン */
@@ -144,7 +157,11 @@ textarea { resize: vertical; }
 .tlist .tname { font-weight: 700; overflow-wrap: anywhere; }
 .tlist .twords { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .tlist .tby { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.tlist button { padding: 2px 8px; font-size: 12px; justify-self: start; }
+.tlist button { padding: 4px 10px; font-size: 12px; }
+.tlist li.off { border-style: dashed; opacity: .55; }
+.tlist li.off:hover, .tlist li.off:focus-within { opacity: .85; }
+.toggle { border-color: var(--line); color: var(--muted); font-weight: 500; }
+.toggle.on { background: var(--tB); border-color: var(--fg); color: var(--tier-ink); font-weight: 700; }
 .tform { display: grid; gap: 10px; border-top: 1.5px solid var(--line); padding-top: 14px; }
 @media (max-width: 520px) {
   .row { grid-template-columns: 48px 1fr; min-height: 58px; }
@@ -190,7 +207,8 @@ textarea { resize: vertical; }
   </div>
   <section class="panel" id="topicsPanel">
     <div class="top"><h2>お題コレクション</h2><span class="status" id="topicCount"></span></div>
-    <p class="muted small">ここにあるお題が、ランダム出題と「お題を選び直す」に使われます。みんなが保存したお題は、ほかの部屋でも使えます。</p>
+    <p class="muted small">「出題する」のお題だけがランダムに出ます。「おやすみ中」にしたお題は次のラウンドから出ません(この部屋だけの設定です)。みんなが保存したお題は、ほかの部屋でも使えます。</p>
+    <div class="btns" id="topicBulk"></div>
     <ul class="tlist" id="topicList"></ul>
     <form id="topicForm" class="tform">
       <h2>お題を追加</h2>
@@ -315,18 +333,8 @@ function moveWord(arr, w, target) {
   if (occ && occ !== w && from) a[from] = occ;
   return a;
 }
-function setArr(a) {
-  local.arr = a;
-  if (S.phase === "guessing" && S.hostId !== me) {
-    clearTimeout(local.sendT);
-    local.sendT = setTimeout(() => {
-      if (!complete(local.arr, S.words)) return;
-      const k = JSON.stringify(local.arr);
-      if (k === local.lastSent) return;
-      local.lastSent = k; send({ t: "guess", arr: local.arr });
-    }, 400);
-  }
-}
+// 予想は「確定する」を押したときだけ送る
+function setArr(a) { local.arr = a; }
 function syncLocalArr() {
   const base = `${S.round}|${S.phase === "ranking" ? "rank" : "guess"}`;
   const key = `${base}|${S.words.join("/")}`;
@@ -446,9 +454,9 @@ function renderSide() {
   side.append(btns);
   if (flashMsg) side.append(h("p", { class: "status" + (flashWarn ? " warn" : "") }, flashMsg));
 }
-function twoStep(label, action) {
+function twoStep(label, action, cls = "ghost danger") {
   let armed = false, t;
-  const b = h("button", { class: "ghost danger", type: "button" }, label);
+  const b = h("button", { class: cls, type: "button" }, label);
   b.onclick = () => {
     if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; }
     clearTimeout(t); action();
@@ -480,7 +488,7 @@ function renderMain() {
     return;
   }
 
-  main.append(h("div", { class: "topic" }, "お題: " + (S.topic || "(未設定)")));
+  if (P !== "finished") main.append(h("div", { class: "topic" }, "お題: " + (S.topic || "(未設定)")));
 
   if (P === "ranking") {
     if (!isHost) {
@@ -502,7 +510,8 @@ function renderMain() {
       h("div", { class: "field" }, "ワード(書き換えOK・重複不可)", words),
       h("div", { class: "btns" },
         h("select", { id: "cat", "aria-label": "お題を選ぶ", onchange: (e) => { send({ t: "pickTopic", name: e.target.value }); e.target.blur(); } },
-          h("option", { value: "", selected: true, disabled: true }, "お題を選び直す"), ...allTopicNames().map((k) => h("option", { value: k }, k))),
+          h("option", { value: "", selected: true, disabled: true }, "お題を選び直す"),
+          ...allTopicNames().filter((k) => !(S.off || []).includes(k)).map((k) => h("option", { value: k }, k))),
         h("button", { class: "ghost", type: "button", onclick: () => send({ t: "reroll" }) }, "ワードを引き直す")),
       boardEl(S.words, local.arr, true),
       h("div", { class: "btns" }, h("button", { class: "primary", type: "button", disabled: !complete(local.arr, S.words),
@@ -523,9 +532,21 @@ function renderMain() {
       if (Object.keys(local.arr).length) main.append(boardEl(S.words, local.arr));
       return;
     }
-    main.append(h("p", {}, `${nameOf(S.hostId)} さんはどう並べた？ 5つ全部置くと自動で提出されます(締切まで何度でも変更OK)。`),
+    if (mine) {
+      // 確定済み: 自分の予想を固定表示。締切前なら取り消して並べ直せる
+      main.append(h("div", { class: "confirmed" }, "確定しました"),
+        boardEl(S.words, S.myGuess || local.arr),
+        h("div", { class: "btns" },
+          h("button", { class: "ghost", type: "button", onclick: () => { if (S.myGuess) local.arr = { ...S.myGuess }; send({ t: "unguess" }); } }, "変更する"),
+          h("span", { class: "muted small" }, `全員が確定するか時間切れで答え合わせになります(確定 ${doneN}/${gs.length})`)));
+      return;
+    }
+    const ready = complete(local.arr, S.words);
+    main.append(h("p", {}, `${nameOf(S.hostId)} さんはどう並べた？ 1位〜5位に並べたら「確定する」を押してください。`),
       boardEl(S.words, local.arr, true),
-      h("p", { class: "status" }, mine ? "提出済み。変更すると自動で更新されます。" : complete(local.arr, S.words) ? "提出中…" : "まだ未提出です。"));
+      h("div", { class: "btns" },
+        h("button", { class: "primary big", type: "button", disabled: !ready, onclick: () => send({ t: "guess", arr: local.arr }) }, "この順番で確定する"),
+        h("span", { class: "status" + (remaining() <= 10 ? " warn" : "") }, ready ? "時間切れまでに確定しないと得点になりません" : `あと ${5 - Object.keys(local.arr).length} つ置いてください`)));
     return;
   }
 
@@ -548,7 +569,9 @@ function renderMain() {
       main.append(h("div", { class: "winner" }, rd.winners.map((w) => w.name).join("・") + " さんが " + S.goal + "点に到達！"),
         h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "最終結果を見る")));
     } else {
-      main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "次のラウンドへ")));
+      main.append(h("div", { class: "btns" },
+        h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, "次のラウンドへ"),
+        twoStep("ゲームを終えて結果発表", () => send({ t: "endGame" }), "ghost")));
     }
     return;
   }
@@ -565,7 +588,34 @@ function renderMain() {
       ol.append(h("li", { class: place === 1 ? "first" : "" }, h("span", { class: "place" }, place + "位"),
         h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : "")), h("span", { class: "pts" }, p.score + "点")));
     });
-    main.append(ol, h("div", { class: "btns" },
+    main.append(ol);
+    const aw = S.awards;
+    if (aw) {
+      // 名探偵賞
+      const det = h("section", { class: "award" }, h("div", { class: "aw-title" }, "名探偵賞"));
+      if (aw.detectives.length) {
+        det.append(h("div", { class: "aw-name" }, aw.detectives.map((d) => d.name).join("・") + " さん"),
+          h("div", { class: "muted small" }, `ぴったり ${aw.detectives[0].exact} 個(的中率 ${aw.detectives[0].rate}%)`));
+      } else det.append(h("div", { class: "muted" }, "今回はぴったり当てた人がいませんでした"));
+      if (aw.stats.length > 1) {
+        const tb = h("tbody");
+        aw.stats.forEach((s) => tb.append(h("tr", {}, h("td", {}, s.name), h("td", {}, s.exact + "個"), h("td", {}, s.rate + "%"), h("td", { class: "muted" }, s.tries + "回"))));
+        det.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "名前"), h("th", {}, "ぴったり"), h("th", {}, "的中率"), h("th", {}, "予想した回数"))), tb)));
+      }
+      main.append(det);
+      // マッチ度ランキング
+      const mt = h("section", { class: "award" }, h("div", { class: "aw-title" }, "マッチ度ランキング"),
+        h("div", { class: "muted small" }, "親の並びと、それを予想した人の並びがどれだけ近かったか(お互いが親になった回は両方を平均)"));
+      if (!aw.matches.length) mt.append(h("div", { class: "muted" }, "データがありません"));
+      let mPlace = 0, mPrev = null;
+      aw.matches.forEach((m, i) => { if (m.match !== mPrev) { mPlace = i + 1; mPrev = m.match; } mt.append(h("div", { class: "match" + (mPlace === 1 ? " top" : "") },
+        h("span", { class: "place" }, mPlace + "位"),
+        h("span", { class: "pair" }, m.names[0], h("span", { class: "amp" }, " × "), m.names[1]),
+        h("span", { class: "meter" }, h("span", { class: "fill", style: `width:${m.match}%` })),
+        h("span", { class: "pct" }, m.match + "%"))); });
+      main.append(mt);
+    }
+    main.append(h("div", { class: "btns" },
       h("button", { class: "primary", type: "button", onclick: () => send({ t: "reset" }) }, "もう一度遊ぶ(得点をリセット)"),
       h("span", { class: "muted small" }, "待機画面に戻ります。同じメンバーのまま始められます")));
   }
@@ -615,16 +665,28 @@ function compareEl(rd, view = "order") {
 let pendingTopic = false;
 function renderTopics() {
   const ul = $("topicList"); ul.replaceChildren();
-  $("topicCount").textContent = `標準 ${Object.keys(builtin).length} 件 / みんなのお題 ${topics.length} 件`;
-  for (const [name, words] of Object.entries(builtin))
-    ul.append(h("li", {}, h("div", { class: "thead" }, h("span", { class: "tname" }, name), h("span", { class: "tby" }, "標準")),
-      h("div", { class: "twords" }, words.join("・"))));
-  for (const t of topics) {
-    const li = h("li", {}, h("div", { class: "thead" }, h("span", { class: "tname" }, t.name), h("span", { class: "tby" }, t.byName ? "作: " + t.byName : "")),
-      h("div", { class: "twords" }, `${t.words.length}語: ` + t.words.join("・")));
-    if (t.mine) li.append(twoStep("削除", () => send({ t: "delTopic", id: t.id })));
+  const off = new Set(S?.off || []);
+  const names = allTopicNames();
+  const onCount = names.filter((n) => !off.has(n)).length;
+  $("topicCount").textContent = `出題する ${onCount} 件 / 全 ${names.length} 件`;
+  $("topicBulk").replaceChildren(
+    h("button", { type: "button", class: "ghost", onclick: () => send({ t: "toggleAll", on: true }) }, "全部出題する"),
+    h("button", { type: "button", class: "ghost", onclick: () => send({ t: "toggleAll", on: false }) }, "全部おやすみにする"));
+  const item = (name, words, by, del) => {
+    const isOn = !off.has(name);
+    const li = h("li", { class: isOn ? "" : "off" },
+      h("div", { class: "thead" }, h("span", { class: "tname" }, name), h("span", { class: "tby" }, by)),
+      h("div", { class: "twords" }, `${words.length}語: ` + words.join("・")));
+    const row = h("div", { class: "btns" },
+      h("button", { type: "button", class: "toggle" + (isOn ? " on" : ""), "aria-pressed": isOn ? "true" : "false",
+        onclick: () => send({ t: "toggleTopic", name, on: !isOn }) }, isOn ? "出題する" : "おやすみ中"));
+    if (del) row.append(del);
+    li.append(row);
     ul.append(li);
-  }
+  };
+  for (const [name, words] of Object.entries(builtin)) item(name, words, "標準");
+  for (const t of topics) if (!(t.name in builtin))
+    item(t.name, t.words, t.byName ? "作: " + t.byName : "", t.mine ? twoStep("削除", () => send({ t: "delTopic", id: t.id })) : null);
 }
 function parseWords(s) {
   const out = [];

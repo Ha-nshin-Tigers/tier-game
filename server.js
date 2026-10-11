@@ -93,8 +93,12 @@ const cleanStr = (s, max) => typeof s === "string" ? s.replace(BAD_CHARS, "").tr
 const tierOf = (arr, w) => TIERS.find((t) => arr[t] === w) || null;
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function pickWords(topic) { return shuffle([...(allTopics()[topic] || [])]).slice(0, 5); }
-function randomTopic(except) {
-  const ks = Object.keys(allTopics()).filter((k) => k !== except);
+// off: その部屋で「おやすみ中」にしたお題名の Set。全部おやすみなら全お題から選ぶ
+function randomTopic(except, off) {
+  const all = Object.keys(allTopics());
+  const on = off ? all.filter((k) => !off.has(k)) : all;
+  const pool = on.length ? on : all;
+  const ks = pool.length > 1 ? pool.filter((k) => k !== except) : pool;
   return ks[Math.floor(Math.random() * ks.length)];
 }
 // 5つのワードを S〜D に1つずつ置いた並びかを検証して、きれいな形で返す
@@ -128,6 +132,8 @@ function newRoom(code) {
   return {
     code, phase: "lobby", round: 0, hostId: null, topic: "", words: [], deadline: 0, duration: 60, goal: 0,
     players: new Map(), answer: null, guesses: new Map(), result: null, timer: null, emptySince: null,
+    off: new Set(), // 出題しない(おやすみ中)お題名
+    history: [], awards: null, // history: 答え合わせ済みラウンドの {hostId, answer, guesses}
   };
 }
 const connected = (p) => p && p.sockets.size > 0;
@@ -137,7 +143,7 @@ function startRound(room, hostId) {
   clearTimeout(room.timer);
   room.round += 1;
   room.hostId = hostId;
-  room.topic = randomTopic(room.topic);
+  room.topic = randomTopic(room.topic, room.off);
   room.words = pickWords(room.topic);
   room.answer = null;
   room.guesses.clear();
@@ -180,8 +186,56 @@ function reveal(room) {
     if (top >= room.goal) winners = order(room).filter((p) => p.score === top).map((p) => ({ id: p.id, name: p.name }));
   }
   room.result = { round: room.round, topic: room.topic, words: room.words, answer: room.answer, hostId: room.hostId, hostName: host ? host.name : "(退出した親)", rows, winners };
+  room.history.push({ hostId: room.hostId, answer: room.answer, guesses: rows.map((r) => ({ id: r.id, guess: r.guess })) });
   room.phase = "reveal";
   broadcast(room);
+}
+
+// ---------------------------------------------------------------
+// 表彰(名探偵賞・マッチ度)
+// ---------------------------------------------------------------
+// 2つの並びの近さ(0〜100%)。ワードごとの順位差が 0 なら4点、4ずれで0点として合計/20
+function similarity(a, b) {
+  let s = 0;
+  for (const t of TIERS) {
+    const w = a[t], j = TIERS.indexOf(tierOf(b, w));
+    if (j >= 0) s += 4 - Math.abs(TIERS.indexOf(t) - j);
+  }
+  return Math.round((s / 20) * 100);
+}
+function computeAwards(room) {
+  const nameOf = (id) => (room.players.get(id) || {}).name || "退出した人";
+  // 名探偵賞: ぴったり当てた数の合計が最多の人
+  const stat = {};
+  for (const h of room.history) for (const g of h.guesses) {
+    const s = (stat[g.id] ||= { exact: 0, tries: 0 });
+    s.exact += TIERS.filter((t) => g.guess[t] === h.answer[t]).length;
+    s.tries += 1;
+  }
+  const stats = Object.entries(stat).map(([id, s]) => ({ id, name: nameOf(id), exact: s.exact, tries: s.tries, rate: Math.round((s.exact / (s.tries * 5)) * 100) }))
+    .sort((a, b) => b.exact - a.exact || b.rate - a.rate);
+  const best = stats.length ? stats[0].exact : 0;
+  const detectives = best > 0 ? stats.filter((s) => s.exact === best) : [];
+  // マッチ度: 親とその並びを予想した人の組ごとに、両方向の結果を平均
+  const pairs = new Map();
+  for (const h of room.history) for (const g of h.guesses) {
+    const key = [h.hostId, g.id].sort().join("|");
+    const p = pairs.get(key) || { a: key.split("|")[0], b: key.split("|")[1], sum: 0, n: 0 };
+    p.sum += similarity(h.answer, g.guess); p.n += 1;
+    pairs.set(key, p);
+  }
+  const matches = [...pairs.values()].map((p) => ({ names: [nameOf(p.a), nameOf(p.b)], match: Math.round(p.sum / p.n), rounds: p.n }))
+    .sort((x, y) => y.match - x.match || y.rounds - x.rounds).slice(0, 5);
+  return { detectives, stats, matches };
+}
+function finish(room) {
+  clearTimeout(room.timer);
+  if (room.result && !room.result.winners.length) {
+    const top = Math.max(...[...room.players.values()].map((p) => p.score));
+    room.result.winners = order(room).filter((p) => p.score === top).map((p) => ({ id: p.id, name: p.name }));
+  }
+  room.awards = computeAwards(room);
+  room.phase = "finished";
 }
 function allGuessed(room) {
   const gs = order(room).filter((p) => p.id !== room.hostId && connected(p));
@@ -200,6 +254,8 @@ function view(room, me) {
       words: room.words, deadline: room.deadline, duration: room.duration, goal: room.goal,
       players: order(room).map((p) => ({ id: p.id, name: p.name, score: p.score, connected: connected(p), submitted: room.phase === "guessing" && room.guesses.has(p.id) })),
       result: room.phase === "reveal" || room.phase === "finished" ? room.result : null,
+      awards: room.phase === "finished" ? room.awards : null,
+      off: [...room.off],
       myGuess: room.phase === "guessing" ? room.guesses.get(me) || null : null,
     },
   };
@@ -322,7 +378,7 @@ function handle(ws, m) {
       break;
     case "reroll":
       if (room.phase !== "ranking" || !isHost) return;
-      if (!(room.topic in allTopics())) room.topic = randomTopic();
+      if (!(room.topic in allTopics())) room.topic = randomTopic(null, room.off);
       room.words = pickWords(room.topic);
       break;
     case "editTopic":
@@ -350,17 +406,37 @@ function handle(ws, m) {
       if (room.phase !== "guessing" || isHost || Date.now() > room.deadline + 500) return;
       const g = cleanArr(m.arr, room.words);
       if (!g) return;
-      room.guesses.set(p.id, g);
+      room.guesses.set(p.id, g); // 「確定する」で届く
       if (allGuessed(room)) return reveal(room);
       break;
     }
+    case "toggleTopic": {
+      // お題を「出題する / おやすみ中」に切り替え(部屋ごと・いつでも)
+      const name = typeof m.name === "string" ? m.name : "";
+      if (!(name in allTopics())) return;
+      if (m.on) room.off.delete(name); else room.off.add(name);
+      break;
+    }
+    case "toggleAll":
+      room.off = m.on ? new Set() : new Set(Object.keys(allTopics()));
+      break;
+    case "unguess":
+      // 「変更する」: 締切前なら確定を取り消す
+      if (room.phase !== "guessing" || isHost || Date.now() > room.deadline) return;
+      room.guesses.delete(p.id);
+      break;
     case "revealNow":
       if (room.phase === "guessing" && isHost) return reveal(room);
       return;
     case "next":
       if (room.phase !== "reveal") return;
-      if (room.result && room.result.winners.length) { clearTimeout(room.timer); room.phase = "finished"; }
+      if (room.result && room.result.winners.length) finish(room);
       else nextRound(room);
+      break;
+    case "endGame":
+      // 終了点を決めずに遊んでいるときの「ゲームを終えて結果発表」
+      if (room.phase !== "reveal") return;
+      finish(room);
       break;
     case "skip":
       // 親が接続していないまま並べる段階で止まったとき用
@@ -369,6 +445,8 @@ function handle(ws, m) {
     case "reset":
       toLobby(room);
       room.round = 0;
+      room.history = [];
+      room.awards = null;
       for (const q of room.players.values()) q.score = 0;
       break;
     default:
