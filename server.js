@@ -339,7 +339,7 @@ function handle(ws, m) {
     case "submitAnswer": {
       if (room.phase !== "ranking" || !isHost) return;
       const a = cleanArr(m.arr, room.words);
-      if (!a) return err(ws, "5つ全部を S〜D に1つずつ置いてください");
+      if (!a) return err(ws, "5つ全部を 1位〜5位 に置いてください");
       room.answer = a;
       room.phase = "guessing";
       room.deadline = Date.now() + room.duration * 1000;
