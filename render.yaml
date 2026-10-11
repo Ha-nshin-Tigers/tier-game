@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tier-game
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      # お題をずっと残したい場合は Upstash Redis の値を Render の画面で設定する
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
