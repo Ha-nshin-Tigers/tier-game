@@ -139,11 +139,56 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 8px 10px;
 .invite input { font-size: 13px; }
 .invite button { white-space: nowrap; flex: none; }
 @media (prefers-reduced-motion: reduce) { .stage.shake, .callout, .bubble { animation: none; } .pc { transition: none; } }
+
+/* スマホのゲーム中: スクロールなしで1画面に収める(上=小さな情報帯、中=酒場、下=手札と操作)。
+   プレイヤー一覧などは「メニュー」で横から開く */
+.menuBtn, .closeDrawer, .stampToggle, .short, .scrim { display: none; }
+body.compact { padding: calc(6px + env(safe-area-inset-top, 0px)) 8px calc(6px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+body.compact #game { height: calc(100dvh - 12px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 6px; }
+body.compact #game > .top { flex: none; }
+body.compact #game > .top > div:first-child { display: none; }
+body.compact .meta { gap: 4px; flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
+body.compact .pill { font-size: 12px; padding: 2px 9px; white-space: nowrap; flex: none; }
+body.compact .menuBtn { display: inline-flex; margin-left: auto; background: var(--fg); color: var(--surface); }
+body.compact .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; }
+body.compact .col { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 6px; }
+body.compact .stage { aspect-ratio: auto; flex: 1; min-height: 150px; }
+body.compact #main { flex: none; padding: 8px 10px; gap: 6px; }
+body.compact .long { display: none; }
+body.compact .short { display: inline; }
+body.compact .say { font-size: 16px; line-height: 1.3; }
+body.compact .cards { flex-wrap: nowrap; overflow-x: auto; padding-top: 10px; gap: 6px; }
+body.compact .pc { width: 54px; height: 76px; font-size: 24px; }
+body.compact .pc small { font-size: 10px; }
+body.compact .cards.small { padding-top: 0; }
+body.compact .cards.small .pc { width: 32px; height: 46px; font-size: 16px; border-width: 1.5px; }
+body.compact .btns { gap: 6px; }
+body.compact button.big { padding: 9px 14px; font-size: 15px; }
+body.compact button.liar { font-size: 16px; padding: 8px 16px; }
+body.compact button.trigger { font-size: 18px; padding: 10px 20px; }
+body.compact .stampToggle { display: inline-flex; border-color: var(--line); font-weight: 500; padding: 6px 12px; font-size: 13px; }
+body.compact .stamps { flex-wrap: nowrap; overflow-x: auto; }
+body.compact .stamps button { flex: none; }
+body.compact .stamps.closed { display: none; }
+body.compact .say .cards.small { display: inline-flex; vertical-align: middle; margin-left: 6px; }
+body.compact #side { position: fixed; top: 0; right: 0; bottom: 0; width: min(88vw, 340px); z-index: 40; overflow-y: auto; border-radius: 0; align-content: start;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(105%); transition: transform .2s ease-out; box-shadow: -8px 0 24px rgba(0,0,0,.25); }
+body.compact.drawer #side { transform: none; }
+body.compact .closeDrawer { display: inline-flex; justify-self: end; }
+body.compact.drawer .scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 39; }
+/* 横向きのスマホ: 左に酒場、右に手札と操作(右側だけ必要ならスクロール) */
+@media (orientation: landscape) {
+  body.compact .col { flex-direction: row; }
+  body.compact .stage { min-height: 0; }
+  body.compact #main { width: min(48vw, 400px); overflow-y: auto; align-content: start; }
+}
+@media (prefers-reduced-motion: reduce) { body.compact #side { transition: none; } }
 </style>
 <script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }</script>
 </head>
 <body>
 <div class="banner" id="banner" hidden></div>
+<div class="scrim" id="scrim"></div>
 
 <!-- 入室画面 -->
 <div class="login" id="login">
@@ -420,8 +465,19 @@ function showStamp(from, i) {
 }
 
 // ---- 画面 ----
+// スマホ(幅が狭い/高さが低い)のゲーム中は1画面に収める表示にする
+const smallScreen = matchMedia("(max-width: 600px), (max-height: 520px)");
+function updateCompact() {
+  const c = !!(joined && S && S.phase !== "lobby" && smallScreen.matches);
+  document.body.classList.toggle("compact", c);
+  if (!c) document.body.classList.remove("drawer");
+}
+smallScreen.addEventListener("change", () => render());
+function setDrawer(open) { document.body.classList.toggle("drawer", open); }
+$("scrim").addEventListener("click", () => setDrawer(false));
 function render() {
   if (!S) return;
+  updateCompact();
   renderMeta(); renderSide(); renderMain();
   if (View3D) View3D.update(S, me);
   if (!View3D || mode !== "3d") render2d();
@@ -438,10 +494,12 @@ function renderMeta() {
     if (S.tableRank) m.append(h("span", { class: "pill table" }, `テーブル: ${RANK_NAME[S.tableRank]}`));
   }
   m.append(h("span", { class: "pill" }, label));
+  m.append(h("button", { type: "button", class: "pill menuBtn", onclick: () => setDrawer(true) }, "メニュー"));
 }
 
 function renderSide() {
   const side = $("side"); side.replaceChildren();
+  side.append(h("button", { type: "button", class: "ghost closeDrawer", onclick: () => setDrawer(false) }, "閉じる ✕"));
   side.append(h("h2", {}, "プレイヤー"));
   const isGM = S.gameHostId === me, inGame = S.phase !== "lobby";
   const ul = h("ul", { class: "players" });
@@ -469,7 +527,7 @@ function renderSide() {
   if (S.log?.length) side.append(h("div", { class: "field" }, "記録", h("ul", { class: "log" }, ...S.log.slice().reverse().map((x) => h("li", {}, x)))));
   const btns = h("div", { class: "btns" });
   if (inGame && isGM) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
-  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); setDrawer(false); backToLogin(""); }));
   side.append(btns);
   side.append(h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")));
   if (flashMsg) side.append(h("p", { class: "status" + (flashWarn ? " warn" : "") }, flashMsg));
@@ -490,8 +548,10 @@ const cardEl = (c, opts = {}) => {
     "aria-label": RANK_NAME[c.r], onclick: opts.onclick }, ...kids);
   return h("div", { class: `pc ${c.r}${match ? " match" : ""}`, "aria-label": RANK_NAME[c.r] }, ...kids);
 };
-const stampRow = () => h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" },
+const stampRow = () => h("div", { class: "stamps" + (local.stampOpen ? "" : " closed"), role: "group", "aria-label": "一言スタンプ" },
   ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t)));
+const stampToggle = () => h("button", { type: "button", class: "stampToggle", "aria-expanded": local.stampOpen ? "true" : "false",
+  onclick: () => { local.stampOpen = !local.stampOpen; renderMain(); } }, local.stampOpen ? "スタンプを閉じる" : "スタンプ");
 
 // 残り秒数は文字だけをタイマーで書き換える(手札やボタンを作り直すと押した操作が消えるため)
 const secEl = (sec) => sec == null ? null : h("span", { class: "secLeft" }, `(残り ${sec}秒)`);
@@ -525,7 +585,7 @@ function renderMain() {
   if (P === "finished") {
     main.append(h("div", { class: "say good" }, S.winner ? `優勝: ${nameOf(S.winner)} さん` : "ゲーム終了"),
       h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"),
-        h("span", { class: "muted small" }, "待機画面に戻ります")), stampRow());
+        h("span", { class: "muted small long" }, "待機画面に戻ります"), stampToggle()), stampRow());
     return;
   }
 
@@ -538,32 +598,34 @@ function renderMain() {
   if (P === "play") {
     const sec = remaining();
     if (myTurn) {
-      main.append(h("div", { class: "say" }, "あなたの番です", secEl(sec)));
-      if (lp && S.canCall) main.append(h("p", {}, `${nameOf(lp.by)} さんが「${RANK_NAME[S.tableRank]}」を ${lp.count}枚 出しました。信じて自分も出す？ それとも…`));
-      else main.append(h("p", {}, `1〜3枚選んで「${RANK_NAME[S.tableRank]}」として出してください(ウソでもOK)。`));
+      main.append(h("div", { class: "say" }, "あなたの番です", secEl(sec),
+        h("span", { class: "short" }, lp && S.canCall ? ` 直前: ${nameOf(lp.by)} ${lp.count}枚` : ` 1〜3枚を「${RANK_NAME[S.tableRank]}」として`)));
+      if (lp && S.canCall) main.append(h("p", { class: "long" }, `${nameOf(lp.by)} さんが「${RANK_NAME[S.tableRank]}」を ${lp.count}枚 出しました。信じて自分も出す？ それとも…`));
+      else main.append(h("p", { class: "long" }, `1〜3枚選んで「${RANK_NAME[S.tableRank]}」として出してください(ウソでもOK)。`));
     } else if (aliveMe) {
       main.append(h("p", {}, `${nameOf(S.turnId)} さんの番です`, secEl(sec), lp ? `。直前: ${nameOf(lp.by)} さんが ${lp.count}枚` : ""));
     } else {
-      main.append(h("p", { class: "muted" }, seated ? "脱落しました。観戦中です。" : "このゲームは観戦中です。次のゲームから参加できます。"),
+      main.append(h("p", { class: "muted" }, seated ? "脱落しました。観戦中です。" : "観戦中です。次のゲームから参加できます。"),
         h("p", {}, `${nameOf(S.turnId)} さんの番です` + (lp ? `。直前: ${nameOf(lp.by)} さんが ${lp.count}枚` : "")));
     }
   }
 
   if (P === "reveal" || P === "shot") {
     const r = S.reveal;
-    main.append(h("p", {}, `${nameOf(r.caller)} さんが ${nameOf(r.by)} さんに「ウソつき！」。出したカード:`),
-      h("div", { class: "cards small" }, ...r.cards.map((c) => cardEl(c, { table: S.tableRank }))),
-      h("div", { class: "say " + (r.honest ? "good" : "red") }, r.honest ? `本当だった！ → ${nameOf(r.target)} さんが引き金を引く` : `ウソだった！ → ${nameOf(r.target)} さんが引き金を引く`));
+    const shown = () => h("div", { class: "cards small" }, ...r.cards.map((c) => cardEl(c, { table: S.tableRank })));
+    main.append(h("p", { class: "long" }, `${nameOf(r.caller)} さんが ${nameOf(r.by)} さんに「ウソつき！」。出したカード:`),
+      h("div", { class: "long" }, shown()),
+      h("div", { class: "say " + (r.honest ? "good" : "red") }, (r.honest ? "本当だった！" : "ウソだった！") + ` → ${nameOf(r.target)} さんが引き金`, h("span", { class: "short" }, shown())));
     if (P === "reveal") {
       const tp = player(r.target);
       if (r.target === me) {
         main.append(h("div", { class: "btns" }, h("button", { class: "trigger", type: "button", onclick: () => send({ t: "pull" }) }, "引き金を引く"),
-          h("span", { class: "muted small" }, `これまで ${tp?.pulls ?? 0}回 引いています(${S.chambers}発中1発が実弾)`)));
+          h("span", { class: "muted small" }, `これまで ${tp?.pulls ?? 0}回(${S.chambers}発中1発が実弾)`)));
       } else main.append(h("p", { class: "muted" }, `${nameOf(r.target)} さんが引き金を引くのを待っています…(これまで ${tp?.pulls ?? 0}回)`));
     } else {
       const s = S.shot;
       main.append(h("div", { class: "say " + (s.died ? "red" : "good") }, s.died ? `バン！ ${nameOf(s.target)} さん脱落` : `カチッ… ${nameOf(s.target)} さんセーフ(${s.pulls}発目)`),
-        h("p", { class: "muted small" }, "まもなく次のラウンドが始まります"));
+        h("p", { class: "muted small long" }, "まもなく次のラウンドが始まります"));
     }
   }
 
@@ -578,7 +640,7 @@ function renderMain() {
         Sound.play("tap"); render();
       } : null,
     })));
-    main.append(h("div", { class: "field" }, `あなたの手札(緑の枠 = テーブルカードかジョーカー)`, hand));
+    main.append(h("div", { class: "field" }, h("span", { class: "long" }, "あなたの手札(緑の枠 = テーブルカードかジョーカー)"), hand));
   } else if (aliveMe && P === "play") {
     main.append(h("p", { class: "muted small" }, "手札がなくなりました。このラウンドはもう出せません。"));
   }
@@ -589,8 +651,8 @@ function renderMain() {
       S.canPlay ? h("button", { class: "primary big", type: "button", disabled: n < 1 || n > 3,
         onclick: () => { send({ t: "play", ids: [...local.sel] }); local.sel.clear(); } }, n ? `${n}枚を「${RANK_NAME[S.tableRank]}」として出す` : "カードを選んでください") : null,
       S.canCall ? h("button", { class: "liar", type: "button", onclick: () => send({ t: "liar" }) }, "ウソつき！") : null,
-      !S.canPlay && S.canCall ? h("span", { class: "muted small" }, "手札がないので指摘するしかありません") : null));
-  }
+      !S.canPlay && S.canCall ? h("span", { class: "muted small" }, "手札がないので指摘するしかありません") : null, stampToggle()));
+  } else main.append(h("div", { class: "btns" }, stampToggle()));
   main.append(stampRow());
 }
 
@@ -992,8 +1054,10 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
         const hp = headPos(tgt);
         const dir = hp.clone().setY(0).normalize();
         // 自分が撃たれるときは画面の手前に銃口が向く
-        const at = seatOf(tgt) === myIndex ? camera.position.clone() : hp;
-        toObj.position.copy(seatOf(tgt) === myIndex ? new THREE.Vector3(0.42, camera.position.y - 0.32, SEAT_R - 0.15) : hp.clone().addScaledVector(dir, -0.55).add(new THREE.Vector3(0, 0.05, 0)).addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x), 0.18));
+        // 真正面から銃口を向けると黒い棒に見えるので、少し斜め(横向き寄り)にする
+        const at = seatOf(tgt) === myIndex ? camera.position.clone().add(new THREE.Vector3(-1.8, -0.4, 0)) : hp;
+        // 自分のときはテーブルの上(少し右)に浮かせて、こちら(カメラ)に向ける
+        toObj.position.copy(seatOf(tgt) === myIndex ? new THREE.Vector3(0.3, TABLE_Y + 0.75, SEAT_R - 1.35) : hp.clone().addScaledVector(dir, -0.55).add(new THREE.Vector3(0, 0.05, 0)).addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x), 0.18));
         toObj.lookAt(at);
       } else {
         toObj.position.set(0.35, TABLE_Y + 0.07, 0.25);

@@ -74,7 +74,12 @@ function setTimer(room, ms, fn) {
   clearTimer(room);
   if (!ms) return;
   room.deadline = Date.now() + ms;
-  room.timer = setTimeout(() => { room.timer = null; fn(); broadcast(room); }, ms);
+  room.timer = setTimeout(() => {
+    room.timer = null;
+    // ここで例外が出てもサーバ全体(ほかのゲームの部屋も)が落ちないようにする
+    try { fn(); } catch (e) { console.error("ウソつき酒場 タイマー処理エラー:", e); }
+    broadcast(room);
+  }, ms);
 }
 
 function toLobby(room) {
@@ -97,7 +102,8 @@ function startRound(room, first) {
   room.round += 1;
   room.tableRank = RANKS[rand(RANKS.length)];
   const deck = makeDeck(room.seats.length);
-  for (const id of room.seats) seat(room, id).hand = [];
+  // 途中で抜けた人の席は残っている(席順を保つため)ので、いる人だけ手札を空にする
+  for (const id of room.seats) { const p = seat(room, id); if (p) p.hand = []; }
   for (const id of ids) seat(room, id).hand = deck.splice(0, HAND);
   room.lastPlay = null; room.pile = 0; room.reveal = null; room.shot = null;
   room.phase = "play";
