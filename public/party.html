@@ -168,6 +168,12 @@ button.pc.sel { transform: translateY(-8px); border-color: var(--accent); box-sh
 .cards { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
 button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); font-family: var(--display); font-weight: 400; font-size: 18px; }
 .log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; }
+.shell { display: inline-block; width: 11px; height: 20px; border-radius: 3px 3px 2px 2px; border: 1.5px solid #181b23; vertical-align: middle; }
+.shell.live { background: linear-gradient(#c8322f 70%, #c9a227 70%); }
+.shell.blank { background: linear-gradient(#7d8a98 70%, #c9a227 70%); }
+.ibtn { display: grid; justify-items: center; min-width: 54px; padding: 3px 5px; border-radius: 8px; border: 2px solid var(--line); background: var(--surface); }
+.ibtn .ic { font-size: 22px; line-height: 1.2; } .ibtn .in { font-size: 10px; font-weight: 700; white-space: nowrap; }
+.ibtn.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
 /* ウソつき酒場は情報が多いので、席を小さくしてスマホでも1画面に収める */
 .table.small { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
 .table.small .seat { min-height: 0; padding: 6px 4px; gap: 0; }
@@ -265,6 +271,8 @@ const GAME_INFO = {
     rules: ["全員に1〜100の数字がこっそり配られます。お題に沿って、数字の大きさを「ことば」で表します。", "全員のヒントがそろったら、話し合って小さい順に並べます(誰が動かしてもOK)。", "公開して、自分のカードが正しい位置なら+2点。全員そろったら全員+1点。", "これを3ラウンド。"] },
   liar: { icon: "🃏", name: "ウソつき酒場", short: "ブラフとロシアンルーレット(大会は2D版)", extra: true,
     rules: ["テーブルカード(キング・クイーン・エース)が決まり、5枚ずつ配られます。ジョーカーは何にでもなります。", "自分の番に1〜3枚を伏せて出し「全部テーブルカード」と言い張ります(ウソでもOK)。", "次の人は出すか「ウソつき！」。ウソなら出した人、本当なら指摘した人が引き金を引きます(6発中1発が実弾)。", "撃たれたら脱落。脱落が遅いほど上位、最後の1人が1位。時間がかかることがあります。"] },
+  shotgun: { icon: "🔫", name: "散弾ルーレット", short: "実弾か空砲か。アイテムを使って生き残る(大会は2D版)", extra: true,
+    rules: ["ショットガンに実弾と空砲が込められます。発数は公開、順番は秘密。", "自分の番に、ほかの人か自分を撃ちます。自分を撃って空砲なら、もう一度自分の番。", "実弾でライフ−1(ライフ4)。弾がなくなると込め直して、アイテムが2つずつ配られます。", "脱落が遅いほど上位、最後の1人が1位。"] },
 };
 const ALL_GAMES = Object.keys(GAME_INFO);
 const RANK_NAME = { K: "キング", Q: "クイーン", A: "エース", J: "ジョーカー" };
@@ -362,6 +370,11 @@ function onTransition(prev, cur) {
     else if (g.step === "play" && g.turnId === me && pg.turnId !== me) Sound.play("pass");
   }
   if ((g.key === "tier" || g.key === "number") && g.step === "show" && pg.step !== "show") Sound.play("good");
+  if (g.key === "shotgun" && g.event && g.event.seq !== pg.event?.seq) {
+    const ev = g.event;
+    if (ev.type === "shot") Sound.play(ev.shell === "live" ? "boom" : "tick");
+    else if (ev.type === "item" || ev.type === "load") Sound.play("pick");
+  }
 }
 
 function connect() {
@@ -521,6 +534,7 @@ function renderMain() {
   else if (g.key === "tier") renderTierMini(main, g);
   else if (g.key === "number") renderNumberMini(main, g);
   else if (g.key === "liar") renderLiarMini(main, g);
+  else if (g.key === "shotgun") renderShotgunMini(main, g);
 }
 
 function renderLobby(main, isGM) {
@@ -786,6 +800,43 @@ function renderLiarMini(main, g) {
   if (g.log?.length) main.append(h("ul", { class: "log" }, ...g.log.slice(-4).reverse().map((x) => h("li", {}, x))));
 }
 
+// ---- 散弾ルーレット(大会版・2D) ----
+function renderShotgunMini(main, g) {
+  const info = g.items, mine = g.seats.find((x) => x.id === me), myTurn = g.step === "turn" && g.turnId === me && mine?.alive;
+  const shell = (t) => h("span", { class: "shell " + t, title: t === "live" ? "実弾" : "空砲" });
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🔫 散弾ルーレット 装填${g.load}`),
+    h("span", { class: "pill", style: "background:var(--gold);color:var(--ink)" }, `実弾${g.counts?.live ?? "-"}・空砲${g.counts?.blank ?? "-"} / 残り${g.remaining}発`)));
+  if (g.spent.length || g.saw || g.dir < 0) main.append(h("div", { class: "btns small" }, ...g.spent.map(shell), g.saw ? "🪚ダメージ2" : null, g.dir < 0 ? "🎛️逆回り" : null));
+  const table = h("div", { class: "table small" });
+  for (const st of g.seats) {
+    const turn = g.step === "turn" && g.turnId === st.id;
+    table.append(h("div", { class: "seat" + (turn ? " holder" : "") + (st.alive ? "" : " out") + (st.id === me ? " me" : ""), style: `border-top:5px solid ${colorOf(st.id)}` },
+      h("span", { class: "nm" }, nameOf(st.id) + (st.id === me ? "(あなた)" : "")),
+      h("span", { class: "small", style: "color:var(--bad)" }, st.alive ? "♥".repeat(st.hp) + "♡".repeat(Math.max(0, g.maxHp - st.hp)) + (st.cuffed ? " ⛓️" : "") : "💀 脱落"),
+      st.alive && st.items.length ? h("span", { class: "small" }, st.items.map((k) => info[k].icon).join("")) : null));
+  }
+  main.append(table);
+  const ev = g.event;
+  if (ev?.type === "shot") main.append(h("div", { class: "say " + (ev.shell === "live" ? "red" : "good") }, ev.shell === "live" ? `💥 実弾 → ${nameOf(ev.target)} −${ev.dmg}${ev.died ? "(脱落)" : ""}` : `カチッ… 空砲 → ${ev.target === ev.by ? "自分" : nameOf(ev.target)}`));
+  else if (ev?.type === "item") main.append(h("p", { class: "small" }, `${nameOf(ev.by)}: ${info[ev.item].icon} ${info[ev.item].name}` + (ev.item === "beer" ? ` → ${ev.shell === "live" ? "実弾" : "空砲"}を排出` : "")));
+  const known = Object.entries(g.know || {}).sort((a, b) => a[0] - b[0]);
+  if (known.length) main.append(h("p", { class: "small" }, "あなたが知っている弾: ", ...known.map(([k, t]) => h("span", {}, (+k === 0 ? " 今の弾=" : ` ${+k + 1}発目=`), shell(t)))));
+  if (g.step === "turn") main.append(countdown(40000), h("p", {}, myTurn ? "あなたの番。アイテムを使ってから撃てます。" : `${nameOf(g.turnId)} さんの番`));
+  if (mine?.alive && mine.items.length) {
+    const pend = local.sgPend;
+    main.append(h("div", { class: "btns" }, ...mine.items.map((k, idx) => h("button", { type: "button", class: "ibtn" + (pend?.idx === idx ? " sel" : ""), disabled: !myTurn, title: info[k].desc,
+      onclick: () => { if (k === "jammer" || k === "adrenaline") { local.sgPend = pend?.idx === idx ? null : { idx, k }; render(); } else { local.sgPend = null; send({ t: "mini", a: "item", idx }); } } },
+      h("span", { class: "ic" }, info[k].icon), h("span", { class: "in" }, info[k].name)))));
+  }
+  if (!myTurn) { local.sgPend = null; return; }
+  const others = g.seats.filter((x) => x.alive && x.id !== me), pend = local.sgPend;
+  if (pend?.k === "jammer") main.append(h("div", { class: "btns" }, "📡 だれを休ませる？", ...others.map((x) => h("button", { type: "button", class: "ghost", disabled: x.cuffed, onclick: () => { local.sgPend = null; send({ t: "mini", a: "item", idx: pend.idx, target: x.id }); } }, nameOf(x.id)))));
+  else if (pend?.k === "adrenaline") main.append(...others.filter((x) => x.items.some((k) => k !== "adrenaline")).map((x) => h("div", { class: "btns small" }, `💉 ${nameOf(x.id)}:`,
+    ...x.items.map((k, pick) => k === "adrenaline" ? null : h("button", { type: "button", class: "ghost tiny", onclick: () => { local.sgPend = null; send({ t: "mini", a: "item", idx: pend.idx, target: x.id, pick }); } }, info[k].icon + info[k].name)))));
+  else main.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => send({ t: "mini", a: "shoot", target: me }) }, "自分を撃つ"),
+    ...others.map((x) => h("button", { type: "button", class: "ghost", style: `border:3px solid ${colorOf(x.id)}`, onclick: () => send({ t: "mini", a: "shoot", target: x.id }) }, `${nameOf(x.id)} を撃つ`))));
+}
+
 // ---- 順位発表 ----
 function rankTable(rows, cols) {
   return h("table", { class: "rank" }, h("thead", {}, h("tr", {}, ...cols.map((c) => h("th", {}, c[0])))),
@@ -793,7 +844,7 @@ function rankTable(rows, cols) {
 }
 function renderResult(main, isGM) {
   const R = S.result, info = GAME_INFO[R.key];
-  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "" }[R.key];
+  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "", shotgun: "" }[R.key];
   main.append(h("div", { class: "say" }, `${info.icon} ${info.name} の結果`));
   const cols = [["順位", (r) => h("td", { class: "pl" }, r.rank + "位")], ["名前", (r) => h("td", {}, chip(r.id))]];
   if (rawLabel) cols.push([rawLabel, (r) => h("td", { class: "n" }, r.raw)]);

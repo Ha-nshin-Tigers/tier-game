@@ -13,6 +13,7 @@ const MINI = {
   tier: require("./mini/tier"),
   liar: require("./mini/liar"),
   number: require("./mini/number"),
+  shotgun: require("./mini/shotgun"),
 };
 
 const WS_PATH = "/party/ws";

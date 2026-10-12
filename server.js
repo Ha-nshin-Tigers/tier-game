@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 const number = require("./games/number"); // かくれナンバー(/number)
 const liar = require("./games/liar");     // ウソつき酒場(/liar)
+const shotgun = require("./games/shotgun"); // 散弾ルーレット(/shotgun)
 const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
 const PORT = process.env.PORT || 3000;
@@ -533,6 +534,7 @@ const PAGES = {
   "/tier": "tier.html", "/tier/": "tier.html",
   "/number": "number.html", "/number/": "number.html",
   "/liar": "liar.html", "/liar/": "liar.html",
+  "/shotgun": "shotgun.html", "/shotgun/": "shotgun.html",
   "/party": "party.html", "/party/": "party.html",
   // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
   "/bridge": "party.html", "/bridge/": "party.html", "/bomb": "party.html", "/bomb/": "party.html", "/memory": "party.html", "/memory/": "party.html",
@@ -586,7 +588,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {
