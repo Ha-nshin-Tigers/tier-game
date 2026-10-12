@@ -7,8 +7,6 @@ const core = require("./mini/shotgun");
 
 const WS_PATH = "/shotgun/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 6, MAX_ROOMS = 500;
-const LIVES = [2, 3, 4, 5, 6];
-const TURN_SECS = [30, 60, 0];
 const STAMPS = ["撃つぞ…", "やめて！", "信じて", "空砲でしょ", "ナイス", "ごめん", "勝負！", "w"];
 const STAMP_GAP_MS = 1200;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
@@ -20,7 +18,7 @@ const rooms = new Map();
 function newRoom(code) {
   return {
     code, phase: "lobby", players: new Map(), roster: [], game: null, ranking: null, timer: null, deadline: 0, emptySince: null,
-    settings: { lives: 4, turnSecs: 30, items: Object.fromEntries(core.ITEM_KEYS.map((k) => [k, true])) },
+    settings: core.normalize({ turnSecs: 30 }),
   };
 }
 const connected = (p) => p && p.sockets.size > 0;
@@ -154,16 +152,13 @@ function handle(ws, m) {
       return removePlayer(room, target.id);
     }
     case "settings": {
-      // ライフ・制限時間・使うアイテム
-      if (room.phase !== "lobby") return;
-      const st = room.settings;
-      if (LIVES.includes(m.lives)) st.lives = m.lives;
-      if (TURN_SECS.includes(m.turnSecs)) st.turnSecs = m.turnSecs;
-      if (m.items && typeof m.items === "object") {
-        const items = {};
-        for (const k of core.ITEM_KEYS) items[k] = m.items[k] !== false;
-        if (core.ITEM_KEYS.some((k) => items[k])) st.items = items; // 1つは残す
-      }
+      // 細かいルール(送られてきた項目だけ上書き。値の検証はルール本体の normalize で行う)
+      if (room.phase !== "lobby" || !m.s || typeof m.s !== "object") return;
+      if (m.s.reset) { room.settings = core.normalize({ turnSecs: 30 }); break; }
+      const next = core.normalize({ ...room.settings, ...m.s, weights: { ...room.settings.weights, ...(m.s.weights || {}) } });
+      // アイテムを配る設定なのに、出るアイテムが1つもない状態にはしない
+      if (next.perLoad !== 0 && !core.ITEM_KEYS.some((k) => next.weights[k] > 0)) return err(ws, "出るアイテムを1つ以上残してください");
+      room.settings = next;
       break;
     }
     case "start": {

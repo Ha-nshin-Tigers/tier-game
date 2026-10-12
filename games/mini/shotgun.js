@@ -21,25 +21,53 @@ const ITEMS = {
 const ITEM_KEYS = Object.keys(ITEMS);
 // 相手を選ぶアイテム
 const NEEDS_TARGET = new Set(["jammer", "adrenaline"]);
-const MAX_ITEMS = 8, ITEMS_PER_LOAD = 2;
-const DEFAULTS = { lives: 4, items: Object.fromEntries(ITEM_KEYS.map((k) => [k, true])), turnSecs: 40 };
+// 細かいルール(ホストが変えられる)。weights はアイテムごとの出やすさ 0=出ない 1=少ない 2=ふつう 3=多い
+const DEFAULTS = {
+  lives: 4, turnSecs: 40,
+  perLoad: 2,          // 1回の装填で配るアイテムの数(0〜4。"r" は1〜4のランダム)
+  maxItems: 8,         // 持てる上限
+  shells: "normal",    // 込める弾の数: few=2〜4 / normal=2〜8 / many=5〜8
+  liveRatio: "normal", // 実弾の割合: low / normal / high
+  noDup: false,        // 1回の配布で同じアイテムが重ならないようにする
+  selfAgain: true,     // 自分を撃って空砲ならもう一度自分の番
+  weights: Object.fromEntries(ITEM_KEYS.map((k) => [k, 2])),
+};
+const SHELL_RANGE = { few: [2, 4], normal: [2, 8], many: [5, 8] };
+const LIVE_RATIO = { low: [0.2, 0.4], normal: [0.35, 0.65], high: [0.6, 0.8] };
+const WEIGHT = [0, 1, 3, 6]; // 出やすさの段階 → 抽選の重み
 const SHOT_SHOW_MS = 2200, LOAD_SHOW_MS = 3500;
 
 const rand = (n) => Math.floor(Math.random() * n);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 // settings: { lives, items: {key: bool}, turnSecs(0=なし) }
+// 設定を検証して、使える値だけにそろえる(単独ゲームのサーバからも使う)
+function normalize(raw) {
+  const r = raw || {}, d = DEFAULTS, out = { ...d, weights: { ...d.weights } };
+  if ([2, 3, 4, 5, 6].includes(r.lives)) out.lives = r.lives;
+  if ([0, 30, 40, 60].includes(r.turnSecs)) out.turnSecs = r.turnSecs;
+  if ([0, 1, 2, 3, 4, "r"].includes(r.perLoad)) out.perLoad = r.perLoad;
+  if ([4, 6, 8].includes(r.maxItems)) out.maxItems = r.maxItems;
+  if (r.shells in SHELL_RANGE) out.shells = r.shells;
+  if (r.liveRatio in LIVE_RATIO) out.liveRatio = r.liveRatio;
+  if (typeof r.noDup === "boolean") out.noDup = r.noDup;
+  if (typeof r.selfAgain === "boolean") out.selfAgain = r.selfAgain;
+  if (r.weights && typeof r.weights === "object") for (const k of ITEM_KEYS) if ([0, 1, 2, 3].includes(r.weights[k])) out.weights[k] = r.weights[k];
+  // 古い形式(使う/使わない)にも対応
+  if (r.items && typeof r.items === "object") for (const k of ITEM_KEYS) if (r.items[k] === false) out.weights[k] = 0;
+  return out;
+}
+
 function start(c, settings) {
-  const s = { ...DEFAULTS, ...(settings || {}) };
+  const s = normalize(settings);
   const seats = shuffle(c.members());
   const st = {};
   for (const id of seats) st[id] = { hp: s.lives, items: [], alive: true, cuffed: false, know: {} };
   c.g = {
-    key: "shotgun", seats, st, maxHp: s.lives, pool: ITEM_KEYS.filter((k) => s.items[k] !== false), turnMs: (s.turnSecs || 0) * 1000,
+    key: "shotgun", seats, st, maxHp: s.lives, cfg: s, turnMs: (s.turnSecs || 0) * 1000,
     shells: [], pos: 0, load: 0, counts: null, spent: [], dir: 1, turnId: seats[rand(seats.length)], saw: false,
     step: "load", out: [], seq: 0, event: null, log: [],
   };
-  if (!c.g.pool.length) c.g.pool = [...ITEM_KEYS];
   reload(c);
 }
 const alive = (c) => c.g.seats.filter((id) => c.g.st[id].alive && c.has(id));
@@ -47,12 +75,22 @@ function log(c, t) { c.g.log.push(t); if (c.g.log.length > 10) c.g.log.shift(); 
 function emit(c, ev) { c.g.seq += 1; c.g.event = { ...ev, seq: c.g.seq }; }
 const nm = (c, id) => c.nameOf(id);
 
-// 込め直し: 2〜8発(実弾・空砲を最低1発ずつ)。アイテムを2つずつ配る
+// アイテムを1つ抽選(出やすさの重み付き)。exclude に入っている種類は除く。出せる種類がなければ null
+function drawItem(cfg, exclude) {
+  const cand = ITEM_KEYS.filter((k) => cfg.weights[k] > 0 && !exclude.includes(k));
+  const total = cand.reduce((n, k) => n + WEIGHT[cfg.weights[k]], 0);
+  if (!total) return null;
+  let x = Math.random() * total;
+  for (const k of cand) { x -= WEIGHT[cfg.weights[k]]; if (x < 0) return k; }
+  return cand[cand.length - 1];
+}
+// 込め直し: 設定の範囲の発数(実弾・空砲を最低1発ずつ)。アイテムを配る
 function reload(c) {
-  const g = c.g;
+  const g = c.g, cfg = g.cfg;
   if (alive(c).length < 2) return finish(c);
-  const n = 2 + rand(7);
-  const live = Math.max(1, Math.min(n - 1, Math.round(n * (0.35 + Math.random() * 0.3))));
+  const [lo, hi] = SHELL_RANGE[cfg.shells], [r0, r1] = LIVE_RATIO[cfg.liveRatio];
+  const n = lo + rand(hi - lo + 1);
+  const live = Math.max(1, Math.min(n - 1, Math.round(n * (r0 + Math.random() * (r1 - r0)))));
   g.shells = shuffle([...Array(live).fill("live"), ...Array(n - live).fill("blank")]);
   g.pos = 0; g.load += 1; g.spent = []; g.saw = false;
   g.counts = { live, blank: n - live };
@@ -60,7 +98,12 @@ function reload(c) {
   const dealt = {};
   for (const id of alive(c)) {
     const s = g.st[id], got = [];
-    for (let i = 0; i < ITEMS_PER_LOAD && s.items.length < MAX_ITEMS; i++) { const k = g.pool[rand(g.pool.length)]; s.items.push(k); got.push(k); }
+    const count = cfg.perLoad === "r" ? 1 + rand(4) : cfg.perLoad;
+    for (let i = 0; i < count && s.items.length < cfg.maxItems; i++) {
+      const k = drawItem(cfg, cfg.noDup ? got : []);
+      if (!k) break;
+      s.items.push(k); got.push(k);
+    }
     dealt[id] = got;
   }
   log(c, `装填${g.load}: 実弾${live}発・空砲${n - live}発`);
@@ -125,7 +168,7 @@ function shoot(c, pid, target, auto) {
   g.saw = false;
   g.step = "shot";
   // 自分を撃って空砲なら続けて自分の番。それ以外は次の人へ
-  const again = self && shell === "blank";
+  const again = self && shell === "blank" && g.cfg.selfAgain;
   c.setTimer(SHOT_SHOW_MS, () => {
     if (alive(c).length < 2) return finish(c);
     if (!again || !g.st[pid].alive) g.turnId = nextOf(c, pid);
@@ -284,8 +327,8 @@ function view(c, me) {
     step: g.step, load: g.load, turnId: g.turnId, dir: g.dir, saw: g.saw, maxHp: g.maxHp,
     counts: g.counts, remaining: remaining(g), spent: g.spent,
     seats: g.seats.map((id) => ({ id, hp: g.st[id].hp, alive: g.st[id].alive && c.has(id), items: g.st[id].items, cuffed: g.st[id].cuffed })),
-    know, event: g.event, log: g.log, items: ITEMS,
+    know, event: g.event, log: g.log, items: ITEMS, selfAgain: g.cfg.selfAgain, maxItems: g.cfg.maxItems,
   };
 }
 
-module.exports = { start, handle, view, onLeave, ITEMS, ITEM_KEYS, DEFAULTS };
+module.exports = { start, handle, view, onLeave, normalize, ITEMS, ITEM_KEYS, DEFAULTS };

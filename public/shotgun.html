@@ -208,6 +208,13 @@ body.compact.drawer .scrim { display: block; position: fixed; inset: 0; backgrou
 .shootbtn { border-width: 3px; font-weight: 700; }
 .selfshot { background: var(--fg); color: var(--surface); }
 .itemtoggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.settings .field { min-width: 0; }
+.settings select { width: 100%; min-width: 0; }
+.itoggle small { display: block; font-size: 10px; font-weight: 500; }
+.itoggle.w1 { background: color-mix(in srgb, var(--gold) 35%, var(--surface)); }
+.itoggle.w3 { background: #f08a3c; color: #181b23; }
+
 .itoggle { border-color: var(--line); color: var(--muted); font-weight: 500; padding: 4px 10px; font-size: 13px; }
 .itoggle.on { background: var(--gold); border-color: var(--fg); color: var(--ink); font-weight: 700; }
 body.compact .ibtn { min-width: 52px; padding: 2px 4px; }
@@ -598,25 +605,34 @@ function renderMain() {
   const live = S.players.filter((p) => p.connected).length;
 
   if (P === "lobby") {
-    const st = S.settings;
+    const st = S.settings, set = (o) => send({ t: "settings", s: o });
+    const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !isGM, onchange: (e) => {
+      const o = opts.find((x) => String(x[0]) === e.target.value); set({ [key]: o[0] });
+    } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+    const WL = ["出ない", "少ない", "ふつう", "多い"];
     main.append(
       h("h2", {}, "遊び方"),
       h("ol", { class: "rules" },
         h("li", {}, "ショットガンに実弾と空砲が込められます。何発ずつかは公開、順番は秘密です。"),
-        h("li", {}, "自分の番に「ほかの人を撃つ」か「自分を撃つ」を選びます。自分を撃って空砲なら、もう一度自分の番。"),
-        h("li", {}, "実弾が当たるとライフ−1。0で脱落です。弾がなくなると込め直して、アイテムが2つずつ配られます。"),
+        h("li", {}, "自分の番に「ほかの人を撃つ」か「自分を撃つ」を選びます。" + (st.selfAgain ? "自分を撃って空砲なら、もう一度自分の番。" : "")),
+        h("li", {}, `実弾が当たるとライフ−1。0で脱落です。弾がなくなると込め直して、アイテムが配られます。`),
         h("li", {}, "アイテムは撃つ前にいくつでも使えます。最後まで生き残った人の勝ち！")),
-      h("div", { class: "btns" },
-        h("label", { class: "field" }, "ライフ", h("select", { disabled: !isGM, onchange: (e) => send({ t: "settings", lives: +e.target.value }) },
-          ...[2, 3, 4, 5, 6].map((n) => h("option", { value: n, selected: st.lives === n }, n)))),
-        h("label", { class: "field" }, "1手の制限時間", h("select", { disabled: !isGM, onchange: (e) => send({ t: "settings", turnSecs: +e.target.value }) },
-          ...[30, 60, 0].map((s) => h("option", { value: s, selected: st.turnSecs === s }, s ? `${s}秒` : "なし"))))),
-      h("div", { class: "field" }, "使うアイテム" + (isGM ? "(押して切り替え)" : ""),
+      h("div", { class: "settings" },
+        sel("ライフ", "lives", [2, 3, 4, 5, 6].map((n) => [n, n + ""])),
+        sel("1手の制限時間", "turnSecs", [[30, "30秒"], [60, "60秒"], [0, "なし"]]),
+        sel("込める弾の数", "shells", [["few", "少なめ(2〜4発)"], ["normal", "ふつう(2〜8発)"], ["many", "多め(5〜8発)"]]),
+        sel("実弾の割合", "liveRatio", [["low", "少なめ"], ["normal", "ふつう"], ["high", "多め"]]),
+        sel("1回に配るアイテム", "perLoad", [[0, "配らない"], [1, "1個"], [2, "2個"], [3, "3個"], [4, "4個"], ["r", "1〜4個ランダム"]]),
+        sel("アイテムの上限", "maxItems", [[4, "4個"], [6, "6個"], [8, "8個"]]),
+        sel("同じアイテム", "noDup", [[false, "重なってもよい"], [true, "1回の配布では重ならない"]]),
+        sel("自分を撃って空砲", "selfAgain", [[true, "もう一度自分の番"], [false, "次の人の番"]])),
+      h("div", { class: "field" }, "アイテムの出やすさ" + (isGM ? "(押すたびに 出ない→少ない→ふつう→多い)" : ""),
         h("div", { class: "itemtoggles" }, ...S.itemKeys.map((k) => {
-          const on = st.items[k] !== false, info = S.itemInfo[k];
-          return h("button", { type: "button", class: "itoggle" + (on ? " on" : ""), disabled: !isGM, title: info.desc, "aria-pressed": on ? "true" : "false",
-            onclick: () => send({ t: "settings", items: { ...st.items, [k]: !on } }) }, info.icon + " " + info.name);
-        }))));
+          const w = st.weights[k] ?? 2, info = S.itemInfo[k];
+          return h("button", { type: "button", class: "itoggle w" + w + (w ? " on" : ""), disabled: !isGM, title: info.desc, "aria-label": `${info.name}: ${WL[w]}`,
+            onclick: () => set({ weights: { [k]: (w + 1) % 4 } }) }, `${info.icon} ${info.name}`, h("small", {}, WL[w]));
+        }))),
+      isGM ? h("div", { class: "btns" }, h("button", { type: "button", class: "ghost tiny", onclick: () => set({ reset: true }) }, "おすすめ設定に戻す")) : null);
     if (isGM) main.append(h("div", { class: "btns" },
       h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "ゲーム開始"),
       h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上でスタートできます" : live > 6 ? "先に入った6人で始めます(ほかの人は観戦)" : `${live}人で開始できます`)));
