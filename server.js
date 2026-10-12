@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 const number = require("./games/number"); // かくれナンバー(/number)
 const liar = require("./games/liar");     // ウソつき酒場(/liar)
+const party = require("./games/party");   // ドタバタ3本勝負(/party)
 
 const PORT = process.env.PORT || 3000;
 const TIERS = ["S", "A", "B", "C", "D"];
@@ -532,6 +533,7 @@ const PAGES = {
   "/tier": "tier.html", "/tier/": "tier.html",
   "/number": "number.html", "/number/": "number.html",
   "/liar": "liar.html", "/liar/": "liar.html",
+  "/party": "party.html", "/party/": "party.html",
 };
 // 3D表示用のファイル(URL の先頭 → 実際のフォルダ)。ここに挙げた場所の .js / .glb だけを配信する
 const STATIC = [
@@ -582,7 +584,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {
