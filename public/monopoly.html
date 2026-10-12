@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>不動産王</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 左(上)=盤面、右(下)=操作・プレイヤー・自分の土地・取引・記録 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a; --boardbg: #d9eedc;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; --boardbg: #1f3326; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 10px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 10px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 17px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; color: var(--fg); }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; align-content: start; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 3px; font-size: 14px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 7px 13px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 10px 20px; }
+button.tiny { padding: 2px 8px; font-size: 12px; }
+input[type=text], input[type=number] { font-family: var(--body); font-size: 16px; padding: 6px 9px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.settings select { width: 100%; }
+.say { font-family: var(--display); font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.chip { display: inline-flex; align-items: center; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #181b23; border: 1.5px solid #181b23; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cd { font-family: var(--display); font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+
+/* ---- ゲーム画面の配置 ---- */
+.play { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 960px) { .play { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; } .play .boardcol { position: sticky; top: 8px; } }
+.boardcol { display: grid; gap: 6px; min-width: 0; }
+.viewbar { display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+/* ---- 2D盤面: 11×11(角は1.6倍) ---- */
+.board { position: relative; width: min(100%, calc(100dvh - 120px)); min-width: 300px; aspect-ratio: 1; margin: 0 auto; display: grid;
+  grid-template-columns: 1.6fr repeat(9, 1fr) 1.6fr; grid-template-rows: 1.6fr repeat(9, 1fr) 1.6fr;
+  background: var(--boardbg); border: 2px solid var(--fg); border-radius: 6px; overflow: hidden; container-type: inline-size; }
+.cell { position: relative; border: .5px solid rgba(24,27,35,.45); background: #f6f2e6; color: #181b23; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 1px; min-width: 0; min-height: 0; overflow: hidden; cursor: pointer; text-align: center; line-height: 1.1; }
+.cell:hover { filter: brightness(.96); }
+.cell .bar { position: absolute; background: var(--c); }
+.cell.s0 .bar { left: 0; right: 0; top: 0; height: 24%; } .cell.s2 .bar { left: 0; right: 0; bottom: 0; height: 24%; }
+.cell.s1 .bar { top: 0; bottom: 0; right: 0; width: 24%; } .cell.s3 .bar { top: 0; bottom: 0; left: 0; width: 24%; }
+.cell .nm { font-size: max(7px, 1.75cqw); font-weight: 700; overflow-wrap: anywhere; z-index: 1; }
+.cell.s0 .nm, .cell.s2 .nm { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: -.05em; max-height: 72%; }
+.cell.s0 .nm.long, .cell.s2 .nm.long { font-size: max(6px, 1.35cqw); }
+.cell.s1 .nm.long, .cell.s3 .nm.long { font-size: max(6px, 1.45cqw); }
+.cell .pr { font-size: max(6px, 1.4cqw); color: #596070; z-index: 1; }
+.cell.corner .nm { font-size: max(8px, 2.1cqw); }
+/* スマホ: 値段を省いて名前を大きく(値段はマスを押すと見られる) */
+@container (max-width: 520px) { .cell .pr { display: none; } .cell .nm { font-size: 8px; } .cell .nm.long { font-size: 6.5px !important; } .cell .ic { font-size: 9px; } }
+.cell .ic { font-size: max(10px, 3cqw); line-height: 1; }
+.cell.owned { box-shadow: inset 0 0 0 max(2px, .6cqw) var(--o); }
+.cell.mort { background: repeating-linear-gradient(45deg, #e3ddcc, #e3ddcc 4px, #cfc8b4 4px, #cfc8b4 8px); }
+.cell .hs { position: absolute; display: flex; gap: 1px; z-index: 2; }
+.cell.s0 .hs { top: 2%; left: 50%; transform: translateX(-50%); } .cell.s2 .hs { bottom: 2%; left: 50%; transform: translateX(-50%); }
+.cell.s1 .hs { right: 3%; top: 50%; transform: translateY(-50%); flex-direction: column; } .cell.s3 .hs { left: 3%; top: 50%; transform: translateY(-50%); flex-direction: column; }
+.hs i { display: block; width: max(4px, 1.1cqw); height: max(4px, 1.1cqw); background: #2f9e57; border: 1px solid #0d3b1e; }
+.hs i.hotel { width: max(7px, 2cqw); background: #d8343a; border-color: #5b1013; }
+.toks { position: absolute; inset: auto 1px 1px 1px; display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; z-index: 3; pointer-events: none; }
+.tok { width: max(8px, 2.4cqw); height: max(8px, 2.4cqw); border-radius: 50%; border: 1.5px solid #181b23; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.tok.cur { outline: 2px solid #fff; animation: bob 1s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-2px); } }
+.cell.here { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 4; }
+.center { grid-row: 2 / 11; grid-column: 2 / 11; display: grid; place-items: center; align-content: center; gap: 1.5cqw; padding: 3cqw; color: var(--fg); text-align: center; cursor: default; }
+.center .logo { font-family: var(--display); font-size: 6cqw; line-height: 1; opacity: .25; transform: rotate(-8deg); }
+.center .stat { font-weight: 700; font-size: max(12px, 2.6cqw); }
+.dice { display: flex; gap: 2cqw; }
+.die { width: 9cqw; height: 9cqw; min-width: 30px; min-height: 30px; border-radius: 18%; background: #fff; border: 2px solid #181b23; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 12%; box-shadow: 0 2px 0 #181b23; }
+.die span { width: 70%; height: 70%; place-self: center; border-radius: 50%; }
+.die span.on { background: #181b23; }
+.die.roll { animation: shake .45s ease-in-out; }
+@keyframes shake { 25% { transform: rotate(-18deg) translateY(-6px); } 50% { transform: rotate(14deg); } 75% { transform: rotate(-8deg) translateY(-3px); } }
+.cardpop { max-width: 80%; padding: 2cqw 3cqw; border-radius: 8px; border: 2px solid #181b23; font-weight: 700; font-size: max(12px, 2.4cqw); color: #181b23; box-shadow: 0 3px 0 #181b23; }
+.cardpop.chance { background: #ffd8a8; } .cardpop.chest { background: #c8e6ff; }
+.cardpop b { display: block; font-family: var(--display); font-weight: 400; }
+
+/* ---- 3D ---- */
+.stage3d { position: relative; width: 100%; aspect-ratio: 1 / .82; max-height: calc(100dvh - 110px); border-radius: 8px; overflow: hidden; background: #0f1a14; touch-action: none; }
+.stage3d canvas { display: block; width: 100%; height: 100%; }
+.stage3d .ov { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); pointer-events: none; display: grid; gap: 6px; justify-items: center; width: 90%; }
+.stage3d .help { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: #cfe9d6; opacity: .8; pointer-events: none; }
+.loading3d { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 700; }
+
+/* ---- 操作 ---- */
+.act .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bidrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bidrow input { width: 110px; }
+.debt { border: 2px solid var(--bad); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+.plist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.plist li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+.plist li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.plist li.out { opacity: .45; }
+.plist .sw { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--fg); }
+.plist .pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .tag { font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 3px; margin-left: 4px; border: 1px solid currentColor; color: var(--accent); }
+.plist .money { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.plist .money small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; }
+.plist .kick { grid-column: 2 / -1; }
+.props { display: grid; gap: 4px; }
+.prop { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.prop .cb { align-self: stretch; border-radius: 3px; background: var(--c); }
+.prop .pn { font-weight: 700; font-size: 14px; min-width: 0; }
+.prop .pn small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+.prop .btns { justify-content: flex-end; }
+.prop.mort { opacity: .7; }
+.trade { border: 1.5px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+.trade.in { border-color: var(--accent); }
+.tcols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tcol { display: grid; gap: 4px; align-content: start; font-size: 13px; }
+.tcol label { display: flex; gap: 4px; align-items: center; }
+.tcol .cbx { width: 10px; height: 10px; border-radius: 2px; background: var(--c); flex: none; }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 220px; overflow: auto; }
+.log li:first-child { color: var(--fg); font-weight: 700; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rank th, .rank td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.rank td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 3px 10px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; max-width: 92vw; }
+/* マスの説明 */
+dialog.info { border: 2px solid var(--fg); border-radius: 10px; padding: 0; width: min(92vw, 360px); background: var(--surface); color: var(--fg); }
+dialog.info::backdrop { background: rgba(0,0,0,.35); }
+.info .ih { padding: 10px 12px; font-family: var(--display); font-size: 18px; color: #181b23; border-bottom: 2px solid var(--fg); }
+.info .ib { padding: 10px 12px; display: grid; gap: 6px; font-size: 14px; }
+.info table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.info td { padding: 2px 4px; border-bottom: 1px solid var(--line); } .info td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.info tr.now td { font-weight: 700; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }</script>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">土地を買って、建てて、相手を破産させるボードゲーム</div><h1>不動産王</h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">土地を買って、建てて、相手を破産させるボードゲーム</div><h1>不動産王</h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <div id="lobby" class="panel"></div>
+  <div class="play" id="play">
+    <div class="boardcol">
+      <div class="viewbar"><span class="small muted" id="viewNote"></span><button type="button" class="pill" id="viewBtn"></button></div>
+      <div class="board" id="board2d" aria-label="盤面"></div>
+      <div class="stage3d" id="stage3d" hidden><div class="ov" id="ov3d"></div><div class="help">ドラッグで回転・2本指(ホイール)で拡大縮小・マスをタップで説明</div><div class="loading3d" id="loading3d" hidden>3Dを読み込んでいます…</div></div>
+    </div>
+    <div class="sidecol" style="display:grid;gap:10px;min-width:0">
+      <section class="panel act" id="act" aria-live="polite"></section>
+      <section class="panel" id="players"></section>
+      <section class="panel" id="mine"></section>
+      <section class="panel" id="trades"></section>
+      <section class="panel"><h2>記録</h2><ul class="log" id="log"></ul></section>
+    </div>
+  </div>
+  <aside class="panel" id="side"></aside>
+</div>
+<dialog class="info" id="info"></dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const COLORS = ["#e8574f", "#4d9de0", "#e6d14a", "#5cc46a", "#a46ee0", "#f0a03c", "#ee7fc0", "#5fd0c8"];
+const M = (n) => `${n}万`;
+const GROUPS = { brown: [1, 3], lblue: [6, 8, 9], pink: [11, 13, 14], orange: [16, 18, 19], red: [21, 23, 24], yellow: [26, 27, 29], green: [31, 32, 34], dblue: [37, 39] };
+const RR = [5, 15, 25, 35], UT = [12, 28];
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); }
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+let local = { trade: null, stale: new Set(), cardShownSeq: 0, cardUntil: 0, rollingUntil: 0 };
+
+// ---- 効果音 ----
+const Sound = {
+  ctx: null, on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {} },
+  seq: { tap: [[880, 0, .06]], join: [[660, 0, .08], [880, .08, .12]], turn: [[784, 0, .1], [988, .1, .1], [1318, .2, .18]], step: [[1200, 0, .03]],
+    coin: [[988, 0, .06], [1318, .06, .16]], pay: [[523, 0, .08], [392, .08, .14]], bad: [[330, 0, .15], [262, .16, .25]],
+    win: [[523, 0, .15], [659, .15, .15], [784, .3, .15], [1046, .45, .2], [784, .65, .12], [1046, .77, .5]], tick: [[1000, 0, .05]], card: [[660, 0, .06], [990, .07, .1]] },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    if (name === "dice") return this.noise(.35, .25, 2500);
+    const t0 = this.ctx.currentTime, soft = name === "tick" || name === "step";
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = soft ? "square" : "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s); g.gain.exponentialRampToValueAtTime(soft ? 0.04 : 0.14, t0 + s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+  noise(dur, vol, cutoff) {
+    const c = this.ctx, n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < .08 ? 1 : .15) * (1 - i / n);
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = buf; f.type = "bandpass"; f.frequency.value = cutoff; g.gain.value = vol;
+    src.connect(f).connect(g).connect(c.destination); src.start();
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/monopoly/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("monopoly:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/monopoly?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) { toast(`${nameOf(m.from)}「${t}」`); Sound.play("tap"); } }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else toast(m.msg); }
+    else if (m.t === "info") toast(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+const act = (a, extra = {}) => send({ t: "game", a, ...extra });
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 3000); }
+
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null;
+  store.set("monopoly:last", { room: "", name: myName });
+  history.replaceState(null, "", "/monopoly");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("monopoly:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+// ---- 共通 ----
+const G = () => S?.game;
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+// 駒の色はゲーム中の順番で固定(待機中は入った順)
+const colorOf = (id) => { const o = G()?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
+const isGM = () => S.gameHostId === me;
+const inGame = () => !!G()?.P[me];
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const groupOf = (i) => Object.keys(GROUPS).find((k) => GROUPS[k].includes(i));
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => { if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; } clearTimeout(t); action(); };
+  return b;
+}
+
+// ---- 駒の表示位置(1マスずつ歩かせる) ----
+const shown = {}; // pid → 表示中のマス
+let walkTimer = null;
+function syncTokens(instant) {
+  const g = G(); if (!g) return;
+  for (const id of g.order) {
+    const target = g.P[id].pos;
+    if (shown[id] == null || instant) shown[id] = target;
+  }
+  if (!walkTimer) walkTimer = setInterval(stepTokens, 140);
+}
+function stepTokens() {
+  const g = G(); if (!g) return;
+  let moving = false;
+  for (const id of g.order) {
+    const target = g.P[id].pos;
+    if (shown[id] === target) continue;
+    // サイコロやカードで前に進んだときだけ1マスずつ歩く(刑務所行き・戻る・取引などは飛ぶ)
+    const lm = local.lastMove, fwd = (target - shown[id] + 40) % 40;
+    if (!lm || lm.pid !== id || lm.to !== target || lm.steps <= 0 || g.P[id].jailed) shown[id] = target;
+    else { shown[id] = (shown[id] + (fwd > 14 ? 2 : 1)) % 40; if (fwd === 1) shown[id] = target; Sound.play("step"); }
+    moving = true;
+  }
+  if (moving) { renderBoard(); if (View3D && mode === "3d") View3D.update(); }
+}
+
+// ---- 状態の変化に合わせて音・演出 ----
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) { syncTokens(true); return; }
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (!g) return;
+  if (!pg) { syncTokens(true); return; }
+  if (g.ev && g.ev.seq !== pg.ev?.seq) {
+    const e = g.ev;
+    if (e.type === "move") local.lastMove = e;
+    if (e.type === "buy") Sound.play("coin");
+    if (e.type === "jail") Sound.play("bad");
+    if (e.type === "bankrupt") Sound.play("bad");
+  }
+  // サイコロ(振った直後に移動まで済んで届くので、振った回数で判定する)
+  if (g.rollSeq !== pg.rollSeq && g.dice) { local.rollingUntil = Date.now() + 500; Sound.play("dice"); if (View3D) View3D.roll(g.dice); setTimeout(render, 520); }
+  if (g.card && g.card.seq !== pg.card?.seq) { local.cardUntil = Date.now() + 6000; Sound.play("card"); setTimeout(render, 6100); }
+  if (g.cur === me && pg.cur !== me && g.step === "roll") Sound.play("turn");
+  if (g.debts.some((d) => d.pid === me) && !pg.debts.some((d) => d.pid === me)) Sound.play("bad");
+  if (cur.phase === "finished" && prev.phase !== "finished") Sound.play("win");
+  syncTokens(false);
+}
+
+// ---- 画面 ----
+function render() {
+  if (!S) return;
+  const playing = S.phase !== "lobby";
+  document.body.classList.toggle("playing", playing);
+  $("lobby").hidden = playing; $("play").hidden = !playing;
+  renderMeta(); renderSide();
+  if (!playing) return renderLobby();
+  renderBoard();
+  if (View3D && mode === "3d") View3D.update();
+  for (const [id, fn] of [["act", renderAct], ["players", renderPlayers], ["mine", renderMine], ["trades", renderTrades]]) {
+    // 入力中の欄は作り直さない(入力が消えるため)
+    const el = $(id), ae = document.activeElement;
+    if (ae && el.contains(ae) && (ae.tagName === "INPUT" || ae.tagName === "SELECT")) { local.stale.add(id); continue; }
+    local.stale.delete(id); fn(el);
+  }
+  renderLog();
+  if ($("info").open) renderInfo(local.infoSq);
+}
+document.addEventListener("focusout", () => setTimeout(() => { if (local.stale.size) render(); }, 0));
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = G();
+  if (g) m.append(h("span", { class: "pill" }, `${g.cfg.map === "world" ? "世界" : "日本"}・${g.turnNo}手目`), h("span", { class: "pill" }, `銀行の家 ${g.houses}・ホテル ${g.hotels}`));
+}
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  const link = location.origin + "/monopoly?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  if (S.phase === "lobby") {
+    const ul = h("ul", { class: "plist" });
+    for (const p of S.players) {
+      const li = h("li", { class: p.connected ? "" : "out" }, h("span", { class: "sw", style: `background:${colorOf(p.id)}` }),
+        h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""), p.id === S.gameHostId ? h("span", { class: "tag" }, "ホスト") : null), h("span", { class: "muted small" }, p.connected ? "" : "切断中"));
+      if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+    side.append(h("h2", {}, "プレイヤー"), ul);
+  }
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("ゲームをやめて待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")));
+}
+
+function renderLobby() {
+  const el = $("lobby"); el.replaceChildren();
+  const st = S.settings, gm = isGM();
+  const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); send({ t: "settings", s: { [key]: o[0] } });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected).length;
+  el.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "サイコロを2つ振って進みます。だれも持っていない土地に止まったら買えます(買わなければ全員で競売)。"),
+      h("li", {}, "人の土地に止まったら使用料を払います。同じ色を全部そろえると使用料が2倍になり、家(4軒まで)→ホテルを建てられます。"),
+      h("li", {}, "お金が足りなければ、家を売る・土地を抵当に入れる・取引でお金を作ります。払えなければ破産。最後まで残った人の勝ち！"),
+      h("li", {}, "ゾロ目はもう一回。3回続くと刑務所。刑務所はゾロ目・保釈金50万・出られるカードで出られます。")),
+    h("div", { class: "settings" },
+      sel("地図", "map", [["japan", "日本"], ["world", "世界"]]),
+      sel("最初のお金", "startCash", [[1500, "1500万(本家)"], [2000, "2000万(長め)"], [1000, "1000万(短め)"]]),
+      sel("1手の持ち時間", "turnSecs", [[90, "90秒"], [60, "60秒"], [120, "120秒"], [0, "なし"]])),
+    h("p", { class: "muted small" }, "2〜8人。最後の1人になるまで続きます(1〜2時間かかることがあります)。時間切れのときは自動で進めます(土地は買わずに競売、支払いは自動で売却・抵当)。"));
+  if (gm) el.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live > 8 ? "先に入った8人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
+  else el.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+
+// ---- 盤面(2D) ----
+// マスの位置: 0=右下の角から反時計回り。辺 s0=下 s1=左 s2=上 s3=右
+function cellPos(i) {
+  const side = Math.floor(i / 10), k = i % 10;
+  if (side === 0) return { row: 11, col: 11 - k, side: 0 };
+  if (side === 1) return { row: 11 - k, col: 1, side: 1 };
+  if (side === 2) return { row: 1, col: 1 + k, side: 2 };
+  return { row: 1 + k, col: 11, side: 3 };
+}
+const CORNER_IC = { go: "←", jail: "🔒", free: "🅿️", gotojail: "👮" };
+const TYPE_IC = { chance: "❓", chest: "💰", tax: "💸", rr: "🚉", util: "" };
+function dieEl(n, rolling) {
+  const pips = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }[n] || [];
+  return h("div", { class: "die" + (rolling ? " roll" : ""), "aria-label": String(n) }, ...Array.from({ length: 9 }, (_, k) => h("span", { class: pips.includes(k) ? "on" : "" })));
+}
+function renderBoard() {
+  const g = G(), el = $("board2d");
+  if (!g || (View3D && mode === "3d")) return;
+  el.replaceChildren();
+  const here = new Map();
+  for (const id of g.order) if (!g.P[id].out) { const k = shown[id] ?? g.P[id].pos; if (!here.has(k)) here.set(k, []); here.get(k).push(id); }
+  g.board.forEach((s, i) => {
+    const { row, col, side } = cellPos(i), corner = i % 10 === 0, o = g.own[i];
+    const cell = h("div", { class: `cell s${side}` + (corner ? " corner" : "") + (o?.owner ? " owned" : "") + (o?.mort ? " mort" : "") + (g.pending === i || g.auction?.sq === i ? " here" : ""),
+      style: `grid-row:${row};grid-column:${col};` + (s.color ? `--c:${s.color};` : "") + (o?.owner ? `--o:${colorOf(o.owner)};` : ""),
+      role: "button", tabindex: "0", "aria-label": s.name, onclick: () => openInfo(i), onkeydown: (e) => { if (e.key === "Enter") openInfo(i); } });
+    if (s.color) cell.append(h("span", { class: "bar" }));
+    if (corner) cell.append(h("span", { class: "ic" }, CORNER_IC[s.type] || ""));
+    else if (TYPE_IC[s.type]) cell.append(h("span", { class: "ic" }, s.type === "util" ? (i === 12 ? "💡" : "🚰") : TYPE_IC[s.type]));
+    cell.append(h("span", { class: "nm" + ([...s.name].length > 4 ? " long" : "") }, s.type === "go" ? "スタート" : s.name));
+    if (s.price && !o?.owner) cell.append(h("span", { class: "pr" }, M(s.price)));
+    if (s.type === "tax") cell.append(h("span", { class: "pr" }, M(s.tax)));
+    if (o?.houses) cell.append(h("span", { class: "hs" }, ...(o.houses === 5 ? [h("i", { class: "hotel" })] : Array.from({ length: o.houses }, () => h("i")))));
+    const toks = here.get(i);
+    if (toks) cell.append(h("span", { class: "toks" }, ...toks.map((id) => h("span", { class: "tok" + (id === g.cur ? " cur" : ""), style: `background:${colorOf(id)}`, title: nameOf(id) }))));
+    el.append(cell);
+  });
+  el.append(centerEl(g));
+}
+function centerEl(g) {
+  const c = h("div", { class: "center" });
+  c.append(h("div", { class: "logo" }, "不動産王"));
+  if (g.dice) c.append(h("div", { class: "dice" }, dieEl(g.dice[0], Date.now() < local.rollingUntil), dieEl(g.dice[1], Date.now() < local.rollingUntil)));
+  c.append(h("div", { class: "stat" }, statusText(g)));
+  if (g.card && Date.now() < local.cardUntil) c.append(h("div", { class: "cardpop " + g.card.kind }, h("b", {}, (g.card.kind === "chance" ? "チャンス" : "共同基金") + ` (${nameOf(g.card.pid)})`), g.card.text));
+  return c;
+}
+function statusText(g) {
+  if (S.phase === "finished") return "ゲーム終了";
+  if (g.debts.length) return `${g.debts.map((d) => nameOf(d.pid)).join("・")} の支払い待ち`;
+  if (g.step === "auction") return `競売中: ${g.board[g.auction.sq].name}`;
+  const who = g.cur === me ? "あなた" : nameOf(g.cur) + " さん";
+  if (g.step === "buy") return `${who}: ${g.board[g.pending].name} を買う？`;
+  if (g.P[g.cur].jailed && g.step === "roll") return `${who}の番(刑務所)`;
+  return `${who}の番`;
+}
+
+// ---- マスの説明 ----
+function openInfo(i) { local.infoSq = i; renderInfo(i); if (!$("info").open) $("info").showModal(); }
+$("info").addEventListener("click", (e) => { if (e.target === $("info")) $("info").close(); });
+function renderInfo(i) {
+  const g = G(), d = $("info"); if (!g) return;
+  const s = g.board[i], o = g.own[i];
+  const body = h("div", { class: "ib" });
+  if (s.type === "prop") {
+    const lv = o?.houses || 0, full = o?.owner && GROUPS[s.group].every((k) => g.own[k].owner === o.owner);
+    body.append(h("table", {}, h("tbody", {},
+      ...[["使用料", s.rent[0]], ["色をそろえると", s.rent[0] * 2], ["家1軒", s.rent[1]], ["家2軒", s.rent[2]], ["家3軒", s.rent[3]], ["家4軒", s.rent[4]], ["ホテル", s.rent[5]]]
+        .map(([t, v], k) => h("tr", { class: o?.owner && !o.mort && ((k === 0 && !lv && !full) || (k === 1 && !lv && full) || (k >= 2 && lv === k - 1)) ? "now" : "" }, h("td", {}, t), h("td", {}, M(v)))))),
+      h("div", { class: "small muted" }, `値段 ${M(s.price)}・家1軒 ${M(s.house)}(ホテルは家4軒+${M(s.house)})・抵当 ${M(s.price / 2)}`));
+  } else if (s.type === "rr") body.append(h("div", {}, `値段 ${M(s.price)}。持っている数で使用料: 1つ25万・2つ50万・3つ100万・4つ200万`), h("div", { class: "small muted" }, `抵当 ${M(s.price / 2)}`));
+  else if (s.type === "util") body.append(h("div", {}, `値段 ${M(s.price)}。使用料はサイコロの目×4(2つとも持っていれば×10)`), h("div", { class: "small muted" }, `抵当 ${M(s.price / 2)}`));
+  else body.append(h("div", {}, { go: "通るか止まると200万もらえます", jail: "ただの見学なら何もありません。入ったら、ゾロ目・保釈金50万・出られるカードで出所", free: "何もありません(休憩)", gotojail: "止まったら刑務所へ(スタートは通らない)", chance: "チャンスカードを引きます", chest: "共同基金カードを引きます", tax: `${M(s.tax)}払います` }[s.type]));
+  if (o) {
+    body.append(h("div", {}, o.owner ? h("span", {}, "持ち主: ", chip(o.owner), o.mort ? " (抵当中)" : "", o.houses ? ` ${o.houses === 5 ? "ホテル" : "家" + o.houses + "軒"}` : "") : h("span", { class: "muted" }, "持ち主なし")));
+    if (o.owner === me) body.append(propBtns(i));
+  }
+  body.append(h("div", { class: "btns" }, h("button", { type: "button", class: "ghost", onclick: () => d.close() }, "閉じる")));
+  d.replaceChildren(h("div", { class: "ih", style: `background:${s.color || "var(--gold)"}` }, s.name), body);
+}
+
+// ---- 操作パネル ----
+function renderAct(el) {
+  el.replaceChildren();
+  const g = G(), r = remaining();
+  if (S.phase === "finished") {
+    el.append(h("div", { class: "say" }, "🏆 " + (S.ranking?.[0] ? nameOf(S.ranking[0].id) + " さんの勝ち！" : "ゲーム終了")));
+    if (S.ranking) el.append(h("table", { class: "rank" }, h("tbody", {}, ...S.ranking.map((x) => h("tr", {}, h("td", {}, x.rank + "位"), h("td", {}, chip(x.id)))))));
+    el.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+    return;
+  }
+  el.append(h("div", { class: "head" }, h("div", { class: "say" }, statusText(g)), r != null ? h("span", { class: "cd" + (r <= 10 ? " low" : ""), id: "cdText" }, r + "秒") : null));
+  if (!inGame()) { el.append(h("p", { class: "muted small" }, "観戦中です。")); return; }
+  const mine = g.P[me];
+  if (mine.out) { el.append(h("p", { class: "muted" }, "破産しました。ゲームの続きを見守りましょう。")); return; }
+  // 支払い(借金)
+  const myDebts = g.debts.filter((d) => d.pid === me);
+  if (myDebts.length) {
+    const d = myDebts[0], total = myDebts.reduce((n, x) => n + x.amount, 0);
+    el.append(h("div", { class: "debt" },
+      h("div", {}, h("b", {}, `${d.to ? nameOf(d.to) + " さん" : "銀行"}に ${M(d.amount)} 払う必要があります`), `(${d.why})` + (myDebts.length > 1 ? ` ほかにも合計 ${M(total)}` : "")),
+      h("div", { class: "small" }, `持っているお金 ${M(mine.cash)}。下の「自分の土地」で家を売る・抵当に入れる、または取引でお金を作れます。`),
+      h("div", { class: "btns" }, h("button", { class: "primary", type: "button", disabled: mine.cash < d.amount, onclick: () => act("pay") }, "払う"),
+        h("button", { type: "button", onclick: () => act("autoPay") }, "自動で集めて払う"),
+        twoStep("破産する", () => act("bankrupt")))));
+  }
+  if (g.step === "auction") {
+    const a = g.auction, s = g.board[a.sq];
+    el.append(h("div", {}, h("b", {}, s.name), ` (定価 ${M(s.price)}) 今の最高: `, a.by ? h("span", {}, M(a.bid) + " ", chip(a.by)) : "まだなし"));
+    const inp = h("input", { type: "number", min: a.bid + 1, max: mine.cash, step: 1, value: local.bidVal ?? "", placeholder: String(a.bid + 10), "aria-label": "入札額", oninput: (e) => { local.bidVal = e.target.value; } });
+    const bid = (n) => { if (n > mine.cash) return toast("持っているお金より多くは入札できません"); act("bid", { amount: n }); local.bidVal = ""; };
+    el.append(h("div", { class: "bidrow" }, ...[1, 10, 50, 100].map((k) => h("button", { type: "button", disabled: a.bid + k > mine.cash || a.by === me, onclick: () => bid(a.bid + k) }, `+${k}`)),
+      inp, h("button", { class: "primary", type: "button", onclick: () => bid(parseInt(inp.value, 10) || 0) }, "入札")),
+      h("p", { class: "small muted" }, `だれでも入札できます。最後の入札から少しで締め切り。持っているお金 ${M(mine.cash)}`));
+    return;
+  }
+  if (g.cur !== me) { el.append(h("p", { class: "muted small" }, "自分の番でなくても、土地の管理や取引はいつでもできます。")); return; }
+  const blocked = g.debts.length > 0;
+  if (g.step === "roll") {
+    if (mine.jailed) {
+      el.append(h("p", {}, `刑務所にいます(${mine.jailTries}/3回目)。ゾロ目が出れば出所。3回目も出なければ50万払って出ます。`),
+        h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("roll") }, "🎲 振る(ゾロ目で出所)"),
+          h("button", { type: "button", disabled: mine.cash < 50, onclick: () => act("payJail") }, "50万払って出る"),
+          mine.jailCards ? h("button", { type: "button", onclick: () => act("useCard") }, "カードを使って出る") : null));
+    } else el.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("roll") }, "🎲 サイコロを振る")));
+  } else if (g.step === "buy") {
+    const s = g.board[g.pending];
+    el.append(h("p", {}, h("b", {}, s.name), ` は ${M(s.price)}。持っているお金 ${M(mine.cash)}`),
+      h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: mine.cash < s.price, onclick: () => act("buy") }, `買う(${M(s.price)})`),
+        h("button", { type: "button", onclick: () => act("decline") }, "買わない(競売へ)"), h("button", { type: "button", class: "ghost tiny", onclick: () => openInfo(g.pending) }, "使用料を見る")),
+      mine.cash < s.price ? h("p", { class: "small muted" }, "お金が足りません。抵当に入れてから買うこともできます。") : null);
+  } else if (g.step === "act") {
+    el.append(h("div", { class: "btns" }, g.again ? h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("roll") }, "🎲 ゾロ目！もう一度振る")
+      : h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("end") }, "ターン終了")),
+      h("p", { class: "small muted" }, "家を建てる・抵当・取引は「自分の土地」と「取引」から。"));
+  }
+}
+
+// ---- プレイヤー一覧 ----
+function renderPlayers(el) {
+  el.replaceChildren(h("h2", {}, "プレイヤー"));
+  const g = G(), ul = h("ul", { class: "plist" });
+  for (const id of g.order) {
+    const p = g.P[id], pl = player(id);
+    const tags = [];
+    if (id === S.gameHostId) tags.push(h("span", { class: "tag" }, "ホスト"));
+    if (p.jailed) tags.push(h("span", { class: "tag" }, "刑務所"));
+    if (p.jailCards) tags.push(h("span", { class: "tag" }, `出所カード${p.jailCards}`));
+    if (pl && !pl.connected) tags.push(h("span", { class: "tag" }, "切断中"));
+    const props = g.own.filter((o) => o?.owner === id).length;
+    const li = h("li", { class: (id === g.cur && !p.out ? "cur" : "") + (p.out ? " out" : "") }, h("span", { class: "sw", style: `background:${colorOf(id)}` }),
+      h("span", { class: "pname" }, (id === g.cur && !p.out ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : ""), ...tags),
+      h("span", { class: "money" }, p.out ? "破産" : M(p.cash), p.out ? null : h("small", {}, `資産 ${M(p.worth)}・土地${props}`)));
+    if (isGM() && id !== me && pl) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id }), "ghost danger tiny")));
+    ul.append(li);
+  }
+  el.append(ul);
+  const spect = S.players.filter((p) => !g.P[p.id]);
+  if (spect.length) el.append(h("p", { class: "small muted" }, "観戦: " + spect.map((p) => p.name).join("・")));
+}
+
+// ---- 自分の土地 ----
+function propBtns(i) {
+  const g = G(), s = g.board[i], o = g.own[i], mine = g.P[me];
+  const grp = s.group ? GROUPS[s.group] : [i];
+  const full = s.type === "prop" && grp.every((k) => g.own[k].owner === me);
+  const groupBuilt = s.type === "prop" && grp.some((k) => g.own[k].houses > 0);
+  const b = h("div", { class: "btns" });
+  if (s.type === "prop" && full && !o.mort) {
+    const canB = o.houses < 5 && !grp.some((k) => g.own[k].mort) && grp.every((k) => g.own[k].houses >= o.houses);
+    b.append(h("button", { type: "button", class: "tiny", disabled: !canB || mine.cash < s.house, onclick: () => act("build", { sq: i }) }, `${o.houses === 4 ? "ホテル" : "家"}を建てる ${M(s.house)}`));
+    if (o.houses) b.append(h("button", { type: "button", class: "tiny ghost", disabled: grp.some((k) => g.own[k].houses > o.houses), onclick: () => act("sell", { sq: i }) }, `売る +${M(s.house / 2)}`));
+  }
+  if (!o.mort) b.append(h("button", { type: "button", class: "tiny ghost", disabled: groupBuilt, title: groupBuilt ? "同じ色の建物を先に売ってください" : "", onclick: () => act("mortgage", { sq: i }) }, `抵当 +${M(s.price / 2)}`));
+  else b.append(h("button", { type: "button", class: "tiny ghost", disabled: mine.cash < g.unmort[i], onclick: () => act("unmortgage", { sq: i }) }, `抵当を外す ${M(g.unmort[i])}`));
+  return b;
+}
+function renderMine(el) {
+  el.replaceChildren(h("h2", {}, "自分の土地"));
+  const g = G();
+  if (!inGame() || g.P[me].out) { el.append(h("p", { class: "muted small" }, "なし")); return; }
+  const list = g.own.map((o, i) => (o?.owner === me ? i : -1)).filter((i) => i >= 0);
+  if (!list.length) { el.append(h("p", { class: "muted small" }, "まだ土地を持っていません。")); return; }
+  const box = h("div", { class: "props" });
+  for (const i of list) {
+    const s = g.board[i], o = g.own[i];
+    const grp = s.group ? GROUPS[s.group] : null;
+    const sub = s.type === "prop" ? (o.houses === 5 ? "ホテル" : o.houses ? `家${o.houses}軒` : grp.every((k) => g.own[k].owner === me) ? "色がそろった！" : `同じ色 ${grp.filter((k) => g.own[k].owner === me).length}/${grp.length}`)
+      : s.type === "rr" ? `${RR.filter((k) => g.own[k].owner === me).length}/4` : `${UT.filter((k) => g.own[k].owner === me).length}/2`;
+    box.append(h("div", { class: "prop" + (o.mort ? " mort" : ""), style: `--c:${s.color || "#888"}` }, h("span", { class: "cb" }),
+      h("span", { class: "pn" }, h("a", { href: "#", onclick: (e) => { e.preventDefault(); openInfo(i); } }, s.name), h("small", {}, sub + (o.mort ? "・抵当中" : g.rents[i] != null ? `・使用料 ${M(g.rents[i])}` : ""))),
+      propBtns(i)));
+  }
+  el.append(box);
+}
+
+// ---- 取引 ----
+function tradeDesc(g, side) {
+  const parts = side.props.map((i) => h("span", { class: "chip", style: `background:${g.board[i].color || "#ddd"}` }, g.board[i].name + (g.own[i].mort ? "(抵当)" : "")));
+  if (side.cash) parts.push(h("b", {}, M(side.cash)));
+  if (side.cards) parts.push(h("span", {}, `出所カード${side.cards}枚`));
+  return parts.length ? parts : [h("span", { class: "muted" }, "なし")];
+}
+function renderTrades(el) {
+  el.replaceChildren(h("h2", {}, "取引"));
+  const g = G();
+  for (const t of g.trades) {
+    const mineIn = t.to === me, mineOut = t.from === me;
+    if (!mineIn && !mineOut) { el.append(h("p", { class: "small muted" }, `${nameOf(t.from)} → ${nameOf(t.to)} に取引を提案中`)); continue; }
+    el.append(h("div", { class: "trade" + (mineIn ? " in" : "") },
+      h("div", { class: "small" }, mineIn ? `${nameOf(t.from)} さんからの提案` : `${nameOf(t.to)} さんへの提案(返事待ち)`),
+      h("div", { class: "tcols" }, h("div", { class: "tcol" }, h("b", {}, mineIn ? "もらう" : "出す"), ...tradeDesc(g, t.give)), h("div", { class: "tcol" }, h("b", {}, mineIn ? "出す" : "もらう"), ...tradeDesc(g, t.get))),
+      h("div", { class: "btns" }, mineIn ? [h("button", { class: "primary", type: "button", onclick: () => act("answer", { id: t.id, ok: true }) }, "受ける"), h("button", { type: "button", onclick: () => act("answer", { id: t.id, ok: false }) }, "断る")]
+        : h("button", { type: "button", class: "ghost", onclick: () => act("cancelOffer", { id: t.id }) }, "取り下げる")),
+      h("p", { class: "small muted" }, "抵当中の土地を受け取ると、利子(抵当額の1割)を払います。")));
+  }
+  if (!inGame() || g.P[me].out || S.phase === "finished") return;
+  const T = local.trade;
+  if (!T) { el.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => { local.trade = { to: null, give: { props: [], cash: 0, cards: 0 }, get: { props: [], cash: 0, cards: 0 } }; render(); } }, "取引を持ちかける"))); return; }
+  const others = g.order.filter((id) => id !== me && !g.P[id].out);
+  if (!T.to || !others.includes(T.to)) T.to = others[0];
+  const tradable = (id) => g.own.map((o, i) => (o?.owner === id && !(g.board[i].group && GROUPS[g.board[i].group].some((k) => g.own[k].houses > 0)) ? i : -1)).filter((i) => i >= 0);
+  const col = (who, side, title) => {
+    const p = g.P[who];
+    return h("div", { class: "tcol" }, h("b", {}, title),
+      ...tradable(who).map((i) => h("label", {}, h("input", { type: "checkbox", checked: side.props.includes(i), onchange: (e) => { side.props = e.target.checked ? [...side.props, i] : side.props.filter((x) => x !== i); } }),
+        h("span", { class: "cbx", style: `--c:${g.board[i].color || "#888"}` }), g.board[i].name + (g.own[i].mort ? "(抵当)" : ""))),
+      h("label", { class: "field" }, `お金(最大 ${M(p.cash)})`, h("input", { type: "number", min: 0, max: p.cash, value: side.cash || "", oninput: (e) => { side.cash = Math.max(0, parseInt(e.target.value, 10) || 0); } })),
+      p.jailCards ? h("label", {}, h("input", { type: "checkbox", checked: side.cards > 0, onchange: (e) => { side.cards = e.target.checked ? 1 : 0; } }), "出所カード1枚") : null);
+  };
+  el.append(h("div", { class: "trade" },
+    h("label", { class: "field" }, "相手", h("select", { onchange: (e) => { T.to = e.target.value; T.get = { props: [], cash: 0, cards: 0 }; e.target.blur(); render(); } }, ...others.map((id) => h("option", { value: id, selected: id === T.to }, nameOf(id))))),
+    h("div", { class: "tcols" }, col(me, T.give, "あなたが出す"), col(T.to, T.get, "相手から欲しい")),
+    h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => { act("offer", { to: T.to, give: T.give, get: T.get }); local.trade = null; render(); } }, "提案する"),
+      h("button", { type: "button", class: "ghost", onclick: () => { local.trade = null; render(); } }, "やめる"))));
+}
+function renderLog() {
+  const g = G(), el = $("log");
+  el.replaceChildren(...[...g.log].reverse().map((t) => h("li", {}, t)));
+}
+
+// 残り時間
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  if (r !== lastSec) { lastSec = r; const g = G(); if (g && r != null && r <= 5 && r >= 1 && (g.cur === me || g.debts.some((d) => d.pid === me))) Sound.play("tick"); }
+}, 250);
+
+// ---- 表示方法(2D / 3D) ----
+let mode = store.get("monopoly:view") || "2d";
+let View3D = null, view3dFailed = false, view3dLoading = false;
+async function setupView() {
+  if (mode === "3d" && !View3D && !view3dFailed && !view3dLoading && G()) {
+    view3dLoading = true; $("stage3d").hidden = false; $("loading3d").hidden = false;
+    try {
+      const THREE = await import("three");
+      const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+      View3D = createView3D(THREE, OrbitControls, $("stage3d"));
+    } catch (e) {
+      console.error("3D表示を使えません:", e);
+      view3dFailed = true; mode = "2d"; toast("この端末では3D表示が使えないため2D表示にしました");
+    }
+    view3dLoading = false; $("loading3d").hidden = true;
+  }
+  applyMode();
+}
+function applyMode() {
+  const use3d = mode === "3d" && !!View3D;
+  $("board2d").hidden = use3d; $("stage3d").hidden = !use3d && !view3dLoading;
+  if (View3D) View3D.setVisible(use3d);
+  $("viewBtn").textContent = mode === "3d" ? "2D表示にする" : "3D表示にする";
+  $("viewNote").textContent = use3d ? "3D表示" : "マスを押すと説明";
+  render();
+}
+$("viewBtn").addEventListener("click", () => { mode = mode === "3d" ? "2d" : "3d"; store.set("monopoly:view", mode); setupView(); });
+// ゲームが始まってから3Dを読み込む
+$("viewBtn").textContent = mode === "3d" ? "2D表示にする" : "3D表示にする";
+$("viewNote").textContent = "マスを押すと説明";
+const _render = render;
+render = function () { _render(); if (mode === "3d" && !View3D && !view3dFailed && !view3dLoading && G()) setupView(); };
+
+// =================================================================
+// 3D 表示(three.js)。盤面の絵はキャンバスに描いて貼る。駒・家・サイコロはコードで組み立て
+// =================================================================
+// マスの四角(盤面の座標 0〜12.2、左上が原点)
+function cellRect(i) {
+  const side = Math.floor(i / 10), k = i % 10, C = 1.6, W = 12.2;
+  if (k === 0) return [[W - C, W - C], [0, W - C], [0, 0], [W - C, 0]][side].concat([C, C]);
+  if (side === 0) return [W - C - k, W - C, 1, C];
+  if (side === 1) return [0, W - C - k, C, 1];
+  if (side === 2) return [C + k - 1, 0, 1, C];
+  return [W - C, C + k - 1, C, 1];
+}
+function drawBoardTexture(board, size) {
+  const cv = document.createElement("canvas"); cv.width = cv.height = size;
+  const x = cv.getContext("2d"), u = size / 12.2;
+  x.fillStyle = "#cfe8d2"; x.fillRect(0, 0, size, size);
+  x.save(); x.translate(size / 2, size / 2); x.rotate(-Math.PI / 4);
+  x.fillStyle = "rgba(24,27,35,.18)"; x.font = `${u * 1.3}px 'Dela Gothic One', sans-serif`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("不動産王", 0, 0);
+  x.restore();
+  board.forEach((s, i) => {
+    const [cx, cy, w, hh] = cellRect(i).map((v) => v * u), side = Math.floor(i / 10), corner = i % 10 === 0;
+    x.fillStyle = "#f6f2e6"; x.fillRect(cx, cy, w, hh);
+    x.strokeStyle = "#181b23"; x.lineWidth = u * 0.02; x.strokeRect(cx, cy, w, hh);
+    // 文字は盤の外側から読める向き(下辺は正位置、左辺は90°、上辺は180°、右辺は270°)
+    x.save(); x.translate(cx + w / 2, cy + hh / 2);
+    const rot = corner ? [-Math.PI / 4, Math.PI / 4, Math.PI * 3 / 4, -Math.PI * 3 / 4][side] : [0, Math.PI / 2, Math.PI, -Math.PI / 2][side];
+    x.rotate(rot);
+    const lw = corner ? 1.6 * u : 1 * u, lh = corner ? 1.6 * u : 1.6 * u;
+    if (s.color && !corner) { x.fillStyle = s.color; x.fillRect(-lw / 2, -lh / 2, lw, lh * 0.24); x.strokeRect(-lw / 2, -lh / 2, lw, lh * 0.24); }
+    x.fillStyle = "#181b23"; x.textAlign = "center"; x.textBaseline = "middle";
+    const label = s.type === "go" ? "スタート" : s.name;
+    const fs = Math.min(u * 0.2, (lw * 0.92) / Math.max(2, [...label].length));
+    x.font = `bold ${corner ? u * 0.26 : fs}px 'Zen Kaku Gothic New', sans-serif`;
+    if (corner) {
+      x.font = `${u * 0.5}px sans-serif`; x.fillText(CORNER_IC[s.type] || "", 0, -u * 0.25);
+      x.font = `bold ${u * 0.24}px 'Zen Kaku Gothic New', sans-serif`; x.fillText(label, 0, u * 0.3);
+    } else {
+      x.fillText(label, 0, -lh * 0.05);
+      const ic = s.type === "util" ? (i === 12 ? "💡" : "🚰") : TYPE_IC[s.type];
+      if (ic) { x.font = `${u * 0.32}px sans-serif`; x.fillText(ic, 0, lh * 0.18); }
+      const pr = s.price ? M(s.price) : s.type === "tax" ? M(s.tax) : "";
+      if (pr) { x.font = `${u * 0.15}px 'Zen Kaku Gothic New', sans-serif`; x.fillStyle = "#596070"; x.fillText(pr, 0, lh * 0.4); }
+    }
+    x.restore();
+  });
+  return cv;
+}
+function createView3D(THREE, OrbitControls, host) {
+  const canvas = document.createElement("canvas");
+  host.prepend(canvas);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f1a14);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(0, 13.5, 11.5);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.target.set(0, 0, 0.6); controls.minDistance = 5; controls.maxDistance = 26; controls.maxPolarAngle = 1.3; controls.enablePan = false;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x334433, 1.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(5, 12, 7); sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 }); scene.add(sun);
+  // テーブルと盤
+  const W = 12.2, half = W / 2;
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 0.3, 48), new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: .7 }));
+  table.position.y = -0.3; table.receiveShadow = true; scene.add(table);
+  let boardMesh = null, boardMap = null;
+  function buildBoard(g) {
+    if (boardMap === g.cfg.map) return;
+    boardMap = g.cfg.map;
+    if (boardMesh) scene.remove(boardMesh);
+    const tex = new THREE.CanvasTexture(drawBoardTexture(g.board, 2048)); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const side = new THREE.MeshStandardMaterial({ color: 0x1d4a2c });
+    boardMesh = new THREE.Mesh(new THREE.BoxGeometry(W, 0.2, W), [side, side, new THREE.MeshStandardMaterial({ map: tex, roughness: .8 }), side, side, side]);
+    boardMesh.position.y = -0.05; boardMesh.receiveShadow = true; scene.add(boardMesh);
+  }
+  // 盤の座標(左上原点)→ 3D の x,z
+  const to3 = (bx, by) => [bx - half, by - half];
+  const cellCenter = (i) => { const [x, y, w, hh] = cellRect(i); return to3(x + w / 2, y + hh / 2); };
+  // 駒(コマの形)
+  const pawnGeo = new THREE.LatheGeometry([[0, 0], [0.22, 0], [0.22, 0.05], [0.12, 0.1], [0.08, 0.32], [0.13, 0.38], [0.06, 0.42], [0.11, 0.5], [0.1, 0.58], [0, 0.62]].map(([a, b]) => new THREE.Vector2(a, b)), 20);
+  const pawns = new Map();
+  function pawn(id, color) {
+    if (!pawns.has(id)) {
+      const m = new THREE.Mesh(pawnGeo, new THREE.MeshStandardMaterial({ color, roughness: .35, metalness: .2 }));
+      m.castShadow = true; scene.add(m); pawns.set(id, { mesh: m, x: null, z: null });
+    }
+    return pawns.get(id);
+  }
+  // 家・ホテル・持ち主の札・抵当の印
+  const marks = new THREE.Group(); scene.add(marks);
+  const houseGeo = new THREE.BoxGeometry(0.16, 0.14, 0.16), roofGeo = new THREE.ConeGeometry(0.14, 0.1, 4);
+  const houseMat = new THREE.MeshStandardMaterial({ color: 0x2f9e57 }), hotelMat = new THREE.MeshStandardMaterial({ color: 0xd8343a });
+  let marksKey = "";
+  function buildMarks(g) {
+    const key = JSON.stringify(g.own) + g.order.join();
+    if (key === marksKey) return; marksKey = key;
+    marks.clear();
+    g.own.forEach((o, i) => {
+      if (!o || !o.owner) return;
+      const [x, y, w, hh] = cellRect(i), side = Math.floor(i / 10);
+      // 持ち主の札: 盤の外側のふち
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(side % 2 ? 0.12 : w * 0.9, 0.05, side % 2 ? hh * 0.9 : 0.12), new THREE.MeshStandardMaterial({ color: colorOf(o.owner) }));
+      const [px, pz] = to3(side === 1 ? x + 0.08 : side === 3 ? x + w - 0.08 : x + w / 2, side === 0 ? y + hh - 0.08 : side === 2 ? y + 0.08 : y + hh / 2);
+      plate.position.set(px, 0.08, pz); marks.add(plate);
+      if (o.mort) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.02, hh * 0.9), new THREE.MeshStandardMaterial({ color: 0x222222, transparent: true, opacity: .45 }));
+        const [cx, cz] = cellCenter(i); m.position.set(cx, 0.07, cz); marks.add(m);
+      }
+      if (!o.houses) return;
+      // 建物: 色帯の上に並べる
+      const along = side % 2 ? [0, 1] : [1, 0];
+      const [bx, bz] = to3(side === 1 ? x + w - 0.22 : side === 3 ? x + 0.22 : x + w / 2, side === 0 ? y + 0.22 : side === 2 ? y + hh - 0.22 : y + hh / 2);
+      if (o.houses === 5) {
+        const ho = new THREE.Mesh(new THREE.BoxGeometry(side % 2 ? 0.2 : 0.5, 0.22, side % 2 ? 0.5 : 0.2), hotelMat);
+        ho.position.set(bx, 0.16, bz); ho.castShadow = true; marks.add(ho);
+      } else for (let k = 0; k < o.houses; k++) {
+        const off = (k - (o.houses - 1) / 2) * 0.21;
+        const hs = new THREE.Mesh(houseGeo, houseMat); hs.position.set(bx + along[0] * off, 0.12, bz + along[1] * off); hs.castShadow = true; marks.add(hs);
+        const rf = new THREE.Mesh(roofGeo, houseMat); rf.position.set(bx + along[0] * off, 0.24, bz + along[1] * off); rf.rotation.y = Math.PI / 4; marks.add(rf);
+      }
+    });
+  }
+  // 今のマスの光
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.52, 32), new THREE.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: .9, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.07; scene.add(ring);
+  // サイコロ
+  const pipTex = (n) => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, 128, 128); x.fillStyle = n === 1 ? "#c4323a" : "#181b23";
+    const P = { 1: [[64, 64]], 2: [[34, 34], [94, 94]], 3: [[30, 30], [64, 64], [98, 98]], 4: [[34, 34], [94, 34], [34, 94], [94, 94]], 5: [[30, 30], [98, 30], [64, 64], [30, 98], [98, 98]], 6: [[34, 28], [94, 28], [34, 64], [94, 64], [34, 100], [94, 100]] }[n];
+    for (const [a, b] of P) { x.beginPath(); x.arc(a, b, n === 1 ? 18 : 12, 0, Math.PI * 2); x.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  // BoxGeometry の面の順: +x,-x,+y,-y,+z,-z → 目: 3,4,1,6,2,5(向かい合う面の和が7)
+  const FACES = [3, 4, 1, 6, 2, 5];
+  const diceMats = FACES.map((n) => new THREE.MeshStandardMaterial({ map: pipTex(n), roughness: .4 }));
+  const dice = [0, 1].map((k) => { const d = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), diceMats); d.castShadow = true; d.position.set(-0.5 + k * 1.0, 0.3, 0.8); scene.add(d); return d; });
+  // 目 n を上(+y)に向ける回転
+  const UP = { 1: [0, 0, 0], 6: [Math.PI, 0, 0], 2: [-Math.PI / 2, 0, 0], 5: [Math.PI / 2, 0, 0], 3: [0, 0, Math.PI / 2], 4: [0, 0, -Math.PI / 2] };
+  let rollAnim = null;
+  function setDie(d, n, spin) { const [a, b, c] = UP[n] || UP[1]; d.rotation.set(a, spin, c); }
+  let lastDice = null;
+
+  let visible = false, raf = 0, w = 0, hgt = 0;
+  function resize() {
+    const r = host.getBoundingClientRect(); if (!r.width) return;
+    if (r.width === w && r.height === hgt) return; w = r.width; hgt = r.height;
+    renderer.setSize(w, hgt, false); camera.aspect = w / hgt; camera.updateProjectionMatrix();
+  }
+  const t0 = performance.now();
+  function frame() {
+    raf = requestAnimationFrame(frame);
+    if (!visible) return;
+    resize();
+    const t = (performance.now() - t0) / 1000, g = G();
+    if (g) {
+      const groups = new Map();
+      for (const id of g.order) { if (g.P[id].out) { if (pawns.has(id)) pawns.get(id).mesh.visible = false; continue; } const k = shown[id] ?? g.P[id].pos; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(id); }
+      for (const [k, ids] of groups) {
+        const [cx, cz] = cellCenter(k);
+        ids.forEach((id, n) => {
+          const p = pawn(id, colorOf(id)); p.mesh.visible = true;
+          const ang = (n / Math.max(1, ids.length)) * Math.PI * 2, rr = ids.length > 1 ? 0.28 : 0;
+          const tx = cx + Math.cos(ang) * rr, tz = cz + Math.sin(ang) * rr;
+          if (p.x == null) { p.x = tx; p.z = tz; }
+          p.x += (tx - p.x) * 0.3; p.z += (tz - p.z) * 0.3;
+          const hop = Math.min(1, Math.hypot(tx - p.x, tz - p.z)) * 0.6;
+          p.mesh.position.set(p.x, 0.05 + hop + (id === g.cur ? Math.abs(Math.sin(t * 3)) * 0.12 : 0), p.z);
+        });
+      }
+      const focus = g.step === "auction" ? g.auction.sq : g.pending ?? (shown[g.cur] ?? g.P[g.cur]?.pos);
+      if (focus != null) { const [fx, fz] = cellCenter(focus); ring.position.x = fx; ring.position.z = fz; ring.material.opacity = 0.55 + Math.sin(t * 4) * 0.35; }
+      if (rollAnim) {
+        const k = (performance.now() - rollAnim.start) / 700;
+        dice.forEach((d, n) => {
+          if (k < 1) { d.rotation.x += 0.35 + n * 0.1; d.rotation.z += 0.27; d.position.y = 0.3 + Math.sin(k * Math.PI) * 1.2; }
+          else { setDie(d, rollAnim.v[n], n * 0.4); d.position.y = 0.3; }
+        });
+        if (k >= 1) rollAnim = null;
+      } else if (g.dice && lastDice !== g.dice.join()) { lastDice = g.dice.join(); dice.forEach((d, n) => setDie(d, g.dice[n], n * 0.4)); }
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  frame();
+  // マスをタップ → 説明
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let downAt = null;
+  canvas.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+  canvas.addEventListener("pointerup", (e) => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6 || !boardMesh) return;
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(boardMesh)[0]; if (!hit) return;
+    const bx = hit.point.x + half, by = hit.point.z + half;
+    for (let i = 0; i < 40; i++) { const [x, y, w2, h2] = cellRect(i); if (bx >= x && bx <= x + w2 && by >= y && by <= y + h2) { openInfo(i); break; } }
+  });
+  function overlay() {
+    const g = G(), ov = $("ov3d"); if (!g) return;
+    ov.replaceChildren(h("div", { class: "pill" }, statusText(g)));
+    if (g.card && Date.now() < local.cardUntil) ov.append(h("div", { class: "cardpop " + g.card.kind, style: "font-size:13px" }, h("b", {}, (g.card.kind === "chance" ? "チャンス" : "共同基金") + ` (${nameOf(g.card.pid)})`), g.card.text));
+  }
+  return {
+    setVisible(v) { visible = v; if (v) { w = 0; resize(); } },
+    update() { const g = G(); if (!g) return; buildBoard(g); buildMarks(g); overlay(); },
+    roll(v) { rollAnim = { start: performance.now(), v }; },
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
