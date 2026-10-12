@@ -525,14 +525,20 @@ function handle(ws, m) {
 // ---------------------------------------------------------------
 // HTTP + WebSocket
 // ---------------------------------------------------------------
-// URL → 画面ファイル(/ はティア表のまま)
+// URL → 画面ファイル(/ はゲームを選ぶホーム画面)
 const PAGES = {
   "/": "index.html", "/index.html": "index.html",
+  "/tier": "tier.html", "/tier/": "tier.html",
   "/number": "number.html", "/number/": "number.html",
 };
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/healthz") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
+  // 以前のティア表の招待リンク(/?room=ABCD)はティア表へ転送する
+  if (url.pathname === "/" && url.searchParams.has("room")) {
+    res.writeHead(302, { Location: "/tier" + url.search });
+    return res.end();
+  }
   const page = PAGES[url.pathname];
   if (page) {
     fs.readFile(path.join(__dirname, "public", page), (e, buf) => {

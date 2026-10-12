@@ -1,4 +1,8 @@
-# みんなでティア表
+# みんなのあそびば(みんなでティア表 / かくれナンバー)
+
+ログインなしで遊べるオンラインパーティーゲーム集。`/` のホーム画面でゲームを選ぶ。
+
+## みんなでティア表(`/tier`)
 
 親が5つのワードを 1位〜5位 に並べ、ほかのプレイヤーが制限時間内にその並びを予想して得点を競うオンラインパーティーゲーム。
 ログイン不要。ニックネームと部屋コードを入れるだけで遊べる。
@@ -8,7 +12,8 @@
 | ファイル | 役割 |
 |---|---|
 | `server.js` | ゲームサーバ(HTTP + WebSocket)。部屋・タイマー・得点計算・お題の保存。WebSocket の振り分け |
-| `public/index.html` | ティア表の画面(入室・ゲーム・お題コレクション)。URL は `/` |
+| `public/index.html` | ゲームを選ぶホーム画面。URL は `/` |
+| `public/tier.html` | ティア表の画面(入室・ゲーム・お題コレクション)。URL は `/tier`(以前の `/?room=` 形式の招待リンクは `/tier?room=` へ転送) |
 | `games/number.js` | かくれナンバーのゲームサーバ(WebSocket は `/number/ws`) |
 | `public/number.html` | かくれナンバーの画面。URL は `/number` |
 | `render.yaml` | Render にデプロイするための設定 |
@@ -45,7 +50,7 @@ npm install
 npm start
 ```
 
-http://localhost:3000 を開く(かくれナンバーは http://localhost:3000/number )。
+http://localhost:3000 を開く(ホーム画面。ティア表は `/tier`、かくれナンバーは `/number`)。
 
 ## Render に公開する
 

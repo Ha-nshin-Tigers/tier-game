@@ -161,7 +161,7 @@ details.gmbox[open] { display: grid; gap: 10px; }
       <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
       <p class="status" id="lMsg" aria-live="polite"></p>
     </form>
-    <p class="small muted">ほかのゲーム: <a href="/">みんなでティア表</a></p>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
   </div>
 </div>
 
@@ -410,7 +410,7 @@ function renderSide() {
   if (S.phase !== "lobby" && isGM) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
   btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
   side.append(btns);
-  side.append(h("p", { class: "small muted" }, "ほかのゲーム: ", h("a", { href: "/" }, "みんなでティア表")));
+  side.append(h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")));
   if (flashMsg) side.append(h("p", { class: "status" + (flashWarn ? " warn" : "") }, flashMsg));
 }
 function twoStep(label, action, cls = "ghost danger") {
