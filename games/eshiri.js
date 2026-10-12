@@ -18,7 +18,7 @@ const rooms = new Map();
 function newRoom(code) {
   return {
     code, phase: "lobby", players: new Map(), roster: [], game: null, ranking: null, timer: null, deadline: 0, emptySince: null,
-    settings: core.normalize({}),
+    settings: core.normalize({ scoring: "coop" }), // 単独で遊ぶときは協力のみが初期設定(個人戦はホストが設定で選べる。大会版は個人戦のまま)
   };
 }
 const connected = (p) => p && p.sockets.size > 0;
