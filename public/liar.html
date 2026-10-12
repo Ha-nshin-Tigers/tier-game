@@ -73,6 +73,12 @@ a { color: var(--accent); }
   border: 2px solid #181b23; white-space: nowrap; pointer-events: none; z-index: 4; animation: pop2 .25s ease-out; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -6px; border: 6px solid transparent; border-top-color: #181b23; border-bottom: 0; }
 @keyframes pop2 { from { opacity: 0; transform: translate(-50%, -80%) scale(.8); } to { opacity: 1; transform: translate(-50%, -100%); } }
+.stage canvas { touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.lookFront { position: absolute; left: 10px; bottom: 8px; z-index: 3; padding: 5px 12px; font-size: 13px; border-radius: 999px; background: rgba(15,10,6,.7); color: #fff; border-color: rgba(255,255,255,.5); }
+.lookFront:hover:not(:disabled) { background: rgba(15,10,6,.9); }
+.lookHint { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); z-index: 3; padding: 6px 14px; border-radius: 999px; background: rgba(15,10,6,.75); color: #fff;
+  font-size: 13px; font-weight: 700; white-space: nowrap; pointer-events: none; transition: opacity .6s; }
 .loading3d { position: absolute; inset: 0; display: grid; place-items: center; color: #e9dcc6; font-size: 14px; font-weight: 700; }
 
 /* 2D 表示 */
@@ -931,23 +937,76 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
   const seatPos = (i, r = SEAT_R) => { const n = Math.max(seatIds.length, 2), th = ((i - Math.max(myIndex, 0)) * 2 * Math.PI) / n; return new THREE.Vector3(Math.sin(th) * r, 0, Math.cos(th) * r); };
   const seatOf = (id) => seatIds.indexOf(id);
   const headPos = (id) => { const i = seatOf(id); if (i < 0) return new THREE.Vector3(0, 2, 0); return seatPos(i).setY(1.62); };
+  // ---- 視点 ----
+  // 席についているときは一人称(自分の席の目の高さ)。スワイプ/ドラッグで首を振って見回す。
+  // 観戦中は上から見下ろし、スワイプでテーブルの周りを回る
+  const EYE_Y = 1.42, PITCH0 = -0.24, YAW_MAX = 2.4, PITCH_MIN = -0.9, PITCH_MAX = 0.35;
+  const look = { yaw: 0, pitch: PITCH0, tYaw: 0, tPitch: PITCH0 };
+  const seatedNow = () => myIndex >= 0;
   function placeCamera() {
-    const aspect = camera.aspect, seated = myIndex >= 0;
-    if (seated) {
-      // 自分の目線: 手前の席の少し後ろ上から、テーブルの奥を見る
-      // 縦長(スマホ)は左右の席まで入るように、高く・後ろから見下ろす
-      // 5人以上は両隣が近くなるので少し引く
-      const many = seatIds.length >= 5 ? 1 : 0;
-      const back = (aspect < 1 ? 1.5 : 1.05) + many * 0.7, up = (aspect < 1 ? 4.3 : 2.05) + many * 0.45;
-      camera.position.set(0, up, SEAT_R + back);
-      camera.lookAt(0, TABLE_Y + (aspect < 1 ? -0.4 : 0.1), aspect < 1 ? 0.35 : -0.35);
+    const aspect = camera.aspect;
+    camera.fov = seatedNow() ? (aspect < 1 ? 78 : 62) : (aspect < 1 ? 60 : 50);
+    camera.updateProjectionMatrix();
+    aimCamera();
+  }
+  function aimCamera() {
+    if (seatedNow()) {
+      camera.position.set(0, EYE_Y, SEAT_R + 0.1);
+      const cp = Math.cos(look.pitch);
+      camera.lookAt(Math.sin(look.yaw) * cp, EYE_Y + Math.sin(look.pitch), SEAT_R + 0.1 - Math.cos(look.yaw) * cp);
     } else {
-      camera.position.set(0, aspect < 1 ? 5.4 : 4.3, aspect < 1 ? 5.2 : 4.4);
+      const d = camera.aspect < 1 ? 5.2 : 4.4, up = camera.aspect < 1 ? 5.4 : 4.3;
+      camera.position.set(Math.sin(look.yaw) * d, up, Math.cos(look.yaw) * d);
       camera.lookAt(0, TABLE_Y, 0);
     }
-    camera.fov = aspect < 1 ? 60 : 50;
-    camera.updateProjectionMatrix();
   }
+  // 指定した人のほうへ顔を向ける
+  function lookAtSeat(id) {
+    const i = seatOf(id);
+    if (i < 0 || !seatedNow() || i === myIndex) return;
+    const p = seatPos(i), dx = p.x, dz = p.z - (SEAT_R + 0.1);
+    look.tYaw = Math.atan2(dx, -dz);
+    look.tPitch = Math.atan2(1.25 - EYE_Y, Math.hypot(dx, dz));
+  }
+  function lookFront() { look.tYaw = 0; look.tPitch = PITCH0; }
+  // スワイプ/ドラッグで見回す。動かさずに離したら「タップ」: 人に当たればその人を見る
+  {
+    let drag = null;
+    const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    canvas.addEventListener("pointerdown", (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); hideHint(); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+      const k = (camera.fov * Math.PI / 180) / Math.max(1, host.clientHeight);
+      look.tYaw -= dx * k * (seatedNow() ? 1 : 1.5);
+      if (seatedNow()) {
+        look.tYaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, look.tYaw));
+        look.tPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, look.tPitch + dy * k));
+      }
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const tap = drag.moved < 8; drag = null;
+      if (!tap) return;
+      const r = canvas.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      const hits = ray.intersectObjects([...robots.values()].map((x) => x.root), true);
+      if (hits.length) for (const [id, x] of robots) { let o = hits[0].object; while (o && o !== x.root) o = o.parent; if (o) { lookAtSeat(id); break; } }
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", () => { drag = null; });
+  }
+  const frontBtn = h("button", { type: "button", class: "lookFront", onclick: lookFront }, "正面を見る");
+  host.append(frontBtn);
+  let hintEl = null;
+  if (!store.get("liar:lookHint")) {
+    hintEl = h("div", { class: "lookHint" }, "スワイプで見回せます・人をタップでその人を見る");
+    host.append(hintEl);
+    setTimeout(hideHint, 6000);
+  }
+  function hideHint() { if (!hintEl) return; store.set("liar:lookHint", 1); hintEl.style.opacity = "0"; const el = hintEl; hintEl = null; setTimeout(() => el.remove(), 700); }
 
   // ---- 吹き出し(スタンプ)は HTML を3D座標に合わせて置く ----
   const bubbles = new Map(); // pid → {el, until}
@@ -968,7 +1027,7 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
     const mi = ids.indexOf(meId);
     const seatsChanged = ids.join() !== seatIds.join() || mi !== myIndex;
     seatIds = ids; myIndex = mi;
-    if (seatsChanged) placeCamera();
+    if (seatsChanged) { look.yaw = look.tYaw = 0; look.pitch = look.tPitch = PITCH0; placeCamera(); }
     // キャラクター: 自分(一人称)以外の席に置く
     if (robotSrc) {
       for (const [id, r] of robots) if (!ids.includes(id) || id === meId) { scene.remove(r.root); if (r.plate) scene.remove(r.plate); robots.delete(id); }
@@ -1048,6 +1107,7 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
     const tgt = rv ? rv.target : null;
     if (tgt !== gunTarget) {
       gunTarget = tgt;
+      if (tgt && tgt === meId) lookFront();
       const fromP = gun.position.clone(), fromQ = gun.quaternion.clone();
       const toObj = new THREE.Object3D();
       if (tgt && seatOf(tgt) >= 0) {
@@ -1057,7 +1117,7 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
         // 真正面から銃口を向けると黒い棒に見えるので、少し斜め(横向き寄り)にする
         const at = seatOf(tgt) === myIndex ? camera.position.clone().add(new THREE.Vector3(-1.8, -0.4, 0)) : hp;
         // 自分のときはテーブルの上(少し右)に浮かせて、こちら(カメラ)に向ける
-        toObj.position.copy(seatOf(tgt) === myIndex ? new THREE.Vector3(0.3, TABLE_Y + 0.75, SEAT_R - 1.35) : hp.clone().addScaledVector(dir, -0.55).add(new THREE.Vector3(0, 0.05, 0)).addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x), 0.18));
+        toObj.position.copy(seatOf(tgt) === myIndex ? new THREE.Vector3(0.22, TABLE_Y + 0.42, SEAT_R - 1.0) : hp.clone().addScaledVector(dir, -0.55).add(new THREE.Vector3(0, 0.05, 0)).addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x), 0.18));
         toObj.lookAt(at);
       } else {
         toObj.position.set(0.35, TABLE_Y + 0.07, 0.25);
@@ -1094,6 +1154,10 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
     sign.rotation.y += dt * 0.6;
     sign.position.y = TABLE_Y + 0.62 + Math.sin(now / 600) * 0.03;
     if (ring.visible) ring.material.color.setHSL(0.12, 0.85, 0.5 + Math.sin(now / 250) * 0.15);
+    const f = 1 - Math.pow(0.0001, dt); // 首の動きをなめらかに追いつかせる
+    look.yaw += (look.tYaw - look.yaw) * f; look.pitch += (look.tPitch - look.pitch) * f;
+    aimCamera();
+    frontBtn.hidden = !seatedNow() || (Math.abs(look.tYaw) < 0.15 && Math.abs(look.tPitch - PITCH0) < 0.15);
     // 吹き出しを頭の上へ
     const rect = host.getBoundingClientRect();
     for (const [id, b] of bubbles) {
@@ -1101,6 +1165,7 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
       if (seatOf(id) === myIndex || seatOf(id) < 0) { b.el.style.left = "50%"; b.el.style.top = "88%"; continue; }
       // 名札のすぐ下(頭の上)に出す。舞台の外にはみ出さないように端で止める
       v.copy(headPos(id)).setY(1.62).project(camera);
+      b.el.hidden = v.z > 1; // カメラの後ろ(見ていない方向)の人の吹き出しは出さない
       b.el.style.left = Math.min(rect.width - 60, Math.max(60, (v.x + 1) / 2 * rect.width)) + "px";
       b.el.style.top = Math.max(44, (1 - v.y) / 2 * rect.height) + "px";
     }
