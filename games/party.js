@@ -8,11 +8,18 @@
 // 部屋は遊び方(mode)ごとに別。同じ部屋コードでも橋と爆弾は別の部屋になる。
 
 const { WebSocketServer } = require("ws");
+// 大会で遊べるほかのゲーム(大会版)。1ゲーム=1ファイルで、start / handle / view / onLeave を持つ
+const MINI = {
+  tier: require("./mini/tier"),
+  liar: require("./mini/liar"),
+  number: require("./mini/number"),
+};
 
 const WS_PATH = "/party/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 8, MAX_ROOMS = 500;
-const GAMES = ["bridge", "bomb", "memory"];
-const MODES = ["party", ...GAMES];           // party = 大会。それ以外はそのゲームだけを繰り返し遊ぶ
+const SINGLE_GAMES = ["bridge", "bomb", "memory"];  // 単独のページ(/bridge など)でも遊べるミニゲーム
+const GAMES = [...SINGLE_GAMES, ...Object.keys(MINI)]; // 大会で並べられるゲーム
+const MODES = ["party", ...SINGLE_GAMES];    // party = 大会。それ以外はそのゲームだけを繰り返し遊ぶ
 const DEFAULT_PLAYLIST = ["bridge", "bomb", "memory"];
 const MAX_PLAYLIST = 9;                      // 大会で並べられる試合数
 const RANK_PTS = [10, 7, 5, 3, 2, 1, 1, 1]; // ゲームごとの順位点(同点は上の順位の点)
@@ -110,7 +117,22 @@ function startGame(room) {
   const key = room.seq[room.gi];
   if (key === "bridge") bridgeStart(room);
   else if (key === "bomb") bombStart(room);
-  else memoryStart(room);
+  else if (key === "memory") memoryStart(room);
+  else MINI[key].start(ctxOf(room));
+}
+// 大会版ゲーム(games/mini/)に渡す、部屋の操作の窓口
+function ctxOf(room) {
+  return {
+    get g() { return room.game; },
+    set g(v) { room.game = v; },
+    members: () => members(room),
+    live: () => liveMembers(room),
+    has: (id) => room.players.has(id),
+    nameOf: (id) => nameOf(room, id),
+    setTimer: (ms, fn) => setTimer(room, ms, fn),
+    clearTimer: () => clearTimer(room),
+    finish: (raw) => finishGame(room, raw),
+  };
 }
 // ミニゲームの素点(raw: 大きいほど良い)から順位と順位点を決めて合計に足す
 function finishGame(room, raw) {
@@ -262,6 +284,7 @@ function gameView(room, me) {
   const g = room.game;
   if (!g) return null;
   if (room.phase === "intro") return { key: g.key };
+  if (MINI[g.key]) return { key: g.key, ...MINI[g.key].view(ctxOf(room), me) };
   if (g.key === "bridge") {
     const mine = g.picks.get(me);
     return { key: "bridge", round: g.round, rounds: BRIDGE_ROUNDS, step: g.step, values: g.values, score: g.score,
@@ -325,6 +348,7 @@ function removePlayer(room, pid) {
       else if (g.alive.length <= 1 && g.step === "fuse") bombFinish(room);
     } else if (g.key === "bridge") checkBridge(room);
     else if (g.key === "memory") checkMemory(room);
+    else if (MINI[g.key]) MINI[g.key].onLeave(ctxOf(room), pid);
   }
   broadcast(room);
 }
@@ -433,6 +457,13 @@ function handle(ws, m) {
       checkMemory(room);
       break;
     }
+    case "mini": {
+      // 大会版ゲームへの操作(中身はゲームごとのファイルで判定する)
+      if (room.phase !== "play" || !g || !MINI[g.key] || !inGame || typeof m.a !== "string") return;
+      const e = MINI[g.key].handle(ctxOf(room), p.id, m);
+      if (typeof e === "string") return err(ws, e);
+      break;
+    }
     case "again":
       // 大会: 総合結果から待機画面へ。単独ゲーム: 結果から同じメンバーで次の試合(通算点は残す)
       if (room.mode === "party") { if (room.phase !== "final") return; toLobby(room); break; }
@@ -482,4 +513,4 @@ setInterval(() => {
     if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { clearTimer(room); rooms.delete(code); }
 }, 60000);
 
-module.exports = { WS_PATH, wss, INGREDIENTS };
+module.exports = { WS_PATH, wss, INGREDIENTS, setTierTopics: MINI.tier.setTopicSource, setNumberTopics: MINI.number.setTopics };

@@ -619,4 +619,8 @@ setInterval(() => {
     if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { clearTimeout(room.timer); rooms.delete(code); }
 }, 60000);
 
+// ドタバタ大会のティア表・かくれナンバー(大会版)にお題を渡す(ティア表はみんなのお題も含む)
+party.setTierTopics(allTopics);
+party.setNumberTopics(number.TOPICS);
+
 loadTopics().then(() => server.listen(PORT, () => console.log(`起動しました: http://localhost:${PORT}`)));

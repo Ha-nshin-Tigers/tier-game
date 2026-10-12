@@ -140,6 +140,41 @@ button.seat:not(:disabled):hover { border-color: var(--bad); background: color-m
 .playlist .ico { font-size: 24px; text-align: center; }
 .adders { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* 大会版ゲーム共通 */
+.slots { display: grid; gap: 6px; }
+.slot { display: grid; grid-template-columns: 2.6em 1fr; align-items: center; gap: 8px; min-height: 44px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); text-align: left; font-weight: 700; }
+.slot .no { font-family: var(--display); font-size: 18px; color: var(--ink); text-align: center; border-radius: 6px; padding: 2px 0; }
+.slot.empty { border-style: dashed; color: var(--muted); font-weight: 500; }
+.words { display: flex; flex-wrap: wrap; gap: 6px; }
+.word { padding: 8px 12px; border-radius: 8px; border: 2px solid var(--fg); background: var(--surface); font-weight: 700; }
+.word.used { opacity: .3; }
+.lineup { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lineup li { display: grid; grid-template-columns: 2em minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border: 2px solid var(--line); border-radius: 8px; }
+.lineup li.me { border-color: var(--fg); }
+.lineup li.ok { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface)); }
+.lineup li.ng { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.lineup .pos { font-family: var(--display); color: var(--muted); text-align: center; }
+.lineup .hint { font-weight: 700; overflow-wrap: anywhere; }
+.lineup .num { font-family: var(--display); font-size: 20px; }
+.bignum { font-family: var(--display); font-size: 52px; line-height: 1; }
+.scale { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 12px; font-weight: 700; }
+.scale .bar2 { height: 8px; border-radius: 999px; background: linear-gradient(90deg, #7fbfff, #ffdf7f, #ff7f7f); }
+.pc { width: 50px; height: 70px; border-radius: 6px; border: 2px solid #181b23; background: #fbf6ea; color: #181b23; display: grid; place-items: center; align-content: center;
+  font-family: var(--display); font-size: 24px; line-height: 1; flex: none; padding: 0; }
+.pc small { font-family: var(--body); font-size: 9px; font-weight: 700; margin-top: 3px; }
+.pc.K { color: #b3261e; } .pc.Q { color: #6a2bb3; } .pc.A { color: #1f5fb3; } .pc.J { background: linear-gradient(135deg, #ffe08a, #ff9f6b, #c9a0ff); }
+.pc.match { box-shadow: inset 0 0 0 3px rgba(31,138,76,.55); }
+button.pc.sel { transform: translateY(-8px); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+.cards { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); font-family: var(--display); font-weight: 400; font-size: 18px; }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; }
+/* ウソつき酒場は情報が多いので、席を小さくしてスマホでも1画面に収める */
+.table.small { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
+.table.small .seat { min-height: 0; padding: 6px 4px; gap: 0; }
+.table.small .face { font-size: 22px; }
+.table.small .nm { font-size: 13px; }
+@media (max-width: 600px) { .log { display: none; } .table.small .muted { font-size: 11px; } }
+
 /* 順位 */
 .rank { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rank th, .rank td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
@@ -223,7 +258,17 @@ const GAME_INFO = {
     rules: ["爆弾を持っている人は、渡したい人を押して押し付けます。", "爆発までの時間は秘密。毎回ちがいます。", "爆発したときに持っていた人は脱落。新しい爆弾で続きます。", "最後まで残った人が1位！"] },
   memory: { icon: "🍳", name: "おぼえて料理", short: "材料を覚えて、正しく選ぶ",
     rules: ["料理の材料が4秒だけ表示されます。しっかり覚えて！", "並んだ12個の食材から、材料だけを選んで「完成！」。", "正解1つ+2点、まちがい1つ−1点、全部正解でボーナス。", "全部正解の中で早かった人はさらにボーナス。材料は3→4→5個と増えます。"] },
+  // ここから下は大会だけで遊べる「大会版」(元のゲームは /tier /number /liar)
+  tier: { icon: "📊", name: "ティア表", short: "親の並びを予想する(全員1回ずつ親)", extra: true,
+    rules: ["全員が1回ずつ親になります。親は5つのワードを自分の本音で1位〜5位に並べます(60秒)。", "ほかの人は親の並びを予想します(45秒)。", "順位ぴったり3点・1つずれ1点・全部ぴったりでボーナス5点。", "全員が親をやり終えたら、予想で取った点の合計で順位が決まります。"] },
+  number: { icon: "🔢", name: "かくれナンバー", short: "数字をことばで伝えて並べる(正しい位置で得点)", extra: true,
+    rules: ["全員に1〜100の数字がこっそり配られます。お題に沿って、数字の大きさを「ことば」で表します。", "全員のヒントがそろったら、話し合って小さい順に並べます(誰が動かしてもOK)。", "公開して、自分のカードが正しい位置なら+2点。全員そろったら全員+1点。", "これを3ラウンド。"] },
+  liar: { icon: "🃏", name: "ウソつき酒場", short: "ブラフとロシアンルーレット(大会は2D版)", extra: true,
+    rules: ["テーブルカード(キング・クイーン・エース)が決まり、5枚ずつ配られます。ジョーカーは何にでもなります。", "自分の番に1〜3枚を伏せて出し「全部テーブルカード」と言い張ります(ウソでもOK)。", "次の人は出すか「ウソつき！」。ウソなら出した人、本当なら指摘した人が引き金を引きます(6発中1発が実弾)。", "撃たれたら脱落。脱落が遅いほど上位、最後の1人が1位。時間がかかることがあります。"] },
 };
+const ALL_GAMES = Object.keys(GAME_INFO);
+const RANK_NAME = { K: "キング", Q: "クイーン", A: "エース", J: "ジョーカー" };
+const TIERS = ["S", "A", "B", "C", "D"];
 
 // ---- 遊び方: /party は大会、/bridge /bomb /memory はそのゲームだけ ----
 const MODE = { "/bridge": "bridge", "/bomb": "bomb", "/memory": "memory" }[location.pathname.replace(/\/$/, "")] || "party";
@@ -311,6 +356,12 @@ function onTransition(prev, cur) {
     else if (g.holder && g.holder !== pg.holder) Sound.play("pass");
   }
   if (g.key === "memory" && g.step === "result" && pg.step !== "result") Sound.play(g.last?.rows[me]?.perfect ? "good" : "bad");
+  if (g.key === "liar") {
+    if (g.step === "shot" && pg.step !== "shot") Sound.play(g.shot.died ? "boom" : "tick");
+    else if (g.step === "reveal" && pg.step !== "reveal") Sound.play("bad");
+    else if (g.step === "play" && g.turnId === me && pg.turnId !== me) Sound.play("pass");
+  }
+  if ((g.key === "tier" || g.key === "number") && g.step === "show" && pg.step !== "show") Sound.play("good");
 }
 
 function connect() {
@@ -403,8 +454,14 @@ let local = { sel: [], selKey: "", passTimer: null };
 function render() {
   if (!S) return;
   document.body.classList.toggle("playing", S.phase !== "lobby");
-  renderMeta(); renderMain(); renderSide();
+  renderMeta(); renderSide();
+  // 文字を入力中に作り直すと入力が消えるので、その間はゲーム部分を描き直さない
+  const ae = document.activeElement;
+  if (ae && $("main").contains(ae) && ae.tagName === "INPUT") { local.mainStale = true; return; }
+  local.mainStale = false;
+  renderMain();
 }
+document.addEventListener("focusout", () => setTimeout(() => { if (local.mainStale) render(); }, 0));
 function renderMeta() {
   const m = $("meta"); m.replaceChildren();
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"));
@@ -460,7 +517,10 @@ function renderMain() {
   if (!inGame()) main.append(h("p", { class: "muted small" }, "観戦中です。次のゲームから参加できます。"));
   if (g.key === "bridge") renderBridge(main, g);
   else if (g.key === "bomb") renderBomb(main, g);
-  else renderMemory(main, g);
+  else if (g.key === "memory") renderMemory(main, g);
+  else if (g.key === "tier") renderTierMini(main, g);
+  else if (g.key === "number") renderNumberMini(main, g);
+  else if (g.key === "liar") renderLiarMini(main, g);
 }
 
 function renderLobby(main, isGM) {
@@ -484,7 +544,7 @@ function renderLobby(main, isGM) {
     });
     main.append(ul);
     if (isGM) main.append(h("div", { class: "adders" },
-      ...["bridge", "bomb", "memory"].map((key) => h("button", { type: "button", class: "ghost", disabled: list.length >= 9, onclick: () => send({ t: "setPlaylist", list: [...list, key] }) }, `+ ${GAME_INFO[key].icon} ${GAME_INFO[key].name}`)),
+      ...ALL_GAMES.map((key) => h("button", { type: "button", class: "ghost", disabled: list.length >= 9, onclick: () => send({ t: "setPlaylist", list: [...list, key] }) }, `+ ${GAME_INFO[key].icon} ${GAME_INFO[key].name}`)),
       h("button", { type: "button", class: "ghost", onclick: () => send({ t: "setPlaylist", list: ["bridge", "bomb", "memory"] }) }, "3本セットに戻す")));
     else main.append(h("p", { class: "muted small" }, "試合の並びはホストが決めます。"));
   }
@@ -602,6 +662,130 @@ function renderMemory(main, g) {
     h("tbody", {}, ...rows.map(([id, r]) => h("tr", { class: id === me ? "me" : "" }, h("td", {}, chip(id)), h("td", { class: "n" }, r.correct), h("td", { class: "n" }, r.wrong), h("td", { class: "n" }, `+${r.pts}`))))));
 }
 
+// ---- ティア表(大会版) ----
+// 並べ方: ワードをタップすると空いている一番上の順位に入る。入ったワードをタップすると外れる
+function tierPicker(words, done) {
+  const filled = TIERS.filter((t) => local.tarr[t]).length;
+  const slots = h("div", { class: "slots" }, ...TIERS.map((t, i) => {
+    const w = local.tarr[t];
+    return h("button", { type: "button", class: "slot" + (w ? "" : " empty"), disabled: !w, onclick: () => { delete local.tarr[t]; render(); } },
+      h("span", { class: "no", style: `background:${["#ff7f7f", "#ffbf7f", "#ffdf7f", "#bfff7f", "#7fbfff"][i]}` }, i + 1 + "位"), w || "(ワードをタップ)");
+  }));
+  const used = new Set(Object.values(local.tarr));
+  const ws = h("div", { class: "words" }, ...words.map((w) => h("button", { type: "button", class: "word" + (used.has(w) ? " used" : ""), disabled: used.has(w),
+    onclick: () => { const t = TIERS.find((x) => !local.tarr[x]); if (t) { local.tarr[t] = w; Sound.play("pick"); render(); } } }, w)));
+  return [slots, ws, h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: filled < 5, onclick: () => done({ ...local.tarr }) },
+    filled < 5 ? `あと ${5 - filled} つ` : "これで決定"))];
+}
+function renderTierMini(main, g) {
+  const key = `${g.round}|${g.step}`;
+  if (local.tkey !== key) { local.tkey = key; local.tarr = {}; }
+  const isParent = g.parent === me;
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `📊 ティア表 ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)),
+    h("div", {}, h("div", { class: "say small" }, "お題: " + g.topic), h("div", { class: "muted small" }, `親: ${nameOf(g.parent)}${isParent ? "(あなた)" : ""}`)));
+  if (g.step === "rank") {
+    main.append(countdown(60000));
+    if (isParent && inGame()) main.append(h("p", { class: "small" }, "あなたが親です。本音で 1位〜5位 に並べてください。"), ...tierPicker(g.words, (arr) => send({ t: "mini", a: "answer", arr })));
+    else main.append(h("p", { class: "small" }, `${nameOf(g.parent)} さんが並べています。今回のワード:`), h("div", { class: "words" }, ...g.words.map((w) => h("span", { class: "word" }, w))));
+    return;
+  }
+  if (g.step === "guess") {
+    main.append(countdown(45000));
+    const n = S.roster.length - 1;
+    if (isParent) main.append(h("p", {}, `みんなが予想中です(${g.guessed.length}/${n})。`), h("div", { class: "slots" }, ...TIERS.map((t, i) => h("div", { class: "slot" }, h("span", { class: "no" }, i + 1 + "位"), g.myAnswer?.[t] || ""))));
+    else if (g.myGuess) main.append(h("p", { class: "say good" }, "予想しました"), h("p", { class: "muted small" }, `予想 ${g.guessed.length}/${n}`));
+    else if (inGame()) main.append(h("p", { class: "small" }, `${nameOf(g.parent)} さんはどう並べた？`), ...tierPicker(g.words, (arr) => send({ t: "mini", a: "guess", arr })));
+    return;
+  }
+  const L = g.last;
+  main.append(h("p", { class: "small muted" }, `${nameOf(g.parent)} さんの答え`),
+    h("div", { class: "slots" }, ...TIERS.map((t, i) => h("div", { class: "slot" }, h("span", { class: "no", style: `background:${["#ff7f7f", "#ffbf7f", "#ffdf7f", "#bfff7f", "#7fbfff"][i]}` }, i + 1 + "位"), L.answer[t]))),
+    h("table", { class: "rank" }, h("thead", {}, h("tr", {}, h("th", {}, "名前"), h("th", {}, "ぴったり"), h("th", {}, "得点"))),
+      h("tbody", {}, ...L.rows.sort((a, b) => b.pts - a.pts).map((r) => h("tr", { class: r.id === me ? "me" : "" }, h("td", {}, chip(r.id)),
+        h("td", { class: "n" }, r.guess ? TIERS.filter((t) => r.guess[t] === L.answer[t]).length + "/5" : "-"), h("td", { class: "n" }, "+" + r.pts))))));
+}
+
+// ---- かくれナンバー(大会版) ----
+function renderNumberMini(main, g) {
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🔢 かくれナンバー ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)),
+    h("div", { class: "say small" }, "お題: " + g.topic.name),
+    h("div", { class: "scale" }, h("span", {}, "1 " + g.topic.low), h("span", { class: "bar2" }), h("span", {}, "100 " + g.topic.high)));
+  if (g.step === "hint") {
+    main.append(countdown(60000));
+    if (!g.mine) { main.append(h("p", { class: "muted" }, "観戦中です。")); return; }
+    main.append(h("div", { class: "head" }, h("span", { class: "muted small" }, "あなたの数字(ほかの人には見えません)"), h("span", { class: "bignum" }, g.mine.num)));
+    if (g.mine.done) {
+      main.append(h("div", { class: "say good" }, "ヒント: " + g.mine.hint), h("div", { class: "btns" }, h("button", { class: "ghost", type: "button", onclick: () => { local.hintDraft = g.mine.hint; send({ t: "mini", a: "unhint" }); } }, "変更する"),
+        h("span", { class: "muted small" }, `ヒント確定 ${g.done.length}/${S.roster.length}`)));
+    } else {
+      const inp = h("input", { type: "text", maxlength: 24, value: local.hintDraft || "", placeholder: "例: おばけ屋敷", "aria-label": "ヒント", autocomplete: "off", oninput: (e) => { local.hintDraft = e.target.value; } });
+      main.append(h("form", { class: "btns", onsubmit: (e) => { e.preventDefault(); const v = inp.value.trim(); if (!v) return flash("ヒントを入れてください", true); send({ t: "mini", a: "hint", hint: v }); local.hintDraft = ""; inp.blur(); } },
+        inp, h("button", { class: "primary", type: "submit" }, "確定")), h("p", { class: "muted small" }, `数字 ${g.mine.num} くらいだと思う「ことば」を書いてください(24文字まで)。ヒント確定 ${g.done.length}/${S.roster.length}`));
+    }
+    return;
+  }
+  if (g.step === "arrange") {
+    main.append(countdown(120000), h("p", { class: "small" }, "話し合って、小さいと思う順に上から並べてください。動かすと全員のOKは取り消されます。"));
+    const ul = h("ol", { class: "lineup" });
+    const can = !!g.mine;
+    g.entries.forEach((e, i) => ul.append(h("li", { class: e.id === me ? "me" : "" }, h("span", { class: "pos" }, i + 1),
+      h("span", {}, h("div", { class: "hint" }, e.hint), h("div", { class: "muted small" }, nameOf(e.id) + (e.id === me ? `(あなた: ${g.mine?.num})` : ""))),
+      can ? h("span", { class: "btns" }, h("button", { type: "button", class: "ghost tiny", disabled: i === 0, "aria-label": "上へ", onclick: () => send({ t: "mini", a: "move", id: e.id, to: i - 1 }) }, "↑"),
+        h("button", { type: "button", class: "ghost tiny", disabled: i === g.entries.length - 1, "aria-label": "下へ", onclick: () => send({ t: "mini", a: "move", id: e.id, to: i + 1 }) }, "↓")) : h("span"))));
+    main.append(h("div", { class: "muted small" }, "↑ 小さい(1)"), ul, h("div", { class: "muted small" }, "↓ 大きい(100)"));
+    const myReady = g.ready.includes(me);
+    if (can) main.append(h("div", { class: "btns" }, h("button", { class: myReady ? "ghost big" : "primary big", type: "button", onclick: () => send({ t: "mini", a: "ready", on: !myReady }) }, myReady ? "OKを取り消す" : "この並びでOK"),
+      h("span", { class: "muted small" }, `OK ${g.ready.length}/${g.entries.length}`)));
+    return;
+  }
+  const L = g.last;
+  main.append(h("div", { class: "say " + (L.all ? "good" : "red") }, L.all ? "全員そろった！ 全員+1点" : "ちがう位置があった…"),
+    h("ol", { class: "lineup" }, ...L.entries.map((e, i) => h("li", { class: (L.ok[i] ? "ok" : "ng") + (e.id === me ? " me" : "") }, h("span", { class: "pos" }, i + 1),
+      h("span", {}, h("div", { class: "hint" }, e.hint), h("div", { class: "muted small" }, nameOf(e.id) + `  +${L.gained[e.id]}点`)), h("span", { class: "num" }, e.num)))));
+}
+
+// ---- ウソつき酒場(大会版・2D) ----
+function renderLiarMini(main, g) {
+  const hk = g.myHand.map((x) => x.id).join();
+  if (local.lhk !== hk) { local.lhk = hk; local.lsel = (local.lsel || []).filter((id) => g.myHand.some((x) => x.id === id)); }
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🃏 ウソつき酒場 ラウンド${g.round}`), h("span", { class: "pill", style: "background:var(--gold);color:var(--ink)" }, `テーブル: ${RANK_NAME[g.tableRank] || "-"}`)));
+  const table = h("div", { class: "table small" });
+  for (const s of g.seats) {
+    const turn = g.step === "play" && g.turnId === s.id, target = g.reveal && g.reveal.target === s.id && g.step !== "play";
+    table.append(h("div", { class: "seat" + (turn ? " holder" : "") + (s.alive ? "" : " out") + (s.id === me ? " me" : ""), style: `border-top:5px solid ${colorOf(s.id)}` },
+      h("span", { class: "face", "aria-hidden": "true" }, !s.alive ? "💀" : target ? "😱" : turn ? "🤔" : "🙂"), h("span", { class: "nm" }, nameOf(s.id) + (s.id === me ? "(あなた)" : "")),
+      h("span", { class: "muted small" }, s.alive ? `手札${s.hand}・引き金${s.pulls}/${g.chambers}` : "脱落")));
+  }
+  main.append(table);
+  const cardEl = (x, onclick, sel) => {
+    const kids = [x.r === "J" ? "★" : x.r, h("small", {}, RANK_NAME[x.r])];
+    const cls = `pc ${x.r}${x.r === g.tableRank || x.r === "J" ? " match" : ""}${sel ? " sel" : ""}`;
+    return onclick ? h("button", { type: "button", class: cls, "aria-pressed": sel ? "true" : "false", onclick }, ...kids) : h("div", { class: cls }, ...kids);
+  };
+  if (g.step === "play") {
+    const lp = g.lastPlay, myTurn = g.turnId === me;
+    main.append(countdown(40000), h("p", {}, myTurn ? (lp && g.canCall ? `あなたの番。${nameOf(lp.by)} さんが ${lp.count}枚 出しました。信じて出す？それとも…` : "あなたの番。1〜3枚を伏せて出してください(ウソでもOK)") :
+      `${nameOf(g.turnId)} さんの番` + (lp ? `。直前: ${nameOf(lp.by)} さんが ${lp.count}枚` : "")));
+    if (g.myHand.length) main.append(h("div", { class: "cards", role: "group", "aria-label": "あなたの手札" }, ...g.myHand.map((x) => cardEl(x, myTurn && g.canPlay ? () => {
+      const sel = local.lsel.includes(x.id);
+      if (sel) local.lsel = local.lsel.filter((y) => y !== x.id); else if (local.lsel.length < 3) local.lsel = [...local.lsel, x.id]; else return flash("出せるのは3枚までです", true);
+      Sound.play("pick"); render();
+    } : null, local.lsel.includes(x.id)))));
+    if (myTurn) main.append(h("div", { class: "btns" },
+      g.canPlay ? h("button", { class: "primary big", type: "button", disabled: !local.lsel.length, onclick: () => { send({ t: "mini", a: "play", ids: local.lsel }); local.lsel = []; } }, local.lsel.length ? `${local.lsel.length}枚を「${RANK_NAME[g.tableRank]}」として出す` : "カードを選んでください") : null,
+      g.canCall ? h("button", { class: "liarbtn", type: "button", onclick: () => send({ t: "mini", a: "liar" }) }, "ウソつき！") : null));
+  } else {
+    const r = g.reveal;
+    main.append(h("p", {}, `${nameOf(r.caller)} さんが ${nameOf(r.by)} さんに「ウソつき！」`), h("div", { class: "cards" }, ...r.cards.map((x) => cardEl(x))),
+      h("div", { class: "say " + (r.honest ? "good" : "red") }, (r.honest ? "本当だった！" : "ウソだった！") + ` → ${nameOf(r.target)} さんが引き金`));
+    if (g.step === "reveal") {
+      main.append(countdown(15000));
+      if (r.target === me) main.append(h("div", { class: "btns" }, h("button", { class: "liarbtn big", type: "button", onclick: () => send({ t: "mini", a: "pull" }) }, "引き金を引く")));
+    } else main.append(h("div", { class: "say " + (g.shot.died ? "red" : "good") }, g.shot.died ? `バン！ ${nameOf(g.shot.target)} さん脱落` : `カチッ… ${nameOf(g.shot.target)} さんセーフ(${g.shot.pulls}発目)`));
+  }
+  if (g.log?.length) main.append(h("ul", { class: "log" }, ...g.log.slice(-4).reverse().map((x) => h("li", {}, x))));
+}
+
 // ---- 順位発表 ----
 function rankTable(rows, cols) {
   return h("table", { class: "rank" }, h("thead", {}, h("tr", {}, ...cols.map((c) => h("th", {}, c[0])))),
@@ -609,7 +793,7 @@ function rankTable(rows, cols) {
 }
 function renderResult(main, isGM) {
   const R = S.result, info = GAME_INFO[R.key];
-  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点" }[R.key];
+  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "" }[R.key];
   main.append(h("div", { class: "say" }, `${info.icon} ${info.name} の結果`));
   const cols = [["順位", (r) => h("td", { class: "pl" }, r.rank + "位")], ["名前", (r) => h("td", {}, chip(r.id))]];
   if (rawLabel) cols.push([rawLabel, (r) => h("td", { class: "n" }, r.raw)]);
