@@ -9,6 +9,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 const number = require("./games/number"); // かくれナンバー(/number)
+const liar = require("./games/liar");     // ウソつき酒場(/liar)
 
 const PORT = process.env.PORT || 3000;
 const TIERS = ["S", "A", "B", "C", "D"];
@@ -530,7 +531,31 @@ const PAGES = {
   "/": "index.html", "/index.html": "index.html",
   "/tier": "tier.html", "/tier/": "tier.html",
   "/number": "number.html", "/number/": "number.html",
+  "/liar": "liar.html", "/liar/": "liar.html",
 };
+// 3D表示用のファイル(URL の先頭 → 実際のフォルダ)。ここに挙げた場所の .js / .glb だけを配信する
+const STATIC = [
+  ["/vendor/three/build/", path.join(__dirname, "node_modules", "three", "build")],
+  ["/vendor/three/examples/jsm/", path.join(__dirname, "node_modules", "three", "examples", "jsm")],
+  ["/models/", path.join(__dirname, "public", "models")],
+];
+const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary" };
+function serveStatic(pathname, res) {
+  for (const [prefix, root] of STATIC) {
+    if (!pathname.startsWith(prefix)) continue;
+    let rel;
+    try { rel = decodeURIComponent(pathname.slice(prefix.length)); } catch { return false; }
+    const file = path.resolve(root, rel), type = TYPES[path.extname(file)];
+    if (!type || !file.startsWith(root + path.sep)) return false;
+    fs.readFile(file, (e, buf) => {
+      if (e) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ファイルが見つかりません"); }
+      res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=86400" });
+      res.end(buf);
+    });
+    return true;
+  }
+  return false;
+}
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/healthz") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
@@ -539,6 +564,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(302, { Location: "/tier" + url.search });
     return res.end();
   }
+  if (serveStatic(url.pathname, res)) return;
   const page = PAGES[url.pathname];
   if (page) {
     fs.readFile(path.join(__dirname, "public", page), (e, buf) => {
@@ -553,9 +579,10 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
-// WebSocket の振り分け: かくれナンバーの接続だけ専用へ、それ以外はこれまで通りティア表へ
+// WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
-  const target = new URL(req.url, "http://x").pathname === number.WS_PATH ? number.wss : wss;
+  const p = new URL(req.url, "http://x").pathname;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {

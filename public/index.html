@@ -40,6 +40,9 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
 .art.number { background: linear-gradient(90deg, color-mix(in srgb, var(--c5) 35%, var(--surface)), color-mix(in srgb, var(--c1) 35%, var(--surface))); }
 .art.number span { min-width: 54px; height: 64px; padding: 0 8px; font-size: 24px; background: var(--surface); color: var(--fg); }
 .art.number span.q { background: var(--fg); color: var(--surface); }
+.art.liar { background: radial-gradient(ellipse at center, #2c6b47 0%, #173d29 75%); }
+.art.liar span { width: 46px; height: 66px; font-size: 24px; background: #fbf6ea; }
+.art.liar span.bk { background: repeating-linear-gradient(45deg, #7a1f1f 0 6px, #5c1414 6px 12px); color: #f2c14e; }
 .body { padding: 16px 18px 18px; display: grid; gap: 10px; align-content: start; }
 .name { font-family: var(--display); font-size: 22px; line-height: 1.25; }
 .desc { margin: 0; }
@@ -79,6 +82,17 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
         <div class="name">かくれナンバー</div>
         <p class="desc">こっそり配られた1〜100の数字を、お題に沿った「ことば」で表現。話し合ってみんなで小さい順に並べる。</p>
         <div class="tags"><span class="tag">協力</span><span class="tag">2〜12人</span><span class="tag">ライフ制</span></div>
+        <span class="go">あそぶ</span>
+      </div>
+    </a>
+    <a class="game" href="/liar">
+      <div class="art liar" aria-hidden="true">
+        <span style="color:#b3261e">K</span><span class="bk">?</span><span class="bk">?</span><span style="color:#1f5fb3">A</span>
+      </div>
+      <div class="body">
+        <div class="name">ウソつき酒場</div>
+        <p class="desc">指定のカードだと言い張って伏せて出す。ウソを見抜いて「ウソつき！」と指摘されたら、ロシアンルーレット。最後まで生き残った人の勝ち。</p>
+        <div class="tags"><span class="tag">対戦</span><span class="tag">2〜6人</span><span class="tag">3D表示</span><span class="tag">通話向き</span></div>
         <span class="go">あそぶ</span>
       </div>
     </a>

@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ウソつき酒場</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上部=部屋/ラウンド/テーブルカード、中央=酒場(3D または 2D)、その下=手札と操作、右=プレイヤーと記録 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --felt: #1f5a3a; --wood: #6b4226; --gold: #f2c14e; --blood: #c4323a;
+  --card-bg: #fbf6ea; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff;
+    --good: #5fd28f; --bad: #ff7b82; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 13px; font-weight: 700; background: var(--surface); }
+button.pill { cursor: pointer; font-family: var(--body); }
+.pill.table { background: var(--gold); color: var(--ink); border-color: var(--ink); }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+.col { display: grid; gap: 12px; min-width: 0; }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); }
+.status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+
+/* 入室画面 */
+.login { max-width: 460px; margin: 6vh auto 0; }
+.login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+
+/* 酒場(3D/2D の舞台) */
+.stage { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid var(--fg); background: #120c08; aspect-ratio: 16 / 9; min-height: 300px; }
+@media (max-width: 600px) { .stage { aspect-ratio: 4 / 5; } }
+.stage canvas { display: block; width: 100%; height: 100%; }
+.stage .flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #ff2a2a; mix-blend-mode: screen; }
+.stage .flash.go { animation: flash .9s ease-out; }
+@keyframes flash { 0% { opacity: .85; } 100% { opacity: 0; } }
+.stage.shake { animation: shake .45s; }
+@keyframes shake { 0%,100% { transform: none; } 20% { transform: translate(-8px, 4px); } 40% { transform: translate(7px, -5px); } 60% { transform: translate(-5px, 3px); } 80% { transform: translate(3px, -2px); } }
+.callout { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); font-family: var(--display); font-size: clamp(22px, 5vw, 40px); color: #fff; text-align: center; line-height: 1.2;
+  text-shadow: 0 3px 0 #000, 0 0 18px rgba(0,0,0,.8); pointer-events: none; white-space: nowrap; animation: pop .35s ease-out; z-index: 3; }
+.callout.red { color: #ff6b6b; } .callout.gold { color: var(--gold); }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px) scale(.9); } to { opacity: 1; transform: translateX(-50%); } }
+.timer3d { position: absolute; right: 10px; bottom: 8px; font-family: var(--display); font-size: 22px; color: #fff; text-shadow: 0 2px 0 #000; z-index: 3; font-variant-numeric: tabular-nums; }
+.timer3d.low { color: #ff6b6b; }
+.bubble { position: absolute; transform: translate(-50%, -100%); background: #fff; color: #181b23; font-weight: 700; font-size: 14px; padding: 4px 12px; border-radius: 14px;
+  border: 2px solid #181b23; white-space: nowrap; pointer-events: none; z-index: 4; animation: pop2 .25s ease-out; }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -6px; border: 6px solid transparent; border-top-color: #181b23; border-bottom: 0; }
+@keyframes pop2 { from { opacity: 0; transform: translate(-50%, -80%) scale(.8); } to { opacity: 1; transform: translate(-50%, -100%); } }
+.loading3d { position: absolute; inset: 0; display: grid; place-items: center; color: #e9dcc6; font-size: 14px; font-weight: 700; }
+
+/* 2D 表示 */
+.board2d { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: 12px; background: radial-gradient(ellipse at center, #2c6b47 0%, #173d29 70%, #0f2a1c 100%); color: #f4ecd8; overflow: auto; }
+.seats2d { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.seat2d { position: relative; border: 2px solid rgba(255,255,255,.25); border-radius: 8px; padding: 6px 10px; background: rgba(0,0,0,.25); font-size: 13px; min-width: 0; }
+.seat2d.turn { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(242,193,78,.35); }
+.seat2d.dead { opacity: .45; }
+.seat2d .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat2d .bubble { left: 50%; top: 0; }
+.center2d { display: grid; place-items: center; gap: 8px; text-align: center; }
+.center2d .tc { font-family: var(--display); font-size: 20px; }
+
+/* カード */
+.cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.pc { width: 64px; height: 92px; border-radius: 7px; border: 2px solid #181b23; background: var(--card-bg); color: #181b23; display: grid; place-items: center; align-content: center; gap: 0;
+  font-family: var(--display); font-size: 30px; line-height: 1; user-select: none; -webkit-user-select: none; position: relative; transition: transform .12s; flex: none; }
+.pc small { font-family: var(--body); font-size: 11px; font-weight: 700; margin-top: 4px; }
+.pc.K { color: #b3261e; } .pc.Q { color: #6a2bb3; } .pc.A { color: #1f5fb3; } .pc.J { color: #181b23; background: linear-gradient(135deg, #ffe08a, #ff9f6b, #c9a0ff); }
+.pc.match { box-shadow: inset 0 0 0 3px rgba(31,138,76,.55); }
+.pc.back { background: repeating-linear-gradient(45deg, #7a1f1f 0 6px, #5c1414 6px 12px); color: transparent; }
+button.pc { cursor: pointer; padding: 0; }
+button.pc.sel { transform: translateY(-10px); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+button.pc:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.cards.small .pc { width: 46px; height: 66px; font-size: 22px; }
+.cards.small .pc small { display: none; }
+
+/* 操作 */
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 4px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.liar { background: var(--blood); color: #fff; border-color: var(--blood); font-family: var(--display); font-weight: 400; font-size: 18px; padding: 10px 22px; }
+button.liar:hover:not(:disabled) { background: #a3202a; }
+button.trigger { background: #181b23; color: #fff; font-family: var(--display); font-weight: 400; font-size: 22px; padding: 14px 28px; border-color: var(--blood); box-shadow: 0 0 0 4px rgba(196,50,58,.35); }
+button.big { font-size: 16px; padding: 12px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: var(--line); font-weight: 700; }
+.say { font-family: var(--display); font-size: 20px; line-height: 1.35; overflow-wrap: anywhere; }
+.say.red { color: var(--bad); } .say.good { color: var(--good); }
+
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.players li.dead .pname { text-decoration: line-through; color: var(--muted); }
+.sw { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; }
+.pname .tag.gm { color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; text-align: right; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.invite { display: flex; gap: 6px; }
+.invite input { font-size: 13px; }
+.invite button { white-space: nowrap; flex: none; }
+@media (prefers-reduced-motion: reduce) { .stage.shake, .callout, .bubble { animation: none; } .pc { transition: none; } }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }</script>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+
+<!-- 入室画面 -->
+<div class="login" id="login">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">カードのブラフとロシアンルーレット</div>
+      <h1>ウソつき酒場</h1>
+    </div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<!-- ゲーム画面 -->
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div>
+      <div class="eyebrow">カードのブラフとロシアンルーレット</div>
+      <h1>ウソつき酒場</h1>
+    </div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <div class="layout">
+    <div class="col">
+      <div class="stage" id="stage">
+        <div class="board2d" id="board2d" hidden></div>
+        <div class="loading3d" id="loading3d" hidden>酒場を準備しています…</div>
+        <div class="timer3d" id="timer3d" hidden></div>
+        <div class="flash" id="flash"></div>
+      </div>
+      <main class="panel" id="main"></main>
+    </div>
+    <aside class="panel" id="side"></aside>
+  </div>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const RANK_NAME = { K: "キング", Q: "クイーン", A: "エース", J: "ジョーカー" };
+const SEAT_COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0"];
+
+// ---- 端末ごとの保存 ----
+// 本人確認用ID・ニックネーム・音の設定はほかのゲームと共通(tier:)、前回の部屋と表示方法はこのゲーム用(liar:)
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") {
+  const a = new Uint8Array(n); crypto.getRandomValues(a);
+  return [...a].map((x) => chars[x % chars.length]).join("");
+}
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+// ---- 通信 ----
+let ws = null, retry = 0, everOpen = false;
+let wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+// ---- 効果音(Web Audio で合成。ファイル不要) ----
+const Sound = {
+  ctx: null,
+  on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() {
+    try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {}
+  },
+  // [周波数Hz, 開始秒, 長さ秒] の並び
+  seq: {
+    tap:    [[880, 0, .06]],
+    join:   [[660, 0, .08], [880, .08, .12]],
+    round:  [[392, 0, .1], [523, .1, .1], [659, .2, .18]],
+    card:   [[1200, 0, .03], [900, .04, .03]],
+    turn:   [[988, 0, .08], [1318, .1, .12]],
+    liar:   [[220, 0, .12], [185, .12, .12], [147, .24, .3]],
+    stamp:  [[1320, 0, .05]],
+    win:    [[523, 0, .15], [659, .15, .15], [784, .3, .15], [1046, .45, .2], [784, .65, .12], [1046, .77, .5]],
+    tick:   [[1000, 0, .05]],
+  },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    if (name === "bang") return this.noise(.9, .5, 900);
+    if (name === "click") return this.noise(.06, .25, 3000);
+    const t0 = this.ctx.currentTime, soft = name === "card" || name === "stamp" || name === "tick";
+    const type = soft ? "square" : "triangle", vol = soft ? 0.05 : 0.14;
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + s + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination);
+      o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+  // 銃声・撃鉄の音: ホワイトノイズをローパスで丸めて短く鳴らす
+  noise(dur, vol, cutoff) {
+    const c = this.ctx, n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = buf; f.type = "lowpass"; f.frequency.value = cutoff; g.gain.value = vol;
+    src.connect(f).connect(g).connect(c.destination); src.start();
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+// 状態の変化に合わせて音と演出
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  if (cur.phase === "play" && (prev.phase !== "play" || prev.round !== cur.round)) { Sound.play("round"); callout(`テーブルカード: ${RANK_NAME[cur.tableRank]}`, "gold"); }
+  if (cur.phase === "play" && cur.pile > prev.pile) Sound.play("card");
+  if (cur.phase === "play" && cur.turnId === me && (prev.turnId !== me || prev.phase !== "play")) setTimeout(() => Sound.play("turn"), 250);
+  if (cur.phase === "reveal" && prev.phase !== "reveal") {
+    Sound.play("liar");
+    const r = cur.reveal;
+    callout(`${nameOf(r.caller)}「ウソつき！」`, "red");
+    setTimeout(() => callout(r.honest ? "本当だった！" : "ウソだった！", r.honest ? "gold" : "red"), 1300);
+  }
+  if (cur.phase === "shot" && prev.phase !== "shot") {
+    const s = cur.shot;
+    if (s.died) {
+      Sound.play("bang");
+      const st = $("stage"); st.classList.remove("shake"); void st.offsetWidth; st.classList.add("shake");
+      const f = $("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+      callout(`バン！ ${nameOf(s.target)} 脱落`, "red");
+    } else { Sound.play("click"); callout(`カチッ… ${nameOf(s.target)} セーフ`, "gold"); }
+  }
+  if (cur.phase === "finished" && prev.phase !== "finished") { Sound.play("win"); if (cur.winner) callout(`${nameOf(cur.winner)} の勝ち！`, "gold"); }
+}
+let calloutT;
+function callout(text, cls = "") {
+  $("stage").querySelectorAll(".callout").forEach((x) => x.remove());
+  const el = h("div", { class: "callout " + cls }, text);
+  $("stage").append(el);
+  clearTimeout(calloutT); calloutT = setTimeout(() => el.remove(), 2200);
+}
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/liar/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => {
+    clearTimeout(slow); retry = 0; everOpen = true; showBanner("");
+    if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token });
+  };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("liar:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/liar?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+      setupView();
+    } else if (m.t === "state") {
+      const prev = S;
+      S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S);
+      render();
+    } else if (m.t === "stamp") {
+      showStamp(m.from, m.i);
+    } else if (m.t === "kicked") {
+      backToLogin("ホストによって部屋から退出しました", true);
+    } else if (m.t === "error") {
+      if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); }
+      else flash(m.msg, true);
+    } else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => {
+    clearTimeout(slow);
+    if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…");
+    setTimeout(connect, Math.min(8000, 800 * 2 ** retry++));
+  };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashMsg = "", flashWarn = false, flashT;
+function flash(msg, warn) { flashMsg = msg; flashWarn = !!warn; clearTimeout(flashT); flashT = setTimeout(() => { flashMsg = ""; render(); }, 6000); render(); }
+
+// ---- 入室 ----
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null;
+  store.set("liar:last", { room: "", name: myName });
+  history.replaceState(null, "", "/liar");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("liar:last");
+  const name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+// ---- 共通 ----
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const colorOf = (id) => { const i = S?.seats.indexOf(id) ?? -1; return SEAT_COLORS[(i >= 0 ? i : S.players.findIndex((p) => p.id === id)) % SEAT_COLORS.length]; };
+// 舞台に並べる人: ゲーム中は席順、待機中は入った順の先頭6人
+const stageSeats = () => S.phase === "lobby" ? S.players.filter((p) => p.connected).slice(0, 6).map((p) => p.id) : S.seats;
+let local = { sel: new Set(), handKey: "" };
+
+// ---- 表示方法(3D / 2D) ----
+let mode = store.get("liar:view") || "3d";
+let View3D = null, view3dFailed = false, view3dLoading = false;
+async function setupView() {
+  if (mode === "3d" && !View3D && !view3dFailed && !view3dLoading) {
+    view3dLoading = true; $("loading3d").hidden = false;
+    try {
+      const THREE = await import("three");
+      const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+      const SkeletonUtils = await import("three/addons/utils/SkeletonUtils.js");
+      View3D = createView3D(THREE, GLTFLoader, SkeletonUtils, $("stage"));
+    } catch (e) {
+      console.error("3D表示を使えません:", e);
+      view3dFailed = true; flash("この端末では3D表示が使えないため2D表示にしました");
+    }
+    view3dLoading = false; $("loading3d").hidden = true;
+  }
+  applyMode();
+}
+function applyMode() {
+  const use3d = mode === "3d" && View3D;
+  $("board2d").hidden = !!use3d;
+  if (View3D) View3D.setVisible(!!use3d);
+  render();
+}
+function toggleMode() { mode = mode === "3d" ? "2d" : "3d"; store.set("liar:view", mode); setupView(); }
+
+// ---- スタンプ ----
+const stampTimers = new Map();
+function showStamp(from, i) {
+  const text = S?.stamps?.[i];
+  if (!text) return;
+  Sound.play("stamp");
+  if (View3D && mode === "3d") View3D.stamp(from, text, i);
+  stampTimers.set(from, { text, until: Date.now() + 2600 });
+  render2dBubbles();
+  setTimeout(render2dBubbles, 2700);
+}
+
+// ---- 画面 ----
+function render() {
+  if (!S) return;
+  renderMeta(); renderSide(); renderMain();
+  if (View3D) View3D.update(S, me);
+  if (!View3D || mode !== "3d") render2d();
+}
+
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  const label = { lobby: "待機中", play: "勝負中", reveal: "公開", shot: "ロシアンルーレット", finished: "ゲーム終了" }[S.phase] || "";
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"));
+  m.append(h("button", { type: "button", class: "pill", onclick: toggleMode, title: "表示方法を切り替える" }, mode === "3d" && !view3dFailed ? "3D表示" : "2D表示"));
+  m.append(h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  if (S.phase !== "lobby") {
+    m.append(h("span", { class: "pill" }, `ラウンド ${S.round}`));
+    if (S.tableRank) m.append(h("span", { class: "pill table" }, `テーブル: ${RANK_NAME[S.tableRank]}`));
+  }
+  m.append(h("span", { class: "pill" }, label));
+}
+
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  side.append(h("h2", {}, "プレイヤー"));
+  const isGM = S.gameHostId === me, inGame = S.phase !== "lobby";
+  const ul = h("ul", { class: "players" });
+  for (const p of S.players) {
+    const seated = S.seats.includes(p.id);
+    const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+    if (p.id === S.gameHostId) nm.append(h("span", { class: "tag gm" }, "ホスト"));
+    let info = "";
+    if (inGame && !seated) info = "観戦";
+    else if (inGame && !p.alive) info = "脱落";
+    else if (inGame) info = `手札${p.hand} / 引き金 ${p.pulls}/${S.chambers}`;
+    const li = h("li", { class: (inGame && seated && !p.alive ? "dead" : "") + (p.connected ? "" : " off") },
+      h("span", { class: "sw", style: `background:${colorOf(p.id)}`, title: p.connected ? "接続中" : "切断中" }), nm, h("span", { class: "pinfo" }, info + (p.connected ? "" : " 切断中")));
+    if (isGM && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+    ul.append(li);
+  }
+  side.append(ul);
+  const link = location.origin + "/liar?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)",
+    h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+      const b = e.currentTarget;
+      navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+    } }, "コピー"))));
+  if (S.log?.length) side.append(h("div", { class: "field" }, "記録", h("ul", { class: "log" }, ...S.log.slice().reverse().map((x) => h("li", {}, x)))));
+  const btns = h("div", { class: "btns" });
+  if (inGame && isGM) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns);
+  side.append(h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")));
+  if (flashMsg) side.append(h("p", { class: "status" + (flashWarn ? " warn" : "") }, flashMsg));
+}
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => {
+    if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; }
+    clearTimeout(t); action();
+  };
+  return b;
+}
+const cardEl = (c, opts = {}) => {
+  const match = opts.table && (c.r === opts.table || c.r === "J");
+  const kids = [c.r === "J" ? "★" : c.r, h("small", {}, RANK_NAME[c.r])];
+  if (opts.onclick) return h("button", { type: "button", class: `pc ${c.r}${match ? " match" : ""}${opts.sel ? " sel" : ""}`, "aria-pressed": opts.sel ? "true" : "false",
+    "aria-label": RANK_NAME[c.r], onclick: opts.onclick }, ...kids);
+  return h("div", { class: `pc ${c.r}${match ? " match" : ""}`, "aria-label": RANK_NAME[c.r] }, ...kids);
+};
+const stampRow = () => h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" },
+  ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t)));
+
+// 残り秒数は文字だけをタイマーで書き換える(手札やボタンを作り直すと押した操作が消えるため)
+const secEl = (sec) => sec == null ? null : h("span", { class: "secLeft" }, `(残り ${sec}秒)`);
+function renderMain() {
+  const main = $("main"); main.replaceChildren();
+  const P = S.phase, isGM = S.gameHostId === me;
+  const mine = player(me), seated = S.seats.includes(me), aliveMe = mine?.alive;
+  const live = S.players.filter((p) => p.connected).length;
+
+  if (P === "lobby") {
+    main.append(
+      h("h2", {}, "遊び方"),
+      h("ol", { class: "rules" },
+        h("li", {}, "ラウンドごとに「テーブルカード」(キング・クイーン・エースのどれか)が決まり、全員に5枚ずつ配られます。ジョーカーは何にでもなります。"),
+        h("li", {}, "自分の番に 1〜3枚 を裏向きで出し、「全部テーブルカードです」と言い張ります。ウソでもOK。"),
+        h("li", {}, "次の人は、自分も出すか「ウソつき！」と指摘するかを選びます。"),
+        h("li", {}, "指摘したらカードを公開。ウソなら出した人が、本当なら指摘した人が、自分のリボルバーの引き金を引きます(6発中1発だけ実弾)。"),
+        h("li", {}, "撃たれたら脱落。最後まで生き残った人の勝ち！")),
+      h("p", { class: "muted small" }, `2〜6人。4人までは山札20枚(K・Q・A 各6 + ジョーカー2)、5人以上は30枚(各9 + ジョーカー3)。通話しながら遊ぶのがおすすめ。`),
+      h("label", { class: "field" }, "1手の制限時間(過ぎると自動で1枚出すか指摘)",
+        h("select", { disabled: !isGM, onchange: (e) => send({ t: "setTurnSecs", sec: +e.target.value }) },
+          ...[30, 60, 0].map((s) => h("option", { value: s, selected: S.turnSecs === s }, s ? `${s}秒` : "なし")))));
+    if (isGM) main.append(h("div", { class: "btns" },
+      h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "ゲーム開始"),
+      h("span", { class: "muted small" }, live < 2 ? "右の招待リンクを友達に送ってください。2人以上でスタートできます" : live > 6 ? `先に入った6人で始めます(ほかの人は観戦)` : `${live}人で開始できます`)));
+    else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんが開始するのを待っています。`));
+    main.append(stampRow());
+    return;
+  }
+
+  if (P === "finished") {
+    main.append(h("div", { class: "say good" }, S.winner ? `優勝: ${nameOf(S.winner)} さん` : "ゲーム終了"),
+      h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"),
+        h("span", { class: "muted small" }, "待機画面に戻ります")), stampRow());
+    return;
+  }
+
+  // 手札(選んだカードは手札が変わるまで覚えておく)
+  const handKey = S.myHand.map((c) => c.id).join();
+  if (handKey !== local.handKey) { local.handKey = handKey; local.sel = new Set([...local.sel].filter((id) => S.myHand.some((c) => c.id === id))); }
+  const myTurn = P === "play" && S.turnId === me;
+  const lp = S.lastPlay;
+
+  if (P === "play") {
+    const sec = remaining();
+    if (myTurn) {
+      main.append(h("div", { class: "say" }, "あなたの番です", secEl(sec)));
+      if (lp && S.canCall) main.append(h("p", {}, `${nameOf(lp.by)} さんが「${RANK_NAME[S.tableRank]}」を ${lp.count}枚 出しました。信じて自分も出す？ それとも…`));
+      else main.append(h("p", {}, `1〜3枚選んで「${RANK_NAME[S.tableRank]}」として出してください(ウソでもOK)。`));
+    } else if (aliveMe) {
+      main.append(h("p", {}, `${nameOf(S.turnId)} さんの番です`, secEl(sec), lp ? `。直前: ${nameOf(lp.by)} さんが ${lp.count}枚` : ""));
+    } else {
+      main.append(h("p", { class: "muted" }, seated ? "脱落しました。観戦中です。" : "このゲームは観戦中です。次のゲームから参加できます。"),
+        h("p", {}, `${nameOf(S.turnId)} さんの番です` + (lp ? `。直前: ${nameOf(lp.by)} さんが ${lp.count}枚` : "")));
+    }
+  }
+
+  if (P === "reveal" || P === "shot") {
+    const r = S.reveal;
+    main.append(h("p", {}, `${nameOf(r.caller)} さんが ${nameOf(r.by)} さんに「ウソつき！」。出したカード:`),
+      h("div", { class: "cards small" }, ...r.cards.map((c) => cardEl(c, { table: S.tableRank }))),
+      h("div", { class: "say " + (r.honest ? "good" : "red") }, r.honest ? `本当だった！ → ${nameOf(r.target)} さんが引き金を引く` : `ウソだった！ → ${nameOf(r.target)} さんが引き金を引く`));
+    if (P === "reveal") {
+      const tp = player(r.target);
+      if (r.target === me) {
+        main.append(h("div", { class: "btns" }, h("button", { class: "trigger", type: "button", onclick: () => send({ t: "pull" }) }, "引き金を引く"),
+          h("span", { class: "muted small" }, `これまで ${tp?.pulls ?? 0}回 引いています(${S.chambers}発中1発が実弾)`)));
+      } else main.append(h("p", { class: "muted" }, `${nameOf(r.target)} さんが引き金を引くのを待っています…(これまで ${tp?.pulls ?? 0}回)`));
+    } else {
+      const s = S.shot;
+      main.append(h("div", { class: "say " + (s.died ? "red" : "good") }, s.died ? `バン！ ${nameOf(s.target)} さん脱落` : `カチッ… ${nameOf(s.target)} さんセーフ(${s.pulls}発目)`),
+        h("p", { class: "muted small" }, "まもなく次のラウンドが始まります"));
+    }
+  }
+
+  if (aliveMe && S.myHand.length) {
+    const canSel = myTurn && S.canPlay;
+    const hand = h("div", { class: "cards", role: "group", "aria-label": "あなたの手札" }, ...S.myHand.map((c) => cardEl(c, {
+      table: S.tableRank, sel: local.sel.has(c.id),
+      onclick: canSel ? () => {
+        if (local.sel.has(c.id)) local.sel.delete(c.id);
+        else if (local.sel.size < 3) local.sel.add(c.id);
+        else return flash("出せるのは3枚までです", true);
+        Sound.play("tap"); render();
+      } : null,
+    })));
+    main.append(h("div", { class: "field" }, `あなたの手札(緑の枠 = テーブルカードかジョーカー)`, hand));
+  } else if (aliveMe && P === "play") {
+    main.append(h("p", { class: "muted small" }, "手札がなくなりました。このラウンドはもう出せません。"));
+  }
+
+  if (myTurn) {
+    const n = local.sel.size;
+    main.append(h("div", { class: "btns" },
+      S.canPlay ? h("button", { class: "primary big", type: "button", disabled: n < 1 || n > 3,
+        onclick: () => { send({ t: "play", ids: [...local.sel] }); local.sel.clear(); } }, n ? `${n}枚を「${RANK_NAME[S.tableRank]}」として出す` : "カードを選んでください") : null,
+      S.canCall ? h("button", { class: "liar", type: "button", onclick: () => send({ t: "liar" }) }, "ウソつき！") : null,
+      !S.canPlay && S.canCall ? h("span", { class: "muted small" }, "手札がないので指摘するしかありません") : null));
+  }
+  main.append(stampRow());
+}
+
+// ---- 2D 表示 ----
+function render2d() {
+  const b = $("board2d"); b.replaceChildren();
+  const ids = stageSeats();
+  const seats = h("div", { class: "seats2d" });
+  for (const id of ids) {
+    const p = player(id); if (!p) continue;
+    const inGame = S.phase !== "lobby";
+    const el = h("div", { class: "seat2d" + (S.phase === "play" && S.turnId === id ? " turn" : "") + (inGame && !p.alive ? " dead" : ""), "data-id": id, style: `border-left:6px solid ${colorOf(id)}` },
+      h("div", { class: "nm" }, p.name + (id === me ? "(あなた)" : "")),
+      h("div", {}, !inGame ? "待機中" : p.alive ? `手札 ${p.hand}枚 / 引き金 ${p.pulls}/${S.chambers}` : "脱落"));
+    seats.append(el);
+  }
+  const center = h("div", { class: "center2d" });
+  if (S.phase === "lobby") center.append(h("div", { class: "tc" }, "ウソつき酒場へようこそ"));
+  else if (S.phase === "finished") center.append(h("div", { class: "tc" }, S.winner ? `${nameOf(S.winner)} の勝ち！` : "ゲーム終了"));
+  else {
+    center.append(h("div", { class: "tc" }, `テーブルカード: ${RANK_NAME[S.tableRank]}`), h("div", {}, `場に出たカード ${S.pile}枚`));
+    if ((S.phase === "reveal" || S.phase === "shot") && S.reveal) center.append(h("div", { class: "cards small" }, ...S.reveal.cards.map((c) => cardEl(c, { table: S.tableRank }))));
+    else if (S.lastPlay) center.append(h("div", { class: "cards small" }, ...Array.from({ length: S.lastPlay.count }, () => h("div", { class: "pc back" }))),
+      h("div", { class: "small" }, `${nameOf(S.lastPlay.by)} が出した`));
+  }
+  b.append(seats, center, h("div"));
+  render2dBubbles();
+}
+function render2dBubbles() {
+  const b = $("board2d"); if (b.hidden) return;
+  b.querySelectorAll(".bubble").forEach((x) => x.remove());
+  const now = Date.now();
+  for (const [id, s] of stampTimers) {
+    if (s.until < now) { stampTimers.delete(id); continue; }
+    const el = b.querySelector(`.seat2d[data-id="${id}"]`);
+    if (el) el.append(h("div", { class: "bubble" }, s.text));
+  }
+}
+
+// ---- タイマー表示 ----
+let lastTick = null;
+setInterval(() => {
+  if (!S) return;
+  const t = $("timer3d"), r = (S.phase === "play" || S.phase === "reveal") ? remaining() : null;
+  t.hidden = r == null;
+  if (r != null) { t.textContent = r + "秒"; t.classList.toggle("low", r <= 5); }
+  if (r !== lastTick) {
+    lastTick = r;
+    if (r != null && r <= 5 && r >= 1 && (S.turnId === me || S.reveal?.target === me)) Sound.play("tick");
+    if (r != null) document.querySelectorAll("#main .secLeft").forEach((x) => { x.textContent = `(残り ${r}秒)`; });
+  }
+}, 250);
+
+// =================================================================
+// 3D 表示(three.js)
+// キャラクター: RobotExpressive(Tomás Laulhé / Quaternius 作、CC0)。テーブル・リボルバー・カードはコードで組み立て
+// =================================================================
+function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
+  const canvas = document.createElement("canvas");
+  host.prepend(canvas);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x140d08);
+  scene.fog = new THREE.Fog(0x140d08, 7, 17);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 60);
+
+  // ---- 光: 天井のランプ1灯 + 弱い環境光 ----
+  scene.add(new THREE.HemisphereLight(0xffd9a8, 0x24160c, 0.55));
+  const lamp = new THREE.SpotLight(0xffc27a, 90, 14, Math.PI / 3, 0.55, 1.4);
+  lamp.position.set(0, 4.4, 0); lamp.target.position.set(0, 0, 0);
+  lamp.castShadow = true; lamp.shadow.mapSize.set(1024, 1024); lamp.shadow.bias = -0.0004;
+  scene.add(lamp, lamp.target);
+  const rim = new THREE.PointLight(0x6a8cff, 6, 12, 1.6); rim.position.set(-4, 2.5, -3); scene.add(rim);
+  const flashLight = new THREE.PointLight(0xffb060, 0, 6, 2); scene.add(flashLight);
+
+  // ---- テクスチャ(キャンバスに描く) ----
+  const canvasTex = (w, hgt, draw, repeat) => {
+    const c = document.createElement("canvas"); c.width = w; c.height = hgt; draw(c.getContext("2d"), w, hgt);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+    return t;
+  };
+  const woodTex = canvasTex(512, 512, (g, w, hh) => {
+    for (let i = 0; i < 8; i++) {
+      const y = i * hh / 8, base = 70 + (i % 3) * 8;
+      g.fillStyle = `rgb(${base + 40},${base},${base - 35})`; g.fillRect(0, y, w, hh / 8);
+      g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 3; g.strokeRect(-2, y, w + 4, hh / 8);
+      for (let k = 0; k < 14; k++) { g.strokeStyle = `rgba(30,15,5,${0.08 + Math.random() * 0.12})`; g.lineWidth = 1; g.beginPath(); const yy = y + Math.random() * hh / 8; g.moveTo(0, yy); g.bezierCurveTo(w * .3, yy + 4, w * .6, yy - 4, w, yy + 2); g.stroke(); }
+    }
+  }, [6, 6]);
+  const feltTex = canvasTex(256, 256, (g, w, hh) => {
+    g.fillStyle = "#1f5a3a"; g.fillRect(0, 0, w, hh);
+    for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${Math.random() < .5 ? "0,0,0" : "255,255,255"},${Math.random() * 0.05})`; g.fillRect(Math.random() * w, Math.random() * hh, 1, 1); }
+  }, [3, 3]);
+  const brickTex = canvasTex(512, 256, (g, w, hh) => {
+    g.fillStyle = "#2a1a12"; g.fillRect(0, 0, w, hh);
+    const bw = 64, bh = 28;
+    for (let r = 0; r * bh < hh; r++) for (let c = -1; c * bw < w; c++) {
+      const x = c * bw + (r % 2 ? bw / 2 : 0), v = 60 + Math.random() * 30;
+      g.fillStyle = `rgb(${v + 30},${v * .55},${v * .4})`; g.fillRect(x + 2, r * bh + 2, bw - 4, bh - 4);
+    }
+  }, [10, 3]);
+  const RANK_COLOR = { K: "#b3261e", Q: "#6a2bb3", A: "#1f5fb3", J: "#181b23" };
+  const faceTex = {};
+  const cardFace = (r) => faceTex[r] ||= canvasTex(256, 368, (g, w, hh) => {
+    g.fillStyle = r === "J" ? "#fff3cf" : "#fbf6ea"; g.fillRect(0, 0, w, hh);
+    g.strokeStyle = "#181b23"; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, hh - 10);
+    g.fillStyle = RANK_COLOR[r]; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "bold 150px 'Dela Gothic One', sans-serif"; g.fillText(r === "J" ? "★" : r, w / 2, hh / 2 - 10);
+    g.font = "bold 34px 'Zen Kaku Gothic New', sans-serif"; g.fillText(RANK_NAME[r], w / 2, hh - 50);
+    g.font = "bold 44px 'Dela Gothic One', sans-serif"; g.fillText(r === "J" ? "★" : r, 36, 44);
+  });
+  const backTex = canvasTex(256, 368, (g, w, hh) => {
+    g.fillStyle = "#6e1b1b"; g.fillRect(0, 0, w, hh);
+    g.strokeStyle = "#f2c14e"; g.lineWidth = 6; g.strokeRect(14, 14, w - 28, hh - 28);
+    g.strokeStyle = "rgba(242,193,78,.35)"; g.lineWidth = 2;
+    for (let i = -hh; i < w + hh; i += 22) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + hh, hh); g.stroke(); g.beginPath(); g.moveTo(i, hh); g.lineTo(i + hh, 0); g.stroke(); }
+    g.fillStyle = "#f2c14e"; g.font = "bold 40px 'Dela Gothic One', sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("?", w / 2, hh / 2);
+  });
+
+  // ---- 部屋: 床・壁・棚のボトル・ランプ ----
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 48), new THREE.MeshStandardMaterial({ map: woodTex, roughness: .85 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(7.5, 7.5, 6, 40, 1, true), new THREE.MeshStandardMaterial({ map: brickTex, roughness: 1, side: THREE.BackSide }));
+  wall.position.y = 3; scene.add(wall);
+  const shelfMat = new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: .8 });
+  const bottleCols = [0x2f7d4a, 0x7a3b1a, 0x2b4f8c, 0xb08a2a, 0x6b1f3a];
+  for (const ang of [Math.PI, Math.PI * 0.75, Math.PI * 1.25]) {
+    const g = new THREE.Group();
+    for (const y of [1.3, 2.1]) {
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.35), shelfMat); sh.position.y = y; g.add(sh);
+      for (let i = 0; i < 7; i++) {
+        const bh = 0.32 + Math.random() * 0.2;
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, bh, 10), new THREE.MeshStandardMaterial({ color: bottleCols[(i + (y > 2 ? 2 : 0)) % bottleCols.length], roughness: .15, metalness: .1, transparent: true, opacity: .85 }));
+        b.position.set(-1.1 + i * 0.36, y + bh / 2 + 0.03, 0); g.add(b);
+      }
+    }
+    g.position.set(Math.sin(ang) * 7.2, 0, Math.cos(ang) * 7.2); g.lookAt(0, 0, 0); scene.add(g);
+  }
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.35, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x2b3a2b, metalness: .6, roughness: .4, side: THREE.DoubleSide }));
+  shade.position.set(0, 3.55, 0); scene.add(shade);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffe2a8 }));
+  bulb.position.set(0, 3.4, 0); scene.add(bulb);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 2.5), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  cord.position.set(0, 4.95, 0); scene.add(cord);
+
+  // ---- テーブル ----
+  const TABLE_R = 1.35, TABLE_Y = 0.78, SEAT_R = 1.95;
+  const table = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_R, TABLE_R, 0.06, 48), new THREE.MeshStandardMaterial({ map: feltTex, roughness: .95 }));
+  top.position.y = TABLE_Y; top.receiveShadow = true; top.castShadow = true; table.add(top);
+  const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0x9a6a44, roughness: .6 });
+  const edge = new THREE.Mesh(new THREE.TorusGeometry(TABLE_R, 0.07, 12, 64), woodMat);
+  edge.rotation.x = Math.PI / 2; edge.position.y = TABLE_Y + 0.02; edge.castShadow = true; table.add(edge);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, TABLE_Y, 16), woodMat); leg.position.y = TABLE_Y / 2; leg.castShadow = true; table.add(leg);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.65, 0.06, 32), woodMat); foot.position.y = 0.03; foot.receiveShadow = true; table.add(foot);
+  scene.add(table);
+  // テーブルカードの札(中央に立てて、ゆっくり回る)
+  let signRank = null;
+  const signMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: .5, side: THREE.DoubleSide });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.49), signMat);
+  sign.position.set(0, TABLE_Y + 0.62, 0); scene.add(sign);
+  sign.visible = false;
+
+  // ---- カード ----
+  const CARD_W = 0.2, CARD_H = 0.29;
+  const cardGeo = new THREE.BoxGeometry(CARD_W, 0.006, CARD_H);
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xe8dfc8 });
+  const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: .6 });
+  const faceMats = {};
+  const makeCard = (r) => {
+    // 上面 = 裏面(伏せた状態)、下面 = 表(rotation.z = π でめくる)
+    const front = r ? (faceMats[r] ||= new THREE.MeshStandardMaterial({ map: cardFace(r), roughness: .6 })) : backMat;
+    const m = new THREE.Mesh(cardGeo, [edgeMat, edgeMat, backMat, front, edgeMat, edgeMat]);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  };
+  const pileGroup = new THREE.Group(); scene.add(pileGroup);
+  const playGroup = new THREE.Group(); scene.add(playGroup);
+  let pileShown = 0, playKey = "", revealKey = "";
+
+  // ---- リボルバー(銃身は +z 方向) ----
+  const gun = new THREE.Group();
+  {
+    const steel = new THREE.MeshStandardMaterial({ color: 0x4b4f57, metalness: .9, roughness: .3 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x24262b, metalness: .8, roughness: .35 });
+    const grip = new THREE.MeshStandardMaterial({ color: 0x5a3417, roughness: .6 });
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.42, 16), steel); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.04, 0.27); gun.add(barrel);
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.025, 0.4), dark); rib.position.set(0, 0.075, 0.27); gun.add(rib);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.14, 6), dark); drum.rotation.x = Math.PI / 2; drum.position.set(0, 0.025, 0.02); gun.add(drum);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.26), steel); frame.position.set(0, 0.03, -0.02); gun.add(frame);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.26, 0.1), grip); handle.position.set(0, -0.11, -0.16); handle.rotation.x = 0.35; gun.add(handle);
+    const guard = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.01, 8, 16, Math.PI), steel); guard.position.set(0, -0.04, 0.0); guard.rotation.set(Math.PI, Math.PI / 2, 0); gun.add(guard);
+    const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.06, 0.04), dark); hammer.position.set(0, 0.1, -0.13); hammer.rotation.x = -0.5; gun.add(hammer);
+    gun.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  gun.scale.setScalar(1.4);
+  scene.add(gun);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0 }));
+  muzzle.position.set(0, 0.04, 0.55); gun.add(muzzle);
+
+  // ---- 席の目印(手番の光る輪) ----
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.03, 8, 40), new THREE.MeshBasicMaterial({ color: 0xf2c14e }));
+  ring.rotation.x = Math.PI / 2; ring.visible = false; scene.add(ring);
+
+  // ---- キャラクター ----
+  let robotSrc = null, robotScale = 1;
+  const robots = new Map(); // pid → {root, mixer, actions, current, head, plate, plateKey, dead, pos}
+  new GLTFLoader().load("/models/RobotExpressive.glb", (gltf) => {
+    robotSrc = gltf;
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    robotScale = 1.4 / (box.max.y - box.min.y);
+    if (S) update(S, me);
+  }, undefined, (e) => console.error("キャラクターの読み込みに失敗:", e));
+
+  function makeRobot(id) {
+    const root = SkeletonUtils.clone(robotSrc.scene);
+    root.scale.setScalar(robotScale);
+    let head = null;
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.material = o.material.clone();
+      if (o.material.name === "Main") o.material.color.set(colorOf(id));
+      if (o.morphTargetDictionary && o.morphTargetDictionary.Surprised != null) head = o;
+    });
+    const mixer = new THREE.AnimationMixer(root);
+    const actions = {};
+    for (const clip of robotSrc.animations) actions[clip.name] = mixer.clipAction(clip);
+    for (const n of ["Death", "Yes", "No", "ThumbsUp", "Wave", "Punch", "Jump"]) { if (!actions[n]) continue; actions[n].setLoop(THREE.LoopOnce, 1); actions[n].clampWhenFinished = true; }
+    const r = { id, root, mixer, actions, current: null, head, plate: null, plateKey: "", dead: false, pos: new THREE.Vector3(), mood: null };
+    mixer.addEventListener("finished", (e) => { if (!r.dead && e.action !== actions.Death) fade(r, r.base || "Idle"); });
+    fade(r, "Idle", 0);
+    scene.add(root);
+    return r;
+  }
+  function fade(r, name, dur = 0.3) {
+    const a = r.actions[name]; if (!a || r.current === a) { if (a && a.loop === THREE.LoopOnce) a.reset().play(); return; }
+    a.reset().fadeIn(dur).play();
+    if (r.current) r.current.fadeOut(dur);
+    r.current = a;
+  }
+  function setMood(r, mood) {
+    if (!r.head || r.mood === mood) return;
+    r.mood = mood;
+    const d = r.head.morphTargetDictionary, inf = r.head.morphTargetInfluences;
+    for (const k of ["Angry", "Surprised", "Sad"]) if (d[k] != null) inf[d[k]] = k === mood ? 1 : 0;
+  }
+  const plateCanvas = (p, isTurn) => {
+    const c = document.createElement("canvas"); c.width = 512; c.height = 150;
+    const g = c.getContext("2d");
+    g.fillStyle = isTurn ? "rgba(242,193,78,.95)" : "rgba(15,10,6,.78)";
+    if (g.roundRect) { g.beginPath(); g.roundRect(4, 4, 504, 142, 24); g.fill(); } else g.fillRect(4, 4, 504, 142);
+    g.fillStyle = isTurn ? "#181b23" : "#fff"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "bold 54px 'Zen Kaku Gothic New', sans-serif"; g.fillText(p.name.slice(0, 10), 256, 52);
+    g.font = "bold 36px 'Zen Kaku Gothic New', sans-serif";
+    const inGame = S.phase !== "lobby";
+    g.fillText(!inGame ? "待機中" : p.alive ? `手札${p.hand}  ` + "●".repeat(p.pulls) + "○".repeat(Math.max(0, S.chambers - p.pulls)) : "脱落", 256, 112);
+    return c;
+  };
+
+  // ---- 簡単なトゥイーン ----
+  const tweens = [];
+  const tween = (dur, step, done) => { tweens.push({ t0: performance.now(), dur, step, done }); };
+  const ease = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+  // ---- 席の位置: 自分の席がいちばん手前(カメラ側)に来るように回す ----
+  let seatIds = [], myIndex = -1;
+  const seatPos = (i, r = SEAT_R) => { const n = Math.max(seatIds.length, 2), th = ((i - Math.max(myIndex, 0)) * 2 * Math.PI) / n; return new THREE.Vector3(Math.sin(th) * r, 0, Math.cos(th) * r); };
+  const seatOf = (id) => seatIds.indexOf(id);
+  const headPos = (id) => { const i = seatOf(id); if (i < 0) return new THREE.Vector3(0, 2, 0); return seatPos(i).setY(1.62); };
+  function placeCamera() {
+    const aspect = camera.aspect, seated = myIndex >= 0;
+    if (seated) {
+      // 自分の目線: 手前の席の少し後ろ上から、テーブルの奥を見る
+      // 縦長(スマホ)は左右の席まで入るように、高く・後ろから見下ろす
+      // 5人以上は両隣が近くなるので少し引く
+      const many = seatIds.length >= 5 ? 1 : 0;
+      const back = (aspect < 1 ? 1.5 : 1.05) + many * 0.7, up = (aspect < 1 ? 4.3 : 2.05) + many * 0.45;
+      camera.position.set(0, up, SEAT_R + back);
+      camera.lookAt(0, TABLE_Y + (aspect < 1 ? -0.4 : 0.1), aspect < 1 ? 0.35 : -0.35);
+    } else {
+      camera.position.set(0, aspect < 1 ? 5.4 : 4.3, aspect < 1 ? 5.2 : 4.4);
+      camera.lookAt(0, TABLE_Y, 0);
+    }
+    camera.fov = aspect < 1 ? 60 : 50;
+    camera.updateProjectionMatrix();
+  }
+
+  // ---- 吹き出し(スタンプ)は HTML を3D座標に合わせて置く ----
+  const bubbles = new Map(); // pid → {el, until}
+  const STAMP_ANIM = ["Yes", "No", "Wave", "Punch", "Jump", "No", "ThumbsUp", "ThumbsUp", "Wave", "Jump"];
+  function stamp(from, text, i) {
+    const old = bubbles.get(from); if (old) old.el.remove();
+    const el = h("div", { class: "bubble" }, text);
+    host.append(el);
+    bubbles.set(from, { el, until: performance.now() + 2600 });
+    const r = robots.get(from);
+    if (r && !r.dead) fade(r, STAMP_ANIM[i] || "Wave", 0.2);
+  }
+
+  // ---- 状態の反映 ----
+  let lastSig = "", visible = true, gunTarget = null;
+  function update(st, meId) {
+    const ids = stageSeats();
+    const mi = ids.indexOf(meId);
+    const seatsChanged = ids.join() !== seatIds.join() || mi !== myIndex;
+    seatIds = ids; myIndex = mi;
+    if (seatsChanged) placeCamera();
+    // キャラクター: 自分(一人称)以外の席に置く
+    if (robotSrc) {
+      for (const [id, r] of robots) if (!ids.includes(id) || id === meId) { scene.remove(r.root); if (r.plate) scene.remove(r.plate); robots.delete(id); }
+      ids.forEach((id, i) => {
+        if (id === meId) return;
+        let r = robots.get(id);
+        if (!r) { r = makeRobot(id); robots.set(id, r); }
+        const p = seatPos(i); r.pos.copy(p);
+        r.root.position.copy(p);
+        r.root.rotation.y = Math.atan2(-p.x, -p.z);
+        const pl = player(id);
+        const inGame = st.phase !== "lobby";
+        const isDead = inGame && pl && !pl.alive;
+        if (isDead && !r.dead) { r.dead = true; fade(r, "Death", 0.2); setMood(r, "Sad"); }
+        if (!isDead && r.dead) { r.dead = false; fade(r, "Idle", 0.2); setMood(r, null); }
+        r.base = st.phase === "finished" && st.winner === id ? "Dance" : "Idle";
+        if (!r.dead && r.current && r.current.loop !== THREE.LoopOnce && r.current !== r.actions[r.base]) fade(r, r.base);
+        if (!r.dead) setMood(r, st.phase === "reveal" && st.reveal?.target === id ? "Surprised" : st.phase === "reveal" && st.reveal?.caller === id ? "Angry" : null);
+        // 名札
+        const key = pl ? `${pl.name}|${pl.hand}|${pl.pulls}|${pl.alive}|${st.phase === "lobby"}|${st.turnId === id && st.phase === "play"}` : "";
+        if (pl && key !== r.plateKey) {
+          r.plateKey = key;
+          const tex = new THREE.CanvasTexture(plateCanvas(pl, st.turnId === id && st.phase === "play")); tex.colorSpace = THREE.SRGBColorSpace;
+          if (!r.plate) { r.plate = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })); r.plate.scale.set(0.9, 0.264, 1); r.plate.renderOrder = 5; scene.add(r.plate); }
+          else { r.plate.material.map.dispose(); r.plate.material.map = tex; }
+        }
+        if (r.plate) r.plate.position.set(p.x, 1.82, p.z);
+      });
+    }
+    // 手番の輪
+    const ti = st.phase === "play" ? seatOf(st.turnId) : -1;
+    ring.visible = ti >= 0;
+    if (ti >= 0) ring.position.copy(seatPos(ti, ti === myIndex ? SEAT_R - 0.35 : SEAT_R)).setY(0.02);
+    // テーブルカードの札
+    sign.visible = !!st.tableRank && st.phase !== "lobby" && st.phase !== "finished";
+    if (st.tableRank && st.tableRank !== signRank) { signRank = st.tableRank; signMat.map = cardFace(st.tableRank); signMat.needsUpdate = true; }
+    // 場のカード: 山(伏せ) + 直前に出たカード(出した人の前)
+    const lp = st.lastPlay, rv = (st.phase === "reveal" || st.phase === "shot") ? st.reveal : null;
+    const inPlay = rv ? rv.cards.length : lp ? lp.count : 0;
+    const pileN = st.phase === "lobby" || st.phase === "finished" ? 0 : Math.max(0, st.pile - inPlay);
+    if (pileN !== pileShown) {
+      pileGroup.clear();
+      for (let i = 0; i < pileN; i++) { const c = makeCard(null); c.position.set((Math.random() - .5) * .18, TABLE_Y + 0.035 + i * 0.007, (Math.random() - .5) * .18); c.rotation.y = Math.random() * Math.PI; pileGroup.add(c); }
+      pileShown = pileN;
+    }
+    const pk = lp && !rv ? `${lp.by}|${lp.count}|${st.pile}` : "";
+    const rk = rv ? `${rv.by}|${rv.cards.map((c) => c.id).join()}` : "";
+    if (pk !== playKey || rk !== revealKey) {
+      const wasSame = rk && rk === revealKey;
+      playKey = pk; revealKey = rk;
+      if (!wasSame) playGroup.clear();
+      const by = rv ? rv.by : lp?.by, n = rv ? rv.cards.length : lp ? lp.count : 0;
+      const bi = seatOf(by);
+      if (n && bi >= 0 && !wasSame) {
+        const dir = seatPos(bi, 1).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
+        const center = dir.clone().multiplyScalar(0.62);
+        const from = dir.clone().multiplyScalar(1.3);
+        for (let k = 0; k < n; k++) {
+          const c = makeCard(rv ? rv.cards[k].r : null);
+          const to = center.clone().addScaledVector(side, (k - (n - 1) / 2) * 0.24);
+          c.rotation.y = Math.atan2(dir.x, dir.z);
+          playGroup.add(c);
+          if (rv) {
+            // 公開: 置いてある場所で少し浮かせてからめくる
+            c.position.copy(to).setY(TABLE_Y + 0.04);
+            setTimeout(() => tween(600, (t) => { const e = ease(t); c.position.y = TABLE_Y + 0.04 + Math.sin(e * Math.PI) * 0.25; c.rotation.z = e * Math.PI; }), 900 + k * 220);
+          } else {
+            // 出した人の手元からテーブルへすべり込む(1枚ずつ少し遅らせる)
+            c.position.copy(from).setY(TABLE_Y + 0.05);
+            const delay = k * 90, dur = 380;
+            tween(dur + delay, (t) => { const e = ease(Math.max(0, Math.min(1, (t * (dur + delay) - delay) / dur))); c.position.lerpVectors(from, to, e).setY(TABLE_Y + 0.04 + Math.sin(e * Math.PI) * 0.15); });
+          }
+        }
+      }
+    }
+    // リボルバー: ふだんはテーブルの上、公開/結果のときは撃たれる人の頭に向ける
+    const tgt = rv ? rv.target : null;
+    if (tgt !== gunTarget) {
+      gunTarget = tgt;
+      const fromP = gun.position.clone(), fromQ = gun.quaternion.clone();
+      const toObj = new THREE.Object3D();
+      if (tgt && seatOf(tgt) >= 0) {
+        const hp = headPos(tgt);
+        const dir = hp.clone().setY(0).normalize();
+        // 自分が撃たれるときは画面の手前に銃口が向く
+        const at = seatOf(tgt) === myIndex ? camera.position.clone() : hp;
+        toObj.position.copy(seatOf(tgt) === myIndex ? new THREE.Vector3(0.42, camera.position.y - 0.32, SEAT_R - 0.15) : hp.clone().addScaledVector(dir, -0.55).add(new THREE.Vector3(0, 0.05, 0)).addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x), 0.18));
+        toObj.lookAt(at);
+      } else {
+        toObj.position.set(0.35, TABLE_Y + 0.07, 0.25);
+        toObj.rotation.set(0, 0.6, Math.PI / 2);
+      }
+      tween(700, (t) => { const e = ease(t); gun.position.lerpVectors(fromP, toObj.position, e); gun.quaternion.slerpQuaternions(fromQ, toObj.quaternion, e); });
+    }
+    // 撃った瞬間の演出
+    const sk = st.phase === "shot" ? `${st.round}|${st.shot.target}|${st.shot.pulls}` : "";
+    if (sk && sk !== lastSig) {
+      lastSig = sk;
+      const r = robots.get(st.shot.target);
+      if (st.shot.died) {
+        flashLight.position.copy(gun.position); flashLight.intensity = 40; muzzle.material.opacity = 1;
+        tween(500, (t) => { flashLight.intensity = 40 * (1 - t); muzzle.material.opacity = 1 - t; });
+        tween(260, (t) => { gun.rotateX(-0.012 * (1 - t)); });
+      } else if (r) { setMood(r, "Surprised"); tween(250, (t) => { gun.rotateX(-0.004 * (1 - t)); }); }
+    }
+  }
+
+  // ---- 描画ループ ----
+  const clock = new THREE.Clock();
+  const v = new THREE.Vector3();
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!visible || document.hidden) return;
+    const dt = Math.min(clock.getDelta(), 0.05), now = performance.now();
+    for (const r of robots.values()) r.mixer.update(dt);
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const tw = tweens[i], t = Math.min(1, (now - tw.t0) / tw.dur);
+      tw.step(t);
+      if (t >= 1) { tweens.splice(i, 1); tw.done && tw.done(); }
+    }
+    sign.rotation.y += dt * 0.6;
+    sign.position.y = TABLE_Y + 0.62 + Math.sin(now / 600) * 0.03;
+    if (ring.visible) ring.material.color.setHSL(0.12, 0.85, 0.5 + Math.sin(now / 250) * 0.15);
+    // 吹き出しを頭の上へ
+    const rect = host.getBoundingClientRect();
+    for (const [id, b] of bubbles) {
+      if (b.until < now) { b.el.remove(); bubbles.delete(id); continue; }
+      if (seatOf(id) === myIndex || seatOf(id) < 0) { b.el.style.left = "50%"; b.el.style.top = "88%"; continue; }
+      // 名札のすぐ下(頭の上)に出す。舞台の外にはみ出さないように端で止める
+      v.copy(headPos(id)).setY(1.62).project(camera);
+      b.el.style.left = Math.min(rect.width - 60, Math.max(60, (v.x + 1) / 2 * rect.width)) + "px";
+      b.el.style.top = Math.max(44, (1 - v.y) / 2 * rect.height) + "px";
+    }
+    renderer.render(scene, camera);
+  }
+  function resize() {
+    const w = host.clientWidth, hh = host.clientHeight;
+    if (!w || !hh) return;
+    renderer.setSize(w, hh, false);
+    camera.aspect = w / hh;
+    placeCamera();
+  }
+  new ResizeObserver(resize).observe(host);
+  resize();
+  frame();
+  // ゲームの初期状態でも銃はテーブルの上に置いておく
+  gun.position.set(0.35, TABLE_Y + 0.07, 0.25); gun.rotation.set(0, 0.6, Math.PI / 2);
+
+  return {
+    update,
+    stamp,
+    setVisible(b) {
+      visible = b; canvas.style.display = b ? "block" : "none";
+      if (!b) { for (const x of bubbles.values()) x.el.remove(); bubbles.clear(); }
+    },
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
