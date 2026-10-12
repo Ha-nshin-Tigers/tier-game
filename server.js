@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
+const number = require("./games/number"); // かくれナンバー(/number)
 
 const PORT = process.env.PORT || 3000;
 const TIERS = ["S", "A", "B", "C", "D"];
@@ -524,13 +525,18 @@ function handle(ws, m) {
 // ---------------------------------------------------------------
 // HTTP + WebSocket
 // ---------------------------------------------------------------
-const INDEX = path.join(__dirname, "public", "index.html");
+// URL → 画面ファイル(/ はティア表のまま)
+const PAGES = {
+  "/": "index.html", "/index.html": "index.html",
+  "/number": "number.html", "/number/": "number.html",
+};
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/healthz") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
-  if (url.pathname === "/" || url.pathname === "/index.html") {
-    fs.readFile(INDEX, (e, buf) => {
-      if (e) { res.writeHead(500); return res.end("index.html が見つかりません"); }
+  const page = PAGES[url.pathname];
+  if (page) {
+    fs.readFile(path.join(__dirname, "public", page), (e, buf) => {
+      if (e) { res.writeHead(500); return res.end(page + " が見つかりません"); }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(buf);
     });
@@ -540,7 +546,12 @@ const server = http.createServer((req, res) => {
   res.end("ページが見つかりません");
 });
 
-const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
+// WebSocket の振り分け: かくれナンバーの接続だけ専用へ、それ以外はこれまで通りティア表へ
+server.on("upgrade", (req, socket, head) => {
+  const target = new URL(req.url, "http://x").pathname === number.WS_PATH ? number.wss : wss;
+  target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
+});
 wss.on("connection", (ws) => {
   ws.isAlive = true;
   ws.budget = 40;
