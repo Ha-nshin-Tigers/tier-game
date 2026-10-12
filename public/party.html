@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ドタバタ3本勝負</title>
+<title>ドタバタ大会</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
@@ -133,6 +133,13 @@ button.seat:not(:disabled):hover { border-color: var(--bad); background: color-m
 .gbtn.ok { border-color: var(--good); background: color-mix(in srgb, var(--good) 16%, var(--surface)); }
 .gbtn.ng { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, var(--surface)); }
 
+/* 大会の試合の並び */
+.playlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: pl; }
+.playlist li { display: grid; grid-template-columns: 2.2em 34px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 8px; counter-increment: pl; }
+.playlist li::before { content: counter(pl) "試合"; font-size: 11px; font-weight: 700; color: var(--muted); }
+.playlist .ico { font-size: 24px; text-align: center; }
+.adders { display: flex; flex-wrap: wrap; gap: 6px; }
+
 /* 順位 */
 .rank { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rank th, .rank td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
@@ -167,8 +174,8 @@ button.seat:not(:disabled):hover { border-color: var(--bad); background: color-m
 <div class="login" id="login">
   <div class="wrap">
     <div>
-      <div class="eyebrow">ミニゲーム3本で総合優勝を決めるパーティーゲーム</div>
-      <h1>ドタバタ3本勝負</h1>
+      <div class="eyebrow modeEyebrow">好きなミニゲームを並べて総合優勝を決める大会</div>
+      <h1 class="modeTitle">ドタバタ大会</h1>
     </div>
     <form class="panel" id="loginForm">
       <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
@@ -186,8 +193,8 @@ button.seat:not(:disabled):hover { border-color: var(--bad); background: color-m
 <div class="wrap" id="game" hidden>
   <div class="top">
     <div>
-      <div class="eyebrow">ミニゲーム3本で総合優勝を決めるパーティーゲーム</div>
-      <h1>ドタバタ3本勝負</h1>
+      <div class="eyebrow modeEyebrow">好きなミニゲームを並べて総合優勝を決める大会</div>
+      <h1 class="modeTitle">ドタバタ大会</h1>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -218,8 +225,19 @@ const GAME_INFO = {
     rules: ["料理の材料が4秒だけ表示されます。しっかり覚えて！", "並んだ12個の食材から、材料だけを選んで「完成！」。", "正解1つ+2点、まちがい1つ−1点、全部正解でボーナス。", "全部正解の中で早かった人はさらにボーナス。材料は3→4→5個と増えます。"] },
 };
 
+// ---- 遊び方: /party は大会、/bridge /bomb /memory はそのゲームだけ ----
+const MODE = { "/bridge": "bridge", "/bomb": "bomb", "/memory": "memory" }[location.pathname.replace(/\/$/, "")] || "party";
+const BASE = MODE === "party" ? "/party" : "/" + MODE;
+const SINGLE = MODE !== "party";
+if (SINGLE) {
+  const info = GAME_INFO[MODE];
+  document.title = info.name;
+  document.querySelectorAll(".modeTitle").forEach((el) => { el.textContent = info.icon + " " + info.name; });
+  document.querySelectorAll(".modeEyebrow").forEach((el) => { el.textContent = info.short + "(2〜8人)"; });
+}
+
 // ---- 端末ごとの保存 ----
-// 本人確認用ID・ニックネーム・音の設定はほかのゲームと共通(tier:)、前回の部屋だけこのゲーム用(party:)
+// 本人確認用ID・ニックネーム・音の設定はほかのゲームと共通(tier:)、前回の部屋は遊び方ごと(party:last:〜)
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -300,14 +318,14 @@ function connect() {
   const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
   ws.onopen = () => {
     clearTimeout(slow); retry = 0; everOpen = true; showBanner("");
-    if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token });
+    if (wantRoom) send({ t: "join", room: wantRoom, mode: MODE, name: myName, pid: ident.pid, token: ident.token });
   };
   ws.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.t === "joined") {
-      joined = true; store.set("party:last", { room: m.room, name: myName }); saveName(myName);
+      joined = true; store.set("party:last:" + MODE, { room: m.room, name: myName }); saveName(myName);
       for (const x of m.ingredients || []) ING[x.id] = x;
-      history.replaceState(null, "", "/party?room=" + m.room);
+      history.replaceState(null, "", BASE + "?room=" + m.room);
       $("login").hidden = true; $("game").hidden = false;
     } else if (m.t === "state") {
       const prev = S;
@@ -337,8 +355,8 @@ function saveName(name) { const t = store.get("tier:last") || { room: "" }; stor
 function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
 function backToLogin(msg, warn) {
   joined = false; wantRoom = null; S = null;
-  store.set("party:last", { room: "", name: myName });
-  history.replaceState(null, "", "/party");
+  store.set("party:last:" + MODE, { room: "", name: myName });
+  history.replaceState(null, "", BASE);
   document.body.classList.remove("playing");
   $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
   $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
@@ -351,12 +369,12 @@ function enter(code) {
   if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
   msg.classList.remove("warn"); msg.textContent = "入室しています…";
   myName = name; wantRoom = code; setLoginBusy(true);
-  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+  send({ t: "join", room: code, mode: MODE, name, pid: ident.pid, token: ident.token });
 }
 $("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
 $("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
 {
-  const last = store.get("party:last");
+  const last = store.get("party:last:" + MODE);
   const name = last?.name || store.get("tier:last")?.name;
   const q = new URLSearchParams(location.search).get("room");
   if (name) $("lName").value = name;
@@ -391,12 +409,12 @@ function renderMeta() {
   const m = $("meta"); m.replaceChildren();
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"));
   m.append(h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
-  if (S.phase !== "lobby" && S.phase !== "final") m.append(h("span", { class: "pill" }, `ゲーム ${S.gi + 1}/${S.seq.length}`));
+  if (!SINGLE && S.phase !== "lobby" && S.phase !== "final") m.append(h("span", { class: "pill" }, `第${S.gi + 1}試合 / 全${S.seq.length}試合`));
 }
 function renderSide() {
   const side = $("side"); side.replaceChildren();
   const isGM = S.gameHostId === me, started = S.phase !== "lobby";
-  side.append(h("h2", {}, started ? "合計点" : "プレイヤー"));
+  side.append(h("h2", {}, started ? (SINGLE ? "通算点" : "合計点") : "プレイヤー"));
   const ul = h("ul", { class: "players" });
   const list = started ? [...S.players].sort((a, b) => b.total - a.total) : S.players;
   for (const p of list) {
@@ -408,7 +426,7 @@ function renderSide() {
     ul.append(li);
   }
   side.append(ul);
-  const link = location.origin + "/party?room=" + S.code;
+  const link = location.origin + BASE + "?room=" + S.code;
   const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
   side.append(h("div", { class: "field" }, "招待リンク(友達に送る)",
     h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
@@ -447,26 +465,39 @@ function renderMain() {
 
 function renderLobby(main, isGM) {
   const live = S.players.filter((p) => p.connected).length;
-  main.append(h("h2", {}, "遊ぶミニゲーム"), h("p", { class: "muted small" }, "ゲームごとの順位で 1位10点・2位7点・3位5点・4位3点… がもらえ、合計で総合優勝が決まります。2〜8人。"));
-  const cards = h("div", { class: "gamecards" });
-  for (const key of ["bridge", "bomb", "memory"]) {
-    const info = GAME_INFO[key], on = S.enabled[key];
-    cards.append(h("div", { class: "gcard" + (on ? "" : " off") }, h("span", { class: "ico", "aria-hidden": "true" }, info.icon),
-      h("div", {}, h("div", { class: "nm" }, info.name), h("div", { class: "ds" }, info.short)),
-      h("button", { type: "button", class: "toggle" + (on ? " on" : ""), disabled: !isGM, "aria-pressed": on ? "true" : "false",
-        onclick: () => send({ t: "toggleGame", key, on: !on }) }, on ? "遊ぶ" : "遊ばない")));
+  if (SINGLE) {
+    const info = GAME_INFO[MODE];
+    main.append(h("div", { class: "intro" }, h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name),
+      h("ol", {}, ...info.rules.map((r) => h("li", {}, r)))),
+      h("p", { class: "muted small" }, "1試合ごとに順位で 1位10点・2位7点・3位5点… がもらえ、「もう一度遊ぶ」で通算点を競えます。2〜8人。"));
+  } else {
+    main.append(h("h2", {}, "大会で遊ぶ試合"),
+      h("p", { class: "muted small" }, "ミニゲームを好きな順番で並べます(同じゲームを何回入れてもOK・最大9試合)。試合ごとの順位で 1位10点・2位7点・3位5点・4位3点… がもらえ、合計で総合優勝が決まります。2〜8人。"));
+    const list = S.playlist;
+    const ul = h("ol", { class: "playlist", "aria-label": "試合の並び" });
+    list.forEach((key, i) => {
+      const info = GAME_INFO[key];
+      ul.append(h("li", {}, h("span", { class: "ico", "aria-hidden": "true" }, info.icon), h("span", { class: "nm" }, info.name),
+        isGM ? h("span", { class: "btns" },
+          h("button", { type: "button", class: "ghost tiny", disabled: i === 0, "aria-label": `${i + 1}試合目を上へ`, onclick: () => { const l = [...list]; [l[i - 1], l[i]] = [l[i], l[i - 1]]; send({ t: "setPlaylist", list: l }); } }, "↑"),
+          h("button", { type: "button", class: "ghost tiny danger", disabled: list.length <= 1, "aria-label": `${i + 1}試合目を外す`, onclick: () => send({ t: "setPlaylist", list: list.filter((_, j) => j !== i) }) }, "外す")) : h("span")));
+    });
+    main.append(ul);
+    if (isGM) main.append(h("div", { class: "adders" },
+      ...["bridge", "bomb", "memory"].map((key) => h("button", { type: "button", class: "ghost", disabled: list.length >= 9, onclick: () => send({ t: "setPlaylist", list: [...list, key] }) }, `+ ${GAME_INFO[key].icon} ${GAME_INFO[key].name}`)),
+      h("button", { type: "button", class: "ghost", onclick: () => send({ t: "setPlaylist", list: ["bridge", "bomb", "memory"] }) }, "3本セットに戻す")));
+    else main.append(h("p", { class: "muted small" }, "試合の並びはホストが決めます。"));
   }
-  main.append(cards);
   if (isGM) main.append(h("div", { class: "btns" },
     h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
     h("span", { class: "muted small" }, live < 2 ? "下の招待リンクを友達に送ってください。2人以上で始められます" : live > 8 ? "先に入った8人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
-  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。遊ぶゲームはホストが選びます。`));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
 }
 
 function renderIntro(main) {
   const info = GAME_INFO[S.game.key];
   main.append(h("div", { class: "intro" },
-    h("div", { class: "muted small" }, `ゲーム ${S.gi + 1} / ${S.seq.length}`),
+    SINGLE ? null : h("div", { class: "muted small" }, `第${S.gi + 1}試合 / 全${S.seq.length}試合`),
     h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name),
     h("ol", {}, ...info.rules.map((r) => h("li", {}, r)))), countdown(7000));
 }
@@ -584,9 +615,15 @@ function renderResult(main, isGM) {
   if (rawLabel) cols.push([rawLabel, (r) => h("td", { class: "n" }, r.raw)]);
   cols.push(["もらった点", (r) => h("td", { class: "n" }, `+${r.pts}`)], ["合計", (r) => h("td", { class: "n pl" }, r.total)]);
   main.append(rankTable(R.rows, cols));
+  if (SINGLE) {
+    // 単独ゲーム: 同じメンバーでもう1試合(通算点は残る)
+    main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"),
+      h("span", { class: "muted small" }, "同じメンバーで次の試合。合計は通算点として残ります")));
+    return;
+  }
   main.append(countdown(15000));
-  main.append(h("div", { class: "btns" }, isGM ? h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, R.last ? "総合結果へ" : "次のゲームへ") : null,
-    h("span", { class: "muted small" }, R.last ? "まもなく総合結果の発表" : "まもなく次のゲーム")));
+  main.append(h("div", { class: "btns" }, isGM ? h("button", { class: "primary", type: "button", onclick: () => send({ t: "next" }) }, R.last ? "総合結果へ" : "次の試合へ") : null,
+    h("span", { class: "muted small" }, R.last ? "まもなく総合結果の発表" : "まもなく次の試合")));
 }
 function renderFinal(main) {
   const rows = S.players.filter((p) => p.inGame).sort((a, b) => b.total - a.total);

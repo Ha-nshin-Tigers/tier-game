@@ -1,15 +1,20 @@
 "use strict";
-// ドタバタ3本勝負 — ミニゲーム3種を続けて遊び、順位点の合計で総合優勝を決める
+// ミニゲーム集 — 3種のミニゲームを、単独で(/bridge /bomb /memory)、または
+// 好きな順番で並べた大会(/party「ドタバタ大会」)として遊ぶ。順位点の合計で競う
 //   ひとりじめ橋: こっそり橋を選ぶ。かぶった橋は崩れて0点
 //   爆弾回し    : 爆発の時刻はサーバだけが知る。爆発したときに持っていた人が脱落
 //   おぼえて料理: 材料を覚えて、並んだ食材から正しく選ぶ
 // 秘密の情報(ほかの人の選択・爆発時刻・入力中のレシピ)は公開の段階まで送らない。
+// 部屋は遊び方(mode)ごとに別。同じ部屋コードでも橋と爆弾は別の部屋になる。
 
 const { WebSocketServer } = require("ws");
 
 const WS_PATH = "/party/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 8, MAX_ROOMS = 500;
 const GAMES = ["bridge", "bomb", "memory"];
+const MODES = ["party", ...GAMES];           // party = 大会。それ以外はそのゲームだけを繰り返し遊ぶ
+const DEFAULT_PLAYLIST = ["bridge", "bomb", "memory"];
+const MAX_PLAYLIST = 9;                      // 大会で並べられる試合数
 const RANK_PTS = [10, 7, 5, 3, 2, 1, 1, 1]; // ゲームごとの順位点(同点は上の順位の点)
 const INTRO_MS = 7000;   // ゲーム紹介を見せる時間
 const RESULT_MS = 15000; // 順位発表のあと自動で次へ
@@ -49,13 +54,13 @@ const rand = (n) => Math.floor(Math.random() * n);
 // ---------------------------------------------------------------
 const rooms = new Map();
 
-function newRoom(code) {
+function newRoom(code, mode) {
   return {
-    code, phase: "lobby", enabled: { bridge: true, bomb: true, memory: true },
+    code, mode, phase: "lobby", playlist: [...DEFAULT_PLAYLIST],
     players: new Map(),
     roster: [],        // このゲームの参加者 pid(開始時に接続していた人)
     seq: [], gi: 0,    // 遊ぶゲームの順番と、いま何番目か
-    total: {},         // 合計の順位点
+    total: {},         // 合計の順位点(単独ゲームは「もう一度」をまたいで通算)
     game: null,        // いま遊んでいるミニゲームの状態
     result: null,      // 直前のミニゲームの順位発表
     timer: null, deadline: 0, emptySince: null,
@@ -77,7 +82,7 @@ function setTimer(room, ms, fn) {
   room.timer = setTimeout(() => {
     room.timer = null; room.deadline = 0;
     // ここで例外が出てもサーバ全体(ほかのゲームの部屋も)が落ちないようにする
-    try { fn(); } catch (e) { console.error("ドタバタ3本勝負 タイマー処理エラー:", e); }
+    try { fn(); } catch (e) { console.error("ミニゲーム集 タイマー処理エラー:", e); }
     broadcast(room);
   }, ms);
 }
@@ -86,11 +91,13 @@ function toLobby(room) {
   clearTimer(room);
   Object.assign(room, { phase: "lobby", roster: [], seq: [], gi: 0, total: {}, game: null, result: null });
 }
-function startParty(room) {
+// keepTotals: 単独ゲームの「もう一度遊ぶ」では通算点を残す
+function startParty(room, keepTotals) {
   room.roster = order(room).filter(connected).slice(0, MAX_PLAYERS).map((p) => p.id);
-  room.seq = GAMES.filter((g) => room.enabled[g]);
-  room.gi = 0; room.total = {}; room.result = null;
-  for (const id of room.roster) room.total[id] = 0;
+  room.seq = room.mode === "party" ? [...room.playlist] : [room.mode];
+  room.gi = 0; room.result = null;
+  if (!keepTotals) room.total = {};
+  for (const id of room.roster) room.total[id] = room.total[id] || 0;
   intro(room);
 }
 function intro(room) {
@@ -119,7 +126,8 @@ function finishGame(room, raw) {
   });
   room.result = { key: room.game.key, rows, last: room.gi >= room.seq.length - 1 };
   room.phase = "result";
-  setTimer(room, RESULT_MS, () => next(room));
+  // 単独ゲームは結果のまま止めて「もう一度遊ぶ」を待つ。大会は少し見せてから次の試合へ
+  if (room.mode === "party") setTimer(room, RESULT_MS, () => next(room));
 }
 function next(room) {
   if (room.phase !== "result") return;
@@ -278,7 +286,7 @@ function view(room, me) {
   return {
     t: "state", me, now: Date.now(),
     room: {
-      code: room.code, phase: room.phase, gameHostId: hostOf(room), enabled: room.enabled,
+      code: room.code, mode: room.mode, phase: room.phase, gameHostId: hostOf(room), playlist: room.playlist,
       seq: room.seq, gi: room.gi, deadline: room.deadline,
       players: order(room).map((p) => ({ id: p.id, name: p.name, connected: connected(p), inGame: room.roster.includes(p.id), total: room.total[p.id] || 0 })),
       roster: members(room),
@@ -339,11 +347,12 @@ function handle(ws, m) {
     if (code.length < 4) return err(ws, "部屋コードは4〜6文字の英数字です");
     if (!name) return err(ws, "ニックネームを入れてください");
     if (!pid || !token) return err(ws, "ページを再読み込みしてください");
-    let room = rooms.get(code);
+    const mode = MODES.includes(m.mode) ? m.mode : "party";
+    let room = rooms.get(mode + ":" + code);
     if (!room) {
       if (rooms.size >= MAX_ROOMS) return err(ws, "部屋がいっぱいです。しばらくしてから試してください");
-      room = newRoom(code);
-      rooms.set(code, room);
+      room = newRoom(code, mode);
+      rooms.set(mode + ":" + code, room);
     }
     let p = room.players.get(pid);
     if (p && p.token !== token) return err(ws, "この部屋に入れませんでした。ページを再読み込みしてください");
@@ -368,7 +377,7 @@ function handle(ws, m) {
   const isGM = p.id === hostOf(room);
   const inGame = room.roster.includes(p.id);
   const g = room.game;
-  if (["toggleGame", "start", "next", "reset", "kick"].includes(m.t) && !isGM) return err(ws, "この操作はホストだけができます");
+  if (["setPlaylist", "start", "next", "reset", "kick"].includes(m.t) && !isGM) return err(ws, "この操作はホストだけができます");
 
   switch (m.t) {
     case "leave":
@@ -383,11 +392,14 @@ function handle(ws, m) {
       target.sockets.clear();
       return removePlayer(room, target.id);
     }
-    case "toggleGame":
-      if (room.phase !== "lobby" || !GAMES.includes(m.key)) return;
-      room.enabled[m.key] = !!m.on;
-      if (!GAMES.some((k) => room.enabled[k])) room.enabled[m.key] = true; // 1つは残す
+    case "setPlaylist": {
+      // 大会で遊ぶ試合の並び(同じゲームを何回入れてもよい。1〜9試合)
+      if (room.mode !== "party" || room.phase !== "lobby" || !Array.isArray(m.list)) return;
+      const list = m.list.filter((k) => GAMES.includes(k)).slice(0, MAX_PLAYLIST);
+      if (!list.length) return err(ws, "1試合以上えらんでください");
+      room.playlist = list;
       break;
+    }
     case "start":
       if (room.phase !== "lobby") return;
       if (order(room).filter(connected).length < MIN_PLAYERS) return err(ws, `${MIN_PLAYERS}人以上でスタートできます`);
@@ -422,8 +434,11 @@ function handle(ws, m) {
       break;
     }
     case "again":
-      if (room.phase !== "final") return;
-      toLobby(room);
+      // 大会: 総合結果から待機画面へ。単独ゲーム: 結果から同じメンバーで次の試合(通算点は残す)
+      if (room.mode === "party") { if (room.phase !== "final") return; toLobby(room); break; }
+      if (room.phase !== "result") return;
+      if (order(room).filter(connected).length < MIN_PLAYERS) return err(ws, `${MIN_PLAYERS}人以上で遊べます`);
+      startParty(room, true);
       break;
     case "reset":
       toLobby(room);
@@ -447,7 +462,7 @@ wss.on("connection", (ws) => {
     let m;
     try { m = JSON.parse(buf); } catch { return; }
     if (!m || typeof m.t !== "string") return;
-    try { handle(ws, m); } catch (e) { console.error("ドタバタ3本勝負 処理エラー:", e); }
+    try { handle(ws, m); } catch (e) { console.error("ミニゲーム集 処理エラー:", e); }
   });
   ws.on("close", () => detach(ws));
 });

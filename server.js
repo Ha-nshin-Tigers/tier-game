@@ -10,7 +10,7 @@ const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 const number = require("./games/number"); // かくれナンバー(/number)
 const liar = require("./games/liar");     // ウソつき酒場(/liar)
-const party = require("./games/party");   // ドタバタ3本勝負(/party)
+const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
 const PORT = process.env.PORT || 3000;
 const TIERS = ["S", "A", "B", "C", "D"];
@@ -534,6 +534,8 @@ const PAGES = {
   "/number": "number.html", "/number/": "number.html",
   "/liar": "liar.html", "/liar/": "liar.html",
   "/party": "party.html", "/party/": "party.html",
+  // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
+  "/bridge": "party.html", "/bridge/": "party.html", "/bomb": "party.html", "/bomb/": "party.html", "/memory": "party.html", "/memory/": "party.html",
 };
 // 3D表示用のファイル(URL の先頭 → 実際のフォルダ)。ここに挙げた場所の .js / .glb だけを配信する
 const STATIC = [
