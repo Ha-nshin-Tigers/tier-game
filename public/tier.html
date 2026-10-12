@@ -167,6 +167,8 @@ textarea { resize: vertical; }
 button.tiny { padding: 3px 9px; font-size: 12px; }
 .gform { display: flex; gap: 6px; align-items: center; }
 .gform input { font-size: 14px; padding: 4px 8px; }
+.wform { display: grid; gap: 4px; }
+.wform textarea { font-size: 14px; padding: 6px 8px; }
 .pname .tag.gm { color: var(--accent); }
 .players li { grid-template-columns: 22px minmax(0, 1fr) auto auto; }
 .kick { grid-column: 2 / -1; justify-self: start; }
@@ -749,11 +751,12 @@ function compareEl(rd, view = "order") {
 // ---- お題コレクション ----
 let pendingTopic = false;
 let editingGenre = null; // ジャンル変更の入力欄を開いているお題名
+let editingWords = null, wordsDraft = null; // ワード編集の入力欄を開いているお題名と、入力途中の内容(描き直しで消えないように)
 function renderTopics() {
   const box = $("topicList");
   // ジャンル入力中に作り直すと入力が消えるので、その間は描き直さない
   const ae = document.activeElement;
-  if (ae && box.contains(ae) && ae.tagName === "INPUT") { local.topicsStale = true; return; }
+  if (ae && box.contains(ae) && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) { local.topicsStale = true; return; }
   local.topicsStale = false;
   box.replaceChildren();
   const off = new Set(S?.off || []);
@@ -796,9 +799,31 @@ function renderTopics() {
       } else if (canGenre) {
         row.append(h("button", { type: "button", class: "ghost tiny", onclick: () => { editingGenre = x.name; renderTopics(); } }, "ジャンル変更"));
       }
+      // ワード編集: 追加お題だけ(作った人かホスト)。標準お題はプログラムに書かれているので変えられない
+      let wordsForm = null;
+      if (x.t && canGenre && editingWords === x.name) {
+        const ta = h("textarea", { rows: Math.min(12, x.words.length + 1), "aria-label": "ワード(1行に1つ)" });
+        ta.value = wordsDraft ?? x.words.join("\n");
+        const note = h("span", { class: "muted small" });
+        const count = () => { const n = parseWords(ta.value).length; note.textContent = `${n}個` + (n < 5 ? `(あと${5 - n}個必要)` : n > 30 ? "(30個までです)" : ""); return n; };
+        ta.addEventListener("input", () => { wordsDraft = ta.value; count(); });
+        const close = () => { editingWords = null; wordsDraft = null; ta.blur(); renderTopics(); };
+        const save = () => {
+          const words = parseWords(ta.value), n = words.length;
+          if (n < 5 || n > 30) { count(); return; }
+          send({ t: "updateTopic", name: x.name, words }); close();
+        };
+        wordsForm = h("div", { class: "wform" }, h("span", { class: "muted small" }, "1行に1つ。1つ24文字まで、5〜30個"), ta,
+          h("div", { class: "btns" }, h("button", { type: "button", class: "primary tiny", onclick: save }, "保存"),
+            h("button", { type: "button", class: "ghost tiny", onclick: close }, "やめる"), note));
+        count();
+        setTimeout(() => ta.focus(), 0);
+      } else if (x.t && canGenre) {
+        row.append(h("button", { type: "button", class: "ghost tiny", onclick: () => { editingWords = x.name; wordsDraft = null; editingGenre = null; renderTopics(); } }, "ワード編集"));
+      }
       ul.append(h("li", { class: isOn ? "" : "off" },
         h("div", { class: "thead" }, h("span", { class: "tname" }, x.name), h("span", { class: "tby" }, x.by)),
-        h("div", { class: "twords" }, `${x.words.length}語: ` + x.words.join("・")), row, genreForm));
+        h("div", { class: "twords" }, `${x.words.length}語: ` + x.words.join("・")), row, genreForm, wordsForm));
     }
     const head = h("div", { class: "ghead" }, h("h3", {}, genre), h("span", { class: "muted small" }, `出題 ${onN}/${list.length}`));
     if (isGM) head.append(h("button", { type: "button", class: "ghost tiny", onclick: () => send({ t: "toggleGenre", genre, on: onN < list.length }) },
