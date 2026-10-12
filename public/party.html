@@ -204,6 +204,38 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
 .invite { display: flex; gap: 6px; }
 .invite input { font-size: 13px; }
 .invite button { white-space: nowrap; flex: none; }
+/* 絵しりとり(大会版)。お絵かき部品は public/js/draw.js */
+.drawwrap { display: grid; gap: 6px; justify-items: center; }
+.drawpad, .drawview { display: block; aspect-ratio: 1; background: #fff; border: 2px solid var(--fg); border-radius: 8px; }
+.drawpad { width: min(100%, 520px, calc(100dvh - 430px)); min-width: 220px; touch-action: none; cursor: crosshair; }
+.drawwrap.off .drawpad { opacity: .6; pointer-events: none; }
+.drawview { width: 100%; }
+.drawtools { display: grid; gap: 4px; justify-items: center; }
+.drawtools .row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.drawtools .sw { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
+.drawtools .sw.on { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--fg); }
+.drawtools .tool { padding: 3px 9px; font-size: 12px; border-color: var(--line); font-weight: 500; }
+.drawtools .tool.on { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.taskrow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 10px; align-items: start; }
+.lbl { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.inputs { display: grid; gap: 6px; }
+.estop { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+#esMsg:empty { display: none; }
+.esw { font-family: var(--display); font-size: 18px; }
+.need { display: inline-block; font-family: var(--display); font-size: 18px; padding: 0 8px; border-radius: 6px; background: var(--gold); color: var(--ink); }
+.watch { width: min(100%, 420px); justify-self: center; }
+.chain { display: grid; gap: 8px; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; }
+.links { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.link { display: grid; gap: 4px; padding: 6px; border-radius: 8px; border: 2px solid var(--line); align-content: start; }
+.link .rd { font-size: 12px; font-weight: 700; }
+.link .rd.ok { color: var(--good); } .link .rd.ng { color: var(--bad); }
+.link.ok { border-color: var(--good); } .link.ng { border-color: var(--bad); }
+@media (max-width: 520px) {
+  .taskrow { grid-template-columns: 112px minmax(0, 1fr); gap: 8px; }
+  .inputs input[type=text] { padding: 5px 8px; }
+  .inputs .field { font-size: 12px; }
+  .drawtools .sw { width: 24px; height: 24px; }
+}
 @media (max-width: 420px) { .canyon { padding: 8px; gap: 6px; } .bridge { min-height: 128px; } .gbtn .e { font-size: 28px; } }
 @media (prefers-reduced-motion: reduce) { .intro .ico, .seat.holder .face, .hot, .boom, .bridge.collapsed { animation: none; } }
 </style>
@@ -243,6 +275,7 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
   <aside class="panel" id="side"></aside>
 </div>
 
+<script src="/js/draw.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const h = (tag, attrs = {}, ...kids) => {
@@ -273,6 +306,8 @@ const GAME_INFO = {
     rules: ["テーブルカード(キング・クイーン・エース)が決まり、5枚ずつ配られます。ジョーカーは何にでもなります。", "自分の番に1〜3枚を伏せて出し「全部テーブルカード」と言い張ります(ウソでもOK)。", "次の人は出すか「ウソつき！」。ウソなら出した人、本当なら指摘した人が引き金を引きます(6発中1発が実弾)。", "撃たれたら脱落。脱落が遅いほど上位、最後の1人が1位。時間がかかることがあります。"] },
   shotgun: { icon: "🔫", name: "散弾ルーレット", short: "実弾か空砲か。アイテムを使って生き残る(大会は2D版)", extra: true,
     rules: ["ショットガンに実弾と空砲が込められます。発数は公開、順番は秘密。", "自分の番に、ほかの人か自分を撃ちます。自分を撃って空砲なら、もう一度自分の番。", "実弾でライフ−1(ライフ4)。弾がなくなると込め直して、アイテムが2つずつ配られます。", "脱落が遅いほど上位、最後の1人が1位。"] },
+  eshiri: { icon: "🎨", name: "絵しりとり", short: "絵だけでしりとりをつなぐ(大会は1本・1周)", extra: true,
+    rules: ["順番に、前の人の絵を見て「何の絵か」を推理し、その最後の文字から始まる言葉を絵だけで描きます(60秒・文字は描かない)。", "最初の人はお題の言葉から。「ん」で終わる言葉はだめ。描いた言葉は答え合わせまで秘密。", "答え合わせで、前の絵を読み取れたら+2点、自分の絵を読み取ってもらえたら+1点。", "全員が1回ずつ描いたら答え合わせ(90秒)。点数の順で順位が決まります。"] },
 };
 const ALL_GAMES = Object.keys(GAME_INFO);
 const RANK_NAME = { K: "キング", Q: "クイーン", A: "エース", J: "ジョーカー" };
@@ -370,6 +405,10 @@ function onTransition(prev, cur) {
     else if (g.step === "play" && g.turnId === me && pg.turnId !== me) Sound.play("pass");
   }
   if ((g.key === "tier" || g.key === "number") && g.step === "show" && pg.step !== "show") Sound.play("good");
+  if (g.key === "eshiri") {
+    if (g.task && pg.task?.did !== g.task.did) Sound.play("pass");
+    else if (g.step === "reveal" && pg.step !== "reveal") Sound.play("good");
+  }
   if (g.key === "shotgun" && g.event && g.event.seq !== pg.event?.seq) {
     const ev = g.event;
     if (ev.type === "shot") Sound.play(ev.shell === "live" ? "boom" : "tick");
@@ -386,6 +425,7 @@ function connect() {
   };
   ws.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (Draw.onMessage(m)) return; // 絵しりとりの絵の線
     if (m.t === "joined") {
       joined = true; store.set("party:last:" + MODE, { room: m.room, name: myName }); saveName(myName);
       for (const x of m.ingredients || []) ING[x.id] = x;
@@ -410,6 +450,7 @@ function connect() {
   };
 }
 function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+Draw.setRequester((did) => send({ t: "mini", a: "pic", did }));
 function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
 let flashMsg = "", flashWarn = false, flashT;
 function flash(msg, warn) { flashMsg = msg; flashWarn = !!warn; clearTimeout(flashT); flashT = setTimeout(() => { flashMsg = ""; render(); }, 6000); render(); }
@@ -469,8 +510,9 @@ function render() {
   document.body.classList.toggle("playing", S.phase !== "lobby");
   renderMeta(); renderSide();
   // 文字を入力中に作り直すと入力が消えるので、その間はゲーム部分を描き直さない
+  // (絵しりとりは描いている画面を作り直さない仕組みがあるので対象外)
   const ae = document.activeElement;
-  if (ae && $("main").contains(ae) && ae.tagName === "INPUT") { local.mainStale = true; return; }
+  if (S.game?.key !== "eshiri" && ae && $("main").contains(ae) && ae.tagName === "INPUT") { local.mainStale = true; return; }
   local.mainStale = false;
   renderMain();
 }
@@ -520,7 +562,11 @@ function twoStep(label, action, cls = "ghost danger") {
 }
 
 function renderMain() {
-  const main = $("main"); main.replaceChildren();
+  const main = $("main");
+  // 絵しりとりで描いている間は画用紙と入力欄を作り直さない
+  if (S.phase === "play" && S.game?.key === "eshiri" && eshiriKeep()) return;
+  local.esKey = "";
+  main.replaceChildren();
   const isGM = S.gameHostId === me, P = S.phase;
   if (P === "lobby") return renderLobby(main, isGM);
   if (P === "intro") return renderIntro(main);
@@ -535,6 +581,7 @@ function renderMain() {
   else if (g.key === "number") renderNumberMini(main, g);
   else if (g.key === "liar") renderLiarMini(main, g);
   else if (g.key === "shotgun") renderShotgunMini(main, g);
+  else if (g.key === "eshiri") renderEshiriMini(main, g, isGM);
 }
 
 function renderLobby(main, isGM) {
@@ -837,6 +884,82 @@ function renderShotgunMini(main, g) {
     ...others.map((x) => h("button", { type: "button", class: "ghost", style: `border:3px solid ${colorOf(x.id)}`, onclick: () => send({ t: "mini", a: "shoot", target: x.id }) }, `${nameOf(x.id)} を撃つ`))));
 }
 
+// ---- 絵しりとり(大会版: 1本のしりとりを1周) ----
+const ES_SMALL = { "ぁ": "あ", "ぃ": "い", "ぅ": "う", "ぇ": "え", "ぉ": "お", "っ": "つ", "ゃ": "や", "ゅ": "ゆ", "ょ": "よ", "ゎ": "わ", "ゕ": "か", "ゖ": "け" };
+const esHira = (s) => String(s || "").normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/\s+/g, "");
+function esLast(w) { const a = [...esHira(w)].filter((ch) => ch !== "ー"); const ch = a[a.length - 1] || ""; return ES_SMALL[ch] || ch; }
+function eshiriKeyOf(g) { return g.task ? "task:" + g.task.did : g.turn ? "watch:" + g.turn.did + ":" + g.turn.watch : g.step; }
+// 同じ画面のままなら、残り時間や「必要な文字」だけ書き換えて true を返す
+function eshiriKeep() {
+  const g = S.game, key = eshiriKeyOf(g);
+  if (key !== local.esKey || !inGame() && g.task) return false;
+  if (g.task) esUpdate();
+  return g.step === "draw";
+}
+function renderEshiriMini(main, g, isGM) {
+  local.esKey = eshiriKeyOf(g);
+  if (g.step === "draw" && g.task) return esTask(main, g);
+  if (g.step === "draw") {
+    main.append(h("div", { class: "say" }, `🎨 ${nameOf(g.turn?.by)} さんが描いています` + (g.turn ? ` (${g.turn.n}/${g.turn.total}番目)` : "")), countdown(60000));
+    if (g.turn?.watch) main.append(h("div", { class: "watch" }, Draw.view(g.turn.did)));
+    else main.append(h("p", { class: "muted" }, "描き終わるまで待ちましょう。絵は答え合わせで全部見られます。"));
+    return;
+  }
+  // 答え合わせ
+  const coop = g.coop || { ok: 0, total: 0 };
+  main.append(h("div", { class: "head" }, h("div", { class: "say good" }, `🎨 答え合わせ つながった: ${coop.ok} / ${coop.total}`)), countdown(90000));
+  for (const ch of g.chains || []) {
+    const links = h("div", { class: "links" });
+    ch.links.forEach((l, i) => {
+      const next = ch.links[i + 1];
+      links.append(h("div", { class: "link" + (next ? (next.ok ? " ok" : " ng") : "") },
+        chip(l.by), l.skipped ? h("p", { class: "muted small" }, "(お休み)") : Draw.view(l.did),
+        h("div", {}, h("span", { class: "muted small" }, "描いた言葉: "), h("b", {}, l.word || "(未入力)")),
+        next ? h("div", { class: "rd " + (next.ok ? "ok" : "ng") }, `${nameOf(next.by)} の読み取り: ${next.guess || "(未入力)"} ${next.ok ? "○" : "×"}`) : null));
+    });
+    main.append(h("div", { class: "chain" }, h("div", { class: "small" }, "お題: ", h("b", {}, "「" + ch.start + "」")), links));
+  }
+  main.append(h("div", { class: "btns" }, isGM ? h("button", { class: "primary", type: "button", onclick: () => send({ t: "mini", a: "done" }) }, "結果へ") : null,
+    h("span", { class: "muted small" }, "時間になると結果に進みます")));
+}
+function esTask(main, g) {
+  const t = g.task;
+  local.esPad = Draw.pad({ stroke: (s) => send({ t: "mini", a: "stroke", s }), undo: () => send({ t: "mini", a: "undo" }), clear: () => send({ t: "mini", a: "clear" }) });
+  const sendWords = () => { clearTimeout(local.esWordsT); local.esWordsT = setTimeout(() => send({ t: "mini", a: "words", guess: local.esGuess?.value || "", word: local.esWord.value }), 500); };
+  local.esGuess = t.first ? null : h("input", { type: "text", maxlength: 15, placeholder: "例: りんご", autocomplete: "off", "aria-label": "前の絵は何？", oninput: () => { esUpdate(); sendWords(); } });
+  local.esWord = h("input", { type: "text", maxlength: 15, placeholder: "ひらがなで", autocomplete: "off", "aria-label": "描く言葉", oninput: () => { esUpdate(); sendWords(); } });
+  main.append(h("div", { class: "estop" }, h("div", { class: "say" }, "🎨 あなたの番！" + (g.turn ? ` ${g.turn.n}/${g.turn.total}` : "")), countdown(60000)));
+  const left = t.first ? h("div", { class: "field" }, "お題", h("span", { class: "esw" }, "「" + t.start + "」"))
+    : h("div", { class: "field" }, `${nameOf(t.prevBy)} さんの絵`, t.prevEmpty ? h("p", { class: "muted small" }, "(何も描かれていません)") : Draw.view(t.prevDid));
+  main.append(h("div", { class: "taskrow" }, left,
+    h("div", { class: "inputs" },
+      local.esGuess ? h("label", { class: "field" }, "① 前の絵は何だと思う？", local.esGuess) : null,
+      h("label", { class: "field" }, h("span", { class: "lbl" }, (local.esGuess ? "② " : "") + "描く言葉:", h("span", { id: "esNeed" })), local.esWord),
+      h("p", { class: "status", id: "esMsg" }))),
+    local.esPad.el,
+    h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", id: "esSubmit", onclick: esSubmit }, "描けた！"),
+      h("span", { class: "muted small" }, "文字は描かないでね")));
+  esUpdate();
+}
+function esNeedFor(t) { const ch = t.first ? esLast(t.start) : esLast(local.esGuess?.value || ""); return ch === "ん" ? "" : ch; }
+function esUpdate() {
+  const t = S.game?.task, el = $("esNeed"); if (!t || !el) return;
+  const need = esNeedFor(t);
+  el.replaceChildren(need ? h("span", { class: "need" }, need) : h("span", {}, t.first || local.esGuess?.value ? "好きな文字" : "①を入れると決まる"), need ? " から始まる" : "");
+}
+function esSubmit() {
+  const t = S.game.task, msg = $("esMsg");
+  const guess = esHira(local.esGuess?.value || ""), word = esHira(local.esWord.value), need = esNeedFor(t);
+  const say = (x) => { msg.textContent = x; msg.classList.add("warn"); };
+  if (local.esGuess && !/^[ぁ-ゖー]+$/.test(guess)) return say("①をひらがなで入れてください");
+  if (!/^[ぁ-ゖー]+$/.test(word)) return say("描く言葉をひらがなで入れてください");
+  const first = [...word][0];
+  if (need && (ES_SMALL[first] || first) !== need) return say(`「${need}」から始まる言葉にしてください`);
+  if (esLast(word) === "ん") return say("「ん」で終わる言葉は使えません");
+  if (!local.esPad.count()) return say("絵を描いてください");
+  send({ t: "mini", a: "submit", guess, word });
+}
+
 // ---- 順位発表 ----
 function rankTable(rows, cols) {
   return h("table", { class: "rank" }, h("thead", {}, h("tr", {}, ...cols.map((c) => h("th", {}, c[0])))),
@@ -844,7 +967,7 @@ function rankTable(rows, cols) {
 }
 function renderResult(main, isGM) {
   const R = S.result, info = GAME_INFO[R.key];
-  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "", shotgun: "" }[R.key];
+  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "", shotgun: "", eshiri: "絵の点" }[R.key];
   main.append(h("div", { class: "say" }, `${info.icon} ${info.name} の結果`));
   const cols = [["順位", (r) => h("td", { class: "pl" }, r.rank + "位")], ["名前", (r) => h("td", {}, chip(r.id))]];
   if (rawLabel) cols.push([rawLabel, (r) => h("td", { class: "n" }, r.raw)]);

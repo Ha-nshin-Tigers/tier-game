@@ -11,6 +11,7 @@ const { WebSocketServer } = require("ws");
 const number = require("./games/number"); // かくれナンバー(/number)
 const liar = require("./games/liar");     // ウソつき酒場(/liar)
 const shotgun = require("./games/shotgun"); // 散弾ルーレット(/shotgun)
+const eshiri = require("./games/eshiri");   // 絵しりとり(/eshiri)
 const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
 const PORT = process.env.PORT || 3000;
@@ -535,15 +536,17 @@ const PAGES = {
   "/number": "number.html", "/number/": "number.html",
   "/liar": "liar.html", "/liar/": "liar.html",
   "/shotgun": "shotgun.html", "/shotgun/": "shotgun.html",
+  "/eshiri": "eshiri.html", "/eshiri/": "eshiri.html",
   "/party": "party.html", "/party/": "party.html",
   // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
   "/bridge": "party.html", "/bridge/": "party.html", "/bomb": "party.html", "/bomb/": "party.html", "/memory": "party.html", "/memory/": "party.html",
 };
-// 3D表示用のファイル(URL の先頭 → 実際のフォルダ)。ここに挙げた場所の .js / .glb だけを配信する
+// 3D表示や共通スクリプトのファイル(URL の先頭 → 実際のフォルダ)。ここに挙げた場所の .js / .glb だけを配信する
 const STATIC = [
   ["/vendor/three/build/", path.join(__dirname, "node_modules", "three", "build")],
   ["/vendor/three/examples/jsm/", path.join(__dirname, "node_modules", "three", "examples", "jsm")],
   ["/models/", path.join(__dirname, "public", "models")],
+  ["/js/", path.join(__dirname, "public", "js")], // 画面どうしで共通のスクリプト(お絵かきなど)
 ];
 const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary" };
 function serveStatic(pathname, res) {
@@ -588,7 +591,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {

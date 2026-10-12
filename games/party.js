@@ -14,6 +14,7 @@ const MINI = {
   liar: require("./mini/liar"),
   number: require("./mini/number"),
   shotgun: require("./mini/shotgun"),
+  eshiri: require("./mini/eshiri"),
 };
 
 const WS_PATH = "/party/ws";
@@ -133,6 +134,8 @@ function ctxOf(room) {
     setTimer: (ms, fn) => setTimer(room, ms, fn),
     clearTimer: () => clearTimer(room),
     finish: (raw) => finishGame(room, raw),
+    // 絵しりとりの絵の線など、特定の人にだけ送るもの
+    sendTo: (id, msg) => { const p = room.players.get(id); if (p) for (const ws of p.sockets) send(ws, msg); },
   };
 }
 // ミニゲームの素点(raw: 大きいほど良い)から順位と順位点を決めて合計に足す
@@ -460,9 +463,15 @@ function handle(ws, m) {
     }
     case "mini": {
       // 大会版ゲームへの操作(中身はゲームごとのファイルで判定する)
-      if (room.phase !== "play" || !g || !MINI[g.key] || !inGame || typeof m.a !== "string") return;
+      if (room.phase !== "play" || !g || !MINI[g.key] || typeof m.a !== "string") return;
+      // 観戦の人は絵しりとりの絵を見ることだけできる(見てよいかはルール本体で判定)
+      if (!inGame && !(g.key === "eshiri" && m.a === "pic")) return;
+      // 絵しりとりの答え合わせを早めに終えるのはホストだけ
+      if (g.key === "eshiri" && m.a === "done" && !isGM) return err(ws, "この操作はホストだけができます");
       const e = MINI[g.key].handle(ctxOf(room), p.id, m);
       if (typeof e === "string") return err(ws, e);
+      // 線を描く・入力途中の言葉・絵の取得は状態が変わらないので一斉送信しない
+      if (["stroke", "undo", "clear", "words", "pic"].includes(m.a)) return;
       break;
     }
     case "again":
@@ -484,7 +493,8 @@ function handle(ws, m) {
 // ---------------------------------------------------------------
 // WebSocket(server.js の upgrade から WS_PATH の接続だけが回ってくる)
 // ---------------------------------------------------------------
-const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
+// 絵しりとりの線を送るので、1回に受け取れる量を少し大きくする
+const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 wss.on("connection", (ws) => {
   ws.isAlive = true;
   ws.budget = 40;

@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>絵しりとり</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=描く/見る/答え合わせ、下=プレイヤーと招待 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 820px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+.say.good { color: var(--good); } .say.red { color: var(--bad); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+.chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #181b23; border: 1.5px solid #181b23; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.word { font-family: var(--display); font-size: 18px; }
+.need { display: inline-block; font-family: var(--display); font-size: 18px; padding: 0 8px; border-radius: 6px; background: var(--gold); color: var(--ink); }
+
+/* お絵かき(public/js/draw.js) */
+.drawwrap { display: grid; gap: 6px; justify-items: center; }
+.drawpad, .drawview { display: block; aspect-ratio: 1; background: #fff; border: 2px solid var(--fg); border-radius: 8px; }
+.drawpad { width: min(100%, 520px, calc(100dvh - 385px)); min-width: 220px; touch-action: none; cursor: crosshair; }
+.drawwrap.off .drawpad { opacity: .6; pointer-events: none; }
+.drawview { width: 100%; }
+.drawtools { display: grid; gap: 4px; justify-items: center; }
+.drawtools .row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.drawtools .sw { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
+.drawtools .sw.on { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--fg); }
+.drawtools .tool { padding: 3px 9px; font-size: 12px; border-color: var(--line); font-weight: 500; }
+.drawtools .tool.on { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+/* 自分の番: 左に前の絵(またはお題)、右に入力欄 */
+.taskrow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 10px; align-items: start; }
+.prevpic { width: 100%; }
+.lbl { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.inputs { display: grid; gap: 6px; }
+.watch { width: min(100%, 420px); justify-self: center; }
+
+/* 答え合わせ */
+.chain { display: grid; gap: 8px; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; }
+.links { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.link { display: grid; gap: 4px; padding: 6px; border-radius: 8px; border: 2px solid var(--line); align-content: start; }
+.link .rd { font-size: 12px; font-weight: 700; }
+.link .rd.ok { color: var(--good); } .link .rd.ng { color: var(--bad); }
+.link.ok { border-color: var(--good); } .link.ng { border-color: var(--bad); }
+.startw { font-size: 13px; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rank th, .rank td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.rank td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.big2 { font-family: var(--display); font-size: clamp(22px, 5vw, 30px); }
+
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; animation: pop .25s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+/* スマホ: 前の絵を小さめにして横に並べ、画用紙まで1画面に収める */
+@media (max-width: 520px) {
+  .taskrow { grid-template-columns: 112px minmax(0, 1fr); gap: 8px; }
+  .inputs input[type=text] { padding: 5px 8px; }
+  .inputs .field { font-size: 12px; }
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .drawtools .sw { width: 24px; height: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">絵だけでしりとりをつなぐパーティーゲーム</div><h1>絵しりとり</h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">絵だけでしりとりをつなぐパーティーゲーム</div><h1>絵しりとり</h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script src="/js/draw.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0", "#ee7fc0", "#5fd0c8"];
+
+// ---- 言葉(サーバの games/mini/eshiri.js と同じ考え方) ----
+const SMALL = { "ぁ": "あ", "ぃ": "い", "ぅ": "う", "ぇ": "え", "ぉ": "お", "っ": "つ", "ゃ": "や", "ゅ": "ゆ", "ょ": "よ", "ゎ": "わ", "ゕ": "か", "ゖ": "け" };
+const toHira = (s) => String(s || "").normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/\s+/g, "");
+function lastChar(w) { const a = [...toHira(w)].filter((ch) => ch !== "ー"); const ch = a[a.length - 1] || ""; return SMALL[ch] || ch; }
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); }
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+// ---- 効果音 ----
+const Sound = {
+  ctx: null, on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {} },
+  seq: { tap: [[880, 0, .06]], join: [[660, 0, .08], [880, .08, .12]], turn: [[784, 0, .1], [988, .1, .1], [1318, .2, .18]], done: [[1046, 0, .07]],
+    reveal: [[392, 0, .14], [523, .14, .14], [659, .28, .14], [1046, .42, .4]], tick: [[1000, 0, .05]] },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    const t0 = this.ctx.currentTime, soft = name === "tick" || name === "done";
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = soft ? "square" : "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s); g.gain.exponentialRampToValueAtTime(soft ? 0.05 : 0.14, t0 + s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/eshiri/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (Draw.onMessage(m)) return; // 絵の線
+    if (m.t === "joined") {
+      joined = true; store.set("eshiri:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/eshiri?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+Draw.setRequester((did) => send({ t: "game", a: "pic", did }));
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (!el) return toast(msg); el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null; local.key = "";
+  store.set("eshiri:last", { room: "", name: myName });
+  history.replaceState(null, "", "/eshiri");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("eshiri:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+// ---- 共通 ----
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+const colorOf = (id) => { const i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const isGM = () => S.gameHostId === me;
+// 自分の番の画用紙と入力欄は、番が終わるまで作り直さない(描いた線や入力が消えないように)
+let local = { key: "", pad: null, guess: null, word: null, wordsT: null };
+
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (g?.task && (!pg?.task || pg.task.did !== g.task.did)) Sound.play("turn");
+  if (g?.step === "reveal" && pg?.step !== "reveal") Sound.play("reveal");
+  if (g?.turn && pg?.turn && g.turn.n !== pg.turn.n && !g.task) Sound.play("done");
+}
+
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  renderMeta(); renderSide(); renderMain();
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g?.turn) m.append(h("span", { class: "pill" }, `${g.turn.n}/${g.turn.total}番目`));
+  if (g?.round) m.append(h("span", { class: "pill" }, `${g.round.n}/${g.round.total}回目`));
+}
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  side.append(h("h2", {}, "プレイヤー"));
+  const g = S.game, ul = h("ul", { class: "players" });
+  for (const p of S.players) {
+    const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+    if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+    let info = "";
+    if (g && g.step === "draw" && !g.players.includes(p.id)) info = "観戦";
+    else if (g?.turn && g.turn.by === p.id) info = "✏️ 描いています";
+    else if (g?.round) info = g.round.done.includes(p.id) ? "描き終えた" : "描いています";
+    const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm, h("span", { class: "pinfo" }, info + (p.connected ? "" : " 切断中")));
+    if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+    ul.append(li);
+  }
+  side.append(ul);
+  const link = location.origin + "/eshiri?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => { if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; } clearTimeout(t); action(); };
+  return b;
+}
+const cd = () => { const r = remaining(); return r == null ? null : h("span", { class: "cd" + (r <= 10 ? " low" : ""), id: "cdText" }, r + "秒"); };
+
+function renderMain() {
+  const main = $("main"), g = S.game;
+  // 自分の番の間は画用紙を作り直さず、進行の表示だけ書き換える
+  const key = g?.task ? "task:" + g.task.did : g?.turn ? "watch:" + g.turn.did + ":" + g.turn.watch : S.phase + ":" + (g?.step || "") + ":" + (g?.round?.n || "");
+  if (key === local.key && g?.task) { updateTaskStatus(); return; }
+  if (key === local.key && g?.round && !g.task) { const el = $("waitText"); if (el) el.textContent = waitText(); return; }
+  local.key = key;
+  main.replaceChildren();
+  if (S.phase === "lobby") return renderLobby(main);
+  if (!g) return;
+  if (g.step === "draw") return g.task ? renderTask(main, g) : renderWait(main, g);
+  renderReveal(main, g);
+}
+
+function renderLobby(main) {
+  const st = S.settings, set = (o) => send({ t: "settings", s: o }), gm = isGM();
+  const sel = (label, key, opts, hide) => hide ? null : h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); set({ [key]: o[0] });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected).length;
+  main.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "自分の番になったら、前の人の絵を見て「何の絵か」を推理して入れます(最初の人はお題の言葉から)。"),
+      h("li", {}, "その最後の文字から始まる言葉を考えて、絵だけで描きます(文字は書かないこと！)。描いた言葉は答え合わせまで秘密。"),
+      h("li", {}, "最後に答え合わせ。どこでつながって、どこで途切れたかをみんなで見ます。"),
+      h("li", {}, "「ん」で終わる言葉はだめ。前の絵を「ん」で終わる言葉だと思ったら、好きな文字から始めてOK。")),
+    h("div", { class: "settings" },
+      sel("進め方", "mode", [["relay", "1本のしりとり"], ["sim", "全員同時に人数分"]]),
+      sel("周回", "laps", [[1, "1周"], [2, "2周"], [3, "3周"]], st.mode !== "relay"),
+      sel("見え方", "view", [["prev", "前の絵だけ"], ["live", "みんなに見える(実況)"]], st.mode !== "relay"),
+      sel("点数", "scoring", [["both", "個人戦+協力"], ["coop", "協力のみ"]]),
+      sel("描く時間", "drawSecs", [[45, "45秒"], [60, "60秒"], [90, "90秒"], [0, "なし"]])),
+    h("p", { class: "muted small" }, st.mode === "relay" ? "全員で1本のしりとりを順番につなぎます。" : "人数分のしりとりを同時に進めて回します(お絵かき伝言ゲーム風)。待ち時間なし。",
+      st.scoring === "both" ? " 前の絵を読み取れたら+2点、自分の絵を読み取ってもらえたら+1点。" : " 何か所つながったかを競う協力ゲーム。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live > 8 ? "先に入った8人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+
+// ---- 自分の番 ----
+function renderTask(main, g) {
+  const t = g.task;
+  local.pad = Draw.pad({ stroke: (s) => send({ t: "game", a: "stroke", s }), undo: () => send({ t: "game", a: "undo" }), clear: () => send({ t: "game", a: "clear" }) });
+  const sendWords = () => { clearTimeout(local.wordsT); local.wordsT = setTimeout(() => send({ t: "game", a: "words", guess: local.guess?.value || "", word: local.word.value }), 500); };
+  local.guess = t.first ? null : h("input", { type: "text", maxlength: 15, placeholder: "例: りんご", autocomplete: "off", "aria-label": "前の絵は何？", oninput: () => { updateTaskStatus(); sendWords(); } });
+  local.word = h("input", { type: "text", maxlength: 15, placeholder: "ひらがなで", autocomplete: "off", "aria-label": "描く言葉", oninput: () => { updateTaskStatus(); sendWords(); } });
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, "あなたの番！"), h("span", { id: "cdWrap" }, cd())));
+  const left = t.first ? h("div", { class: "field" }, "お題", h("span", { class: "word" }, "「" + t.start + "」"))
+    : h("div", { class: "field prevpic" }, `${nameOf(t.prevBy)} さんの絵`, t.prevEmpty ? h("p", { class: "muted small" }, "(何も描かれていません)") : Draw.view(t.prevDid));
+  main.append(h("div", { class: "taskrow" }, left,
+    h("div", { class: "inputs" },
+      local.guess ? h("label", { class: "field" }, "① 前の絵は何だと思う？", local.guess) : null,
+      h("label", { class: "field" }, h("span", { class: "lbl" }, (local.guess ? "② " : "") + "描く言葉:", h("span", { id: "needText" })), local.word),
+      h("p", { class: "status", id: "taskMsg" }))),
+    local.pad.el,
+    h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", id: "submitBtn", onclick: submitTask }, "描けた！"),
+      h("span", { class: "muted small" }, "文字は描かないでね")));
+  updateTaskStatus();
+}
+function needFor(g) {
+  const t = g.task;
+  const ch = t.first ? lastChar(t.start) : lastChar(local.guess?.value || "");
+  return ch === "ん" ? "" : ch;
+}
+function updateTaskStatus() {
+  const g = S.game; if (!g?.task) return;
+  const need = needFor(g), el = $("needText");
+  if (el) el.replaceChildren(need ? h("span", { class: "need" }, need) : h("span", {}, g.task.first || local.guess?.value ? "好きな文字" : "①を入れると決まる"), need ? " から始まる" : "");
+  const c = $("cdWrap"); if (c) c.replaceChildren(cd() || "");
+}
+function submitTask() {
+  const g = S.game, msg = $("taskMsg");
+  const guess = toHira(local.guess?.value || ""), word = toHira(local.word.value), need = needFor(g);
+  const say = (t) => { msg.textContent = t; msg.classList.add("warn"); };
+  if (local.guess && !/^[ぁ-ゖー]+$/.test(guess)) return say("①をひらがなで入れてください");
+  if (!/^[ぁ-ゖー]+$/.test(word)) return say("描く言葉をひらがなで入れてください");
+  const first = [...word][0];
+  if (need && (SMALL[first] || first) !== need) return say(`「${need}」から始まる言葉にしてください`);
+  if (lastChar(word) === "ん") return say("「ん」で終わる言葉は使えません");
+  if (!local.pad.count()) return say("絵を描いてください");
+  send({ t: "game", a: "submit", guess, word });
+}
+
+// ---- 自分の番ではないとき ----
+function waitText() {
+  const g = S.game;
+  if (g.round) return `描き終えた人 ${g.round.done.length}/${g.round.total}` + (g.round.done.includes(me) ? "。あなたは提出済み、みんなを待っています…" : "");
+  return "";
+}
+function renderWait(main, g) {
+  if (g.turn) {
+    main.append(h("div", { class: "head" }, h("div", { class: "say" }, `${nameOf(g.turn.by)} さんが描いています`), h("span", { id: "cdWrap" }, cd())));
+    if (g.turn.watch) main.append(h("div", { class: "watch" }, Draw.view(g.turn.did)));
+    else main.append(h("p", { class: "muted" }, "描き終わるまで待ちましょう。絵は答え合わせで全部見られます。"));
+  } else {
+    main.append(h("div", { class: "say" }, "みんなが描いています"), h("p", { class: "muted", id: "waitText" }, waitText()), h("span", { id: "cdWrap" }, cd()));
+  }
+  if (isGM()) main.append(h("div", { class: "btns" }, twoStep(g.turn ? "この番を締め切る" : "この回を締め切る", () => send({ t: "skip" }), "ghost"),
+    h("span", { class: "muted small" }, "止まってしまったとき用(まだ描いていない絵はそのまま提出)")));
+}
+
+// ---- 答え合わせ ----
+function renderReveal(main, g) {
+  const coop = g.coop;
+  main.append(h("div", { class: "say good" }, "答え合わせ"), h("div", { class: "big2" }, `つながった: ${coop.ok} / ${coop.total}`));
+  for (const ch of g.chains) {
+    const links = h("div", { class: "links" });
+    ch.links.forEach((l, i) => {
+      const next = ch.links[i + 1];
+      links.append(h("div", { class: "link" + (next ? (next.ok ? " ok" : " ng") : "") },
+        chip(l.by), l.skipped ? h("p", { class: "muted small" }, "(お休み)") : Draw.view(l.did),
+        h("div", {}, h("span", { class: "muted small" }, "描いた言葉: "), h("b", {}, l.word || "(未入力)")),
+        next ? h("div", { class: "rd " + (next.ok ? "ok" : "ng") }, `${nameOf(next.by)} の読み取り: ${next.guess || "(未入力)"} ${next.ok ? "○" : "×"}`) : null));
+    });
+    main.append(h("div", { class: "chain" }, h("div", { class: "startw" }, "お題: ", h("b", {}, "「" + ch.start + "」")), links));
+  }
+  if (g.scores) {
+    const rows = Object.entries(g.scores).sort((a, b) => b[1] - a[1]);
+    main.append(h("h2", {}, "個人戦の点数"), h("table", { class: "rank" }, h("tbody", {}, ...rows.map(([id, p], i) => h("tr", { class: id === me ? "me" : "" },
+      h("td", {}, (i > 0 && rows[i - 1][1] === p ? "" : (i + 1) + "位")), h("td", {}, chip(id)), h("td", { class: "n" }, p + "点"))))));
+  }
+  main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"), h("span", { class: "muted small" }, "待機画面に戻ります")));
+}
+
+// 残り秒数の表示だけを書き換える
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  if (r !== lastSec) { lastSec = r; if (S.game?.task && r != null && r <= 5 && r >= 1) Sound.play("tick"); }
+}, 250);
+
+connect();
+</script>
+</body>
+</html>
