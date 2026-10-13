@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ヒート（Heat: Pedal to the Metal風）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=コース・走行中の車・自分のダッシュボード、下=ドライバーと招待 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+.say.good { color: var(--good); } .say.red { color: var(--bad); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+.chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #181b23; border: 1.5px solid #181b23; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.word { font-family: var(--display); font-size: 18px; }
+.need { display: inline-block; font-family: var(--display); font-size: 18px; padding: 0 8px; border-radius: 6px; background: var(--gold); color: var(--ink); }
+
+/* コース */
+.boardbox { display: grid; gap: 4px; }
+.mapwrap { overflow: auto; border: 2px solid var(--fg); border-radius: 8px; background: #333; -webkit-overflow-scrolling: touch; }
+.mapwrap.zoomed { max-height: min(64dvh, 640px); }
+.mapwrap .track { display: block; height: auto; margin: 0 auto; }
+.car.cur .ring { animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { stroke-opacity: .2; } }
+.zoom { gap: 4px; } .zoom .legend { margin-left: auto; }
+/* 手札・ダッシュボード */
+.dash { display: grid; gap: 8px; padding: 10px; border: 2px solid var(--line); border-radius: 10px; }
+.gauges { display: flex; flex-wrap: wrap; gap: 6px; }
+.gauge { display: grid; padding: 3px 10px; border-radius: 8px; background: var(--bg); min-width: 64px; } .gauge small { font-size: 11px; color: var(--muted); } .gauge b { font-family: var(--display); font-weight: 400; font-size: 18px; line-height: 1.2; }
+.gauge.heat b { color: #d9480f; }
+.hand { display: flex; flex-wrap: wrap; gap: 6px; }
+.hc { display: inline-grid; justify-items: center; align-content: center; width: 58px; height: 80px; border-radius: 8px; border: 2px solid #181b23; background: #fff; color: #181b23; font-family: var(--body); padding: 2px; }
+.hc b { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1.1; } .hc .kn { font-size: 10px; font-weight: 700; }
+button.hc { cursor: pointer; } button.hc:hover { transform: translateY(-2px); }
+.hc.spd { background: linear-gradient(#dbe8ff, #fff); } .hc.up { background: linear-gradient(#ffd9d6, #fff); border-color: #c4323a; }
+.hc.heat { background: linear-gradient(#ffb36b, #ffe2c2); } .hc.stress { background: repeating-linear-gradient(45deg, #fff2a8 0 8px, #fff 8px 16px); }
+.hc.sel { outline: 3px solid var(--accent); outline-offset: 1px; transform: translateY(-5px); }
+.hc.dim { opacity: .45; } .hc.small { width: 40px; height: 54px; vertical-align: middle; } .hc.small b { font-size: 18px; } .hc.small .kn { display: none; }
+.gears { display: flex; gap: 6px; } .gearbtn { display: grid; justify-items: center; min-width: 64px; padding: 4px 8px; } .gearbtn b { font-family: var(--display); font-weight: 400; font-size: 22px; line-height: 1.1; } .gearbtn small { font-size: 11px; }
+.gearbtn.on { background: var(--fg); color: var(--surface); }
+.planrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; font-weight: 700; }
+.prompt { border: 2px solid var(--accent); border-radius: 10px; padding: 8px; display: grid; gap: 6px; }
+.revealrow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; } .speed { font-family: var(--display); font-weight: 400; font-size: 20px; margin-left: 6px; }
+.good { color: var(--good); } .bad { color: var(--bad); }
+.players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.pextra { grid-column: 2 / -1; font-size: 11px; color: var(--muted); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 200px; overflow: auto; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; } .rank td { padding: 4px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; animation: pop .25s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (max-width: 520px) {
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .hc { width: 50px; height: 70px; } .hc b { font-size: 22px; }
+  .gearbtn { min-width: 0; flex: 1; }
+  .zoom .legend { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">ギアとヒートをやりくりして、コーナーを攻めるカーレース</div><h1>ヒート <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（Heat: Pedal to the Metal）</small></h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">ギアとヒートをやりくりして、コーナーを攻めるカーレース</div><h1>ヒート <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（Heat: Pedal to the Metal）</small></h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0", "#ee7fc0", "#5fd0c8"];
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); }
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+// ---- 効果音 ----
+const Sound = {
+  ctx: null, on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {} },
+  seq: { tap: [[880, 0, .06]], join: [[660, 0, .08], [880, .08, .12]], turn: [[784, 0, .1], [988, .1, .1], [1318, .2, .18]], done: [[1046, 0, .07]],
+    reveal: [[392, 0, .14], [523, .14, .14], [659, .28, .14], [1046, .42, .4]], tick: [[1000, 0, .05]] },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    const t0 = this.ctx.currentTime, soft = name === "tick" || name === "done";
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = soft ? "square" : "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s); g.gain.exponentialRampToValueAtTime(soft ? 0.05 : 0.14, t0 + s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/heat/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("heat:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/heat?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "db") { DB = m; if (S) render();
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (!el) return toast(msg); el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null; 
+  store.set("heat:last", { room: "", name: myName });
+  history.replaceState(null, "", "/heat");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("heat:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+
+// ---- 共通 ----
+let DB = { tracks: {} };
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+const CAR = ["#e5484d", "#3e8ef7", "#f2c230", "#3fb36a", "#f2f0e6", "#9b6ef3"];
+const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return CAR[(i < 0 ? 0 : i) % CAR.length]; };
+const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
+const isGM = () => S.gameHostId === me;
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const act = (a, x = {}) => send({ t: "game", a, ...x });
+const SVGNS = "http://www.w3.org/2000/svg";
+const s = (tag, attrs = {}, ...kids) => { const el = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) el.setAttribute(k, v); for (const c of kids.flat()) if (c != null) el.append(c.nodeType ? c : document.createTextNode(String(c))); return el; };
+const KN = { s1: "1", s2: "2", s3: "3", s4: "4", u0: "0", u5: "5", h: "ヒート", x: "ストレス" };
+const KV = { s1: 1, s2: 2, s3: 3, s4: 4, u0: 0, u5: 5 };
+const KEEP = new Set(["u5", "h", "x"]);
+// sel: 出す札 / shift: ギアの変え方 / dsel: 捨てる札 / zoom: 盤の拡大
+let local = { sel: new Set(), shift: 0, dsel: new Set(), zoom: 1, round: 0, follow: true };
+
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (!g || !pg) return;
+  if (g.round !== pg.round && g.step === "plan") Sound.play("turn");
+  if (g.turn?.pid === me && pg.turn?.pid !== me) Sound.play("turn");
+  if (g.step === "end" && pg.step !== "end") Sound.play("reveal");
+  if (g.hall.length > pg.hall.length) Sound.play("reveal");
+}
+
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  renderMeta(); renderSide(); renderMain();
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g) m.append(h("span", { class: "pill" }, `${g.track.name}・${g.laps}周・ラウンド${g.round}`));
+}
+function lapOf(g, p) { return Math.min(g.laps, Math.max(0, Math.floor(p.pos / g.track.n)) + 1); }
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  const g = S.game;
+  if (g) {
+    side.append(h("h2", {}, "ドライバー"));
+    const ul = h("ul", { class: "players" });
+    const ids = g.order.filter((id) => g.P[id]).sort((a, b) => rankKey(g, a) - rankKey(g, b));
+    ids.forEach((id, i) => {
+      const p = g.P[id];
+      const st = p.done ? (g.hall.includes(id) ? `🏁 ${g.hall.indexOf(id) + 1}位でゴール` : "棄権") : g.step === "plan" ? (p.ready ? "準備OK" : "考え中…") : g.turn?.pid === id ? "走行中" : "";
+      ul.append(h("li", { class: g.turn?.pid === id ? "cur" : "" }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
+        h("span", { class: "pname" }, `${i + 1}. ` + nameOf(id) + (id === me ? "(あなた)" : "")),
+        h("span", { class: "pinfo" }, p.done ? "" : `${p.gear}速・🔥${p.engine}・${lapOf(g, p)}/${g.laps}周`),
+        st ? h("span", { class: "pextra" }, st) : null));
+    });
+    side.append(ul);
+  } else {
+    side.append(h("h2", {}, "プレイヤー"));
+    const ul = h("ul", { class: "players" });
+    for (const p of S.players) {
+      const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+      if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+      const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm, h("span", { class: "pinfo" }, p.connected ? "" : "切断中"));
+      if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+    side.append(ul);
+  }
+  const link = location.origin + "/heat?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  if (g?.log?.length) side.append(h("details", { open: true }, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+// 順位: ゴール済みは到着順、ほかは前にいる順
+function rankKey(g, id) { const p = g.P[id]; if (g.hall.includes(id)) return g.hall.indexOf(id) - 1e6; if (p.left) return 1e6; return -(p.pos * 2 - p.spot); }
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => { if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; } clearTimeout(t); action(); };
+  return b;
+}
+
+function renderMain() {
+  const main = $("main");
+  const keep = main.querySelector(".mapwrap");
+  const sx = keep ? keep.scrollLeft : null, sy = keep ? keep.scrollTop : null;
+  main.replaceChildren();
+  if (S.phase === "lobby") return renderLobby(main);
+  const g = S.game; if (!g) return;
+  if (local.round !== g.round) { local.round = g.round; local.sel.clear(); local.shift = 0; }
+  if (g.turn?.pid !== me || g.turn?.phase !== "discard") local.dsel.clear();
+  const mine = g.P[me];
+  const say = g.step === "end" ? "レース終了" : g.step === "plan" ? (mine && !mine.done ? (mine.ready ? "ほかの人を待っています" : "ギアを決めて、カードを伏せてください") : "みんながカードを選んでいます")
+    : g.turn ? (g.turn.pid === me ? { react: "あなたの番: リアクト", slip: "スリップストリームしますか？", discard: "捨てる札を選んでターン終了" }[g.turn.phase] : `${nameOf(g.turn.pid)} さんが走っています`) : "";
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, say), remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null));
+  if (g.step === "end") renderResult(main, g);
+  if (g.turn) renderTurn(main, g);
+  main.append(boardEl(g));
+  const wrap = main.querySelector(".mapwrap");
+  // 拡大中は、走る車が変わったらその車に寄せる
+  if (local.zoom > 1 && g.turn && g.turn.pid !== local.lastPid) local.recenter = true;
+  local.lastPid = g.turn ? g.turn.pid : null;
+  if (wrap && sx != null && !local.recenter) { wrap.scrollLeft = sx; wrap.scrollTop = sy; }
+  else if (wrap) requestAnimationFrame(() => centerOn(g));
+  local.recenter = false;
+  if (mine && !mine.done && g.step !== "end") renderDash(main, g);
+}
+
+// ---- コース ----
+function cellXY(g, pos) { const n = g.track.n; return g.track.cells[((pos % n) + n) % n]; }
+function dirAt(g, pos) { const a = cellXY(g, pos - 1), b = cellXY(g, pos + 1); const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+const W = 62; // 道幅
+function boardEl(g) {
+  const cells = g.track.cells, n = g.track.n;
+  const svg = s("svg", { viewBox: "0 0 1650 1100", class: "track", role: "img", "aria-label": `${g.track.name}のコース` });
+  svg.append(s("rect", { x: 0, y: 0, width: 1650, height: 1100, fill: TRACKBG[g.track.id] || "#5c8a4a" }));
+  const d = "M" + cells.map((p) => p.join(",")).join(" L") + " Z";
+  svg.append(s("path", { d, fill: "none", stroke: "#e9e4d4", "stroke-width": W + 14, "stroke-linejoin": "round" }));
+  svg.append(s("path", { d, fill: "none", stroke: "#2b2d33", "stroke-width": W, "stroke-linejoin": "round" }));
+  svg.append(s("path", { d, fill: "none", stroke: "#cfd3dc", "stroke-width": 2, "stroke-dasharray": "10 9", opacity: 0.6 }));
+  // マスの区切り
+  for (let i = 0; i < n; i++) {
+    const a = cells[i], b = cells[(i + 1) % n], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    const isCorner = g.track.corners.some((c) => (c.at + n - 1) % n === i), isFinish = i === n - 1;
+    if (isFinish) {
+      for (let k = -2; k < 2; k++) for (let j = 0; j < 2; j++) {
+        const cx = mx + nx * (k + 0.5) * (W / 4) + (dx / l) * (j - 0.5) * 9, cy = my + ny * (k + 0.5) * (W / 4) + (dy / l) * (j - 0.5) * 9;
+        svg.append(s("rect", { x: cx - 4.5, y: cy - W / 8, width: 9, height: W / 4, fill: (k + j) % 2 ? "#111" : "#fff", transform: `rotate(${Math.atan2(ny, nx) * 180 / Math.PI + 90} ${cx} ${cy})` }));
+      }
+      continue;
+    }
+    svg.append(s("line", { x1: mx + nx * W / 2, y1: my + ny * W / 2, x2: mx - nx * W / 2, y2: my - ny * W / 2, stroke: isCorner ? "#e5484d" : "#d8dbe2", "stroke-width": isCorner ? 7 : 2 }));
+  }
+  // コーナーの制限速度
+  for (const c of g.track.corners) {
+    const a = cells[(c.at + n - 1) % n], b = cells[c.at], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    // 盤の中心から遠い側(コースの外側)に看板を置く
+    let nx = -dy / l, ny = dx / l; if ((mx + nx * 10 - 825) ** 2 + (my + ny * 10 - 550) ** 2 < (mx - 825) ** 2 + (my - 550) ** 2) { nx = -nx; ny = -ny; }
+    const bx = mx + nx * 66, by = my + ny * 66;
+    svg.append(s("circle", { cx: bx, cy: by, r: 27, fill: "#fff", stroke: "#181b23", "stroke-width": 5 }),
+      s("text", { x: bx, y: by + 11, "text-anchor": "middle", "font-size": 32, "font-weight": 700, fill: "#181b23" }, c.lim));
+  }
+  // グリッドの番号
+  for (let k = 0; k < 3; k++) {
+    const p = cellXY(g, -1 - k), [dx, dy] = dirAt(g, -1 - k);
+    for (let j = 0; j < 2; j++) svg.append(s("text", { x: p[0] + (-dy) * (j ? -1 : 1) * 15, y: p[1] + dx * (j ? -1 : 1) * 15 + 5, "text-anchor": "middle", "font-size": 13, fill: "#9aa0ad" }, k * 2 + j + 1));
+  }
+  // 車
+  const ids = g.order.filter((id) => g.P[id] && !g.P[id].done);
+  for (const id of ids) {
+    const p = g.P[id], c = cellXY(g, p.pos), [dx, dy] = dirAt(g, p.pos);
+    const side = p.spot ? -1 : 1, x = c[0] + (-dy) * side * 15, y = c[1] + dx * side * 15;
+    const cur = g.turn?.pid === id;
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    svg.append(s("g", { transform: `translate(${x} ${y}) rotate(${ang})`, class: "car" + (cur ? " cur" : ""), "data-id": id },
+      cur ? s("circle", { r: 24, fill: "none", stroke: "#fff", "stroke-width": 4, class: "ring" }) : null,
+      s("rect", { x: -17, y: -10, width: 34, height: 20, rx: 7, fill: colorOf(id), stroke: id === me ? "#fff" : "#111", "stroke-width": id === me ? 4 : 2 }),
+      s("rect", { x: 3, y: -6, width: 8, height: 12, rx: 2, fill: "rgba(0,0,0,.45)" })));
+  }
+  const wrap = h("div", { class: "mapwrap" + (local.zoom > 1 ? " zoomed" : ""), style: `background:${TRACKBG[g.track.id] || "#5c8a4a"}` }, svg);
+  // 全体表示はコース全体が画面に収まる大きさ、拡大中は横にもスクロール
+  svg.style.width = local.zoom * 100 + "%";
+  if (local.zoom === 1) svg.style.maxHeight = "70dvh";
+  const zoomBtns = h("div", { class: "btns zoom" }, h("span", { class: "small muted" }, "拡大"),
+    ...[[1, "全体"], [1.8, "×1.8"], [2.6, "×2.6"]].map(([z, t]) => h("button", { type: "button", class: "tiny" + (local.zoom === z ? " primary" : " ghost"), onclick: () => { local.zoom = z; local.recenter = true; render(); } }, t)),
+    h("span", { class: "small muted legend" }, "赤い線=コーナー(数字が制限速度)・白黒=ゴール"));
+  return h("div", { class: "boardbox" }, wrap, zoomBtns);
+}
+const TRACKBG = { usa: "#c9773b", italia: "#d9b77a", france: "#7fa457", gb: "#5e8f52" };
+// 拡大中は、動いている車(いなければ自分の車)が見えるように寄せる
+function centerOn(g) {
+  const wrap = document.querySelector(".mapwrap"); if (!wrap || local.zoom === 1) return;
+  const id = g.turn?.pid || me; const p = g.P[id]; if (!p) return;
+  const c = cellXY(g, p.pos), sc = wrap.scrollWidth / 1650;
+  wrap.scrollLeft = c[0] * sc - wrap.clientWidth / 2; wrap.scrollTop = c[1] * sc - wrap.clientHeight / 2;
+}
+
+// ---- 手札とギア ----
+function cardEl(c, opt = {}) {
+  const k = c.k || c;
+  const cls = "hc " + (k[0] === "s" ? "spd" : k[0] === "u" ? "up" : k === "h" ? "heat" : "stress") + (opt.sel ? " sel" : "") + (opt.dim ? " dim" : "") + (opt.small ? " small" : "");
+  const label = k === "h" ? "🔥" : k === "x" ? "?" : KN[k];
+  return h(opt.onclick ? "button" : "span", { type: opt.onclick ? "button" : null, class: cls, onclick: opt.onclick || null, "aria-pressed": opt.onclick ? String(!!opt.sel) : null, title: KN[k] + (KEEP.has(k) ? "(捨てられない)" : "") },
+    h("b", {}, label), h("span", { class: "kn" }, k === "h" ? "ヒート" : k === "x" ? "ストレス" : k[0] === "u" ? "強化" : "スピード"));
+}
+function renderDash(main, g) {
+  const p = g.P[me];
+  const box = h("div", { class: "dash" });
+  const nc = p.next;
+  box.append(h("div", { class: "gauges" },
+    h("span", { class: "gauge" }, h("small", {}, "ギア"), h("b", {}, p.gear)),
+    h("span", { class: "gauge heat" }, h("small", {}, "エンジンのヒート"), h("b", {}, p.engine)),
+    h("span", { class: "gauge" }, h("small", {}, "周回"), h("b", {}, `${lapOf(g, p)}/${g.laps}`)),
+    h("span", { class: "gauge" }, h("small", {}, "次のコーナー"), h("b", {}, nc ? `${nc.dist}マス先・制限${nc.lim}` : "ゴールへ")),
+    h("span", { class: "gauge" }, h("small", {}, "山札/捨て札"), h("b", {}, `${p.deck}/${p.discard}`))));
+  if (g.step === "plan") {
+    if (p.ready) {
+      box.append(h("div", { class: "prompt" }, h("div", {}, `${g.plan.gear}速で `, ...g.plan.ids.map((id) => cardEl(g.hand.find((c) => c.id === id) || { k: "h" }, { small: true }))),
+        h("div", { class: "btns" }, h("button", { type: "button", class: "ghost", onclick: () => act("unplan") }, "選び直す"))));
+    } else renderPlan(box, g, p);
+  } else {
+    const disc = g.turn?.pid === me && g.turn.phase === "discard";
+    box.append(h("div", { class: "small muted" }, disc ? "捨てる札を押して選ぶ(ヒート・ストレス・5は捨てられない)" : "手札"),
+      h("div", { class: "hand" }, ...g.hand.map((c) => cardEl(c, disc && !KEEP.has(c.k) ? { sel: local.dsel.has(c.id), onclick: () => { local.dsel.has(c.id) ? local.dsel.delete(c.id) : local.dsel.add(c.id); render(); } } : { dim: disc && KEEP.has(c.k) }))));
+    if (disc) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary big", onclick: () => { act("discard", { ids: [...local.dsel] }); local.dsel.clear(); } }, local.dsel.size ? `${local.dsel.size}枚捨ててターン終了` : "捨てずにターン終了")));
+  }
+  main.append(box);
+}
+function renderPlan(box, g, p) {
+  const gear = p.gear + local.shift;
+  const playable = g.hand.filter((c) => c.k !== "h");
+  const clutter = playable.length < gear;
+  // 選んだ札が新しいギアの枚数より多ければ減らす
+  for (const id of [...local.sel]) if (!g.hand.some((c) => c.id === id)) local.sel.delete(id);
+  const gearBtns = h("div", { class: "gears", role: "group", "aria-label": "ギア" }, ...[1, 2, 3, 4].map((x) => {
+    const sh = x - p.gear, ok = Math.abs(sh) <= 2 && (Math.abs(sh) < 2 || p.engine > 0);
+    return h("button", { type: "button", class: "gearbtn" + (x === gear ? " on" : ""), disabled: !ok, onclick: () => { local.shift = sh; while (local.sel.size > x) local.sel.delete([...local.sel].pop()); render(); } },
+      h("b", {}, x), h("small", {}, sh === 0 ? "そのまま" : Math.abs(sh) === 2 ? "ヒート1" : sh > 0 ? "上げる" : "下げる"));
+  }));
+  const sel = [...local.sel].map((id) => g.hand.find((c) => c.id === id)).filter(Boolean);
+  const known = sel.reduce((a, c) => a + (KV[c.k] || 0), 0), unknown = sel.filter((c) => c.k === "x").length;
+  const cool = COOL[gear] || 0;
+  box.append(h("div", { class: "small muted" }, `ギア(1速=1枚・2速=2枚…)。1速はクールダウン3、2速は1。`), gearBtns,
+    h("div", { class: "small muted" }, clutter ? `出せる札が${playable.length}枚しかありません(オーバーヒート)。出せる札を全部出すと、足りない分はヒートになり今回は動けません。` : `${gear}枚選んでください`),
+    h("div", { class: "hand" }, ...g.hand.map((c) => {
+      const on = local.sel.has(c.id), dis = c.k === "h" && !clutter;
+      return cardEl(c, dis ? { dim: true } : { sel: on, onclick: () => { if (on) local.sel.delete(c.id); else if (local.sel.size < gear) local.sel.add(c.id); render(); } });
+    })),
+    h("div", { class: "planrow" }, h("span", {}, `スピード ${known}${unknown ? ` + ストレス${unknown}枚(1〜4)` : ""}`, cool ? `・クールダウン${cool}` : "", nextWarn(g, p, known, unknown)),
+      h("button", { type: "button", class: "primary big", disabled: sel.length !== gear, onclick: () => act("plan", { shift: local.shift, ids: [...local.sel] }) }, "決定")));
+}
+const COOL = [0, 3, 1, 0, 0];
+function nextWarn(g, p, known, unknown) {
+  const nc = p.next; if (!nc || unknown) return "";
+  if (known >= nc.dist && known > nc.lim) return h("b", { class: "bad" }, ` ⚠ コーナーで${known - nc.lim}ヒート`);
+  return "";
+}
+
+// ---- 走行中 ----
+function renderTurn(main, g) {
+  const t = g.turn, p = g.P[t.pid], mine = t.pid === me;
+  const rev = p.revealed || [];
+  const flips = t.flips.map((f) => `${f.by === "boost" ? "ブースト" : "ストレス"}→${f.card ? KN[f.card] : "なし"}${f.skipped.length ? `(${f.skipped.map((k) => KN[k]).join("・")}をとばす)` : ""}`);
+  const box = h("div", { class: "prompt" }, h("div", { class: "revealrow" }, chip(t.pid), ` ${p.gear}速 `, ...rev.map((k) => cardEl({ k }, { small: true })), h("b", { class: "speed" }, `スピード${t.speed}`)),
+    flips.length ? h("div", { class: "small" }, flips.join("・")) : null,
+    t.adrenaline ? h("div", { class: "small" }, "⚡ アドレナリン(最後尾): +1マスとクールダウン+1") : null);
+  if (t.corners) box.append(h("div", { class: "small" }, t.corners.length ? t.corners.map((c) => `コーナー(制限${c.lim}): ${c.spin ? `スピン！ヒート${c.paid}・ストレス+${c.stress}` : c.paid ? `ヒート${c.paid}` : "セーフ"}`).join("・") : "コーナーなし"));
+  if (mine && t.phase === "react") {
+    const heatHand = g.P[me].heatInHand || 0;
+    box.append(h("div", { class: "btns" },
+      h("button", { type: "button", disabled: t.boosted || !g.P[me].engine, onclick: () => act("boost") }, t.boosted ? "ブースト済み" : "ブースト(ヒート1・めくって進む)"),
+      h("button", { type: "button", disabled: !(t.coolLeft > 0 && heatHand > 0), onclick: () => act("cool", { n: t.coolLeft }) }, `クールダウン(あと${t.coolLeft}・手札のヒート${heatHand})`),
+      t.adrenaline ? h("button", { type: "button", disabled: t.adrUsed, onclick: () => act("adr") }, t.adrUsed ? "+1済み" : "アドレナリン +1マス") : null,
+      h("button", { type: "button", class: "primary", onclick: () => act("react") }, "次へ")),
+      h("div", { class: "small muted" }, cornerHint(g, t)));
+  }
+  if (mine && t.phase === "slip") box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("slip", { yes: true }) }, "スリップストリーム(+2マス)"), h("button", { type: "button", class: "ghost", onclick: () => act("slip", { yes: false }) }, "しない")),
+    h("div", { class: "small muted" }, "+2マスはスピードに入りません(コーナーの判定は今のスピードのまま)。" + cornerHint(g, t, 2)));
+  main.append(box);
+}
+// このあと通るコーナーの見込み
+function cornerHint(g, t, extra = 0) {
+  const p = g.P[t.pid], n = g.track.n, out = [];
+  for (let lap = Math.floor(Math.max(t.start, 0) / n) - 1; lap <= Math.floor((p.pos + extra) / n) + 1; lap++)
+    for (const c of g.track.corners) { const x = lap * n + c.at; if (x > t.start && x <= p.pos + extra && x <= g.goal) out.push(c.lim); }
+  if (!out.length) return "今のところコーナーは通りません。";
+  return "通るコーナー: " + out.map((lim) => `制限${lim}${t.speed > lim ? `(ヒート${t.speed - lim})` : "(セーフ)"}`).join("・") + `。エンジンのヒート${p.engine}。`;
+}
+
+function renderResult(main, g) {
+  const rows = g.result || [];
+  main.append(h("div", { class: "say good" }, rows[0] ? `🏆 優勝は ${nameOf(rows[0])} さん！` : "レース終了"),
+    h("table", { class: "rank" }, h("tbody", {}, ...rows.map((id, i) => h("tr", { class: id === me ? "me" : "" }, h("td", {}, `${i + 1}位`), h("td", {}, chip(id)), h("td", { class: "small" }, g.hall.includes(id) ? "ゴール" : "完走できず"))))),
+    h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+}
+function renderLobby(main) {
+  const st = S.settings, gm = isGM();
+  const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); send({ t: "settings", s: { [key]: o[0] } });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected).length;
+  const tr = DB.tracks[st.track];
+  main.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "毎ラウンド、全員同時にギアを決めて(1つ上げ下げは自由、2つはヒート1)、ギアの数だけ手札を伏せます。合計がスピード=進むマス数。"),
+      h("li", {}, "先頭の車から順に公開して進みます。ストレスは山札からスピードカードが出るまでめくった数。最後尾はアドレナリン(+1マスとクールダウン+1)。"),
+      h("li", {}, "リアクト: ブースト(ヒート1でめくって進む)とクールダウン(1速3・2速1。手札のヒートをエンジンに戻す)。車の横か1マス後ろに着いたらスリップストリームで+2。"),
+      h("li", {}, "コーナーを通るとき、スピードが制限を超えた分だけヒートを払います。払えないとスピン(コーナーの手前へ・ストレスが増える・1速)。決められた周回を先にゴールした人の勝ち！")),
+    h("div", { class: "settings" },
+      sel("コース(本家の盤面)", "track", Object.entries(DB.tracks).map(([k, t]) => [k, `${t.name}(${t.n}マス・コーナー${t.corners}・${t.laps}周)`])),
+      sel("周回数", "laps", [[0, `盤の表示どおり${tr ? `(${tr.laps}周)` : ""}`], [1, "1周(練習)"], [2, "2周"], [3, "3周"]]),
+      sel("カードを選ぶ時間", "planSecs", [[60, "60秒"], [45, "45秒"], [30, "30秒"], [90, "90秒"], [120, "120秒"]]),
+      sel("1台の持ち時間", "turnSecs", [[45, "45秒"], [30, "30秒"], [20, "20秒"], [60, "60秒"], [90, "90秒"]])),
+    h("p", { class: "muted small" }, "2〜6人。約30〜60分(1周なら約15分)。はじめてならUSAの1周がおすすめ。基本ルールで遊びます(ガレージ・天候・レジェンドのモジュールは未対応)。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live > 6 ? "先に入った6人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  const g = S.game;
+  const mineWait = g && ((g.step === "plan" && g.P[me] && !g.P[me].ready && !g.P[me].done) || g.turn?.pid === me);
+  if (r !== lastSec) { lastSec = r; if (mineWait && r != null && r <= 5 && r >= 1) Sound.play("tick"); }
+}, 250);
+
+connect();
+</script>
+</body>
+</html>

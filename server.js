@@ -18,6 +18,7 @@ const coyote = require("./games/coyote");     // コヨーテ(/coyote)
 const challengers = require("./games/challengers"); // チャレンジャーズ(/challengers)
 const eldorado = require("./games/eldorado"); // エルドラドを目指して(/eldorado)
 const guessclub = require("./games/guessclub"); // ゲスクラブ(/guessclub)
+const heat = require("./games/heat"); // ヒート(/heat)
 const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
 const PORT = process.env.PORT || 3000;
@@ -549,6 +550,7 @@ const PAGES = {
   "/challengers": "challengers.html", "/challengers/": "challengers.html",
   "/eldorado": "eldorado.html", "/eldorado/": "eldorado.html",
   "/guessclub": "guessclub.html", "/guessclub/": "guessclub.html",
+  "/heat": "heat.html", "/heat/": "heat.html",
   "/party": "party.html", "/party/": "party.html",
   // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
   "/bridge": "party.html", "/bridge/": "party.html", "/bomb": "party.html", "/bomb/": "party.html", "/memory": "party.html", "/memory/": "party.html",
@@ -603,7 +605,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {
