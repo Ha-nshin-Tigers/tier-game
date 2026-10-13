@@ -2,7 +2,7 @@
 // パーティーに入っていれば /lobby/ws につながり、ホストが次のゲームを選ぶと全員の画面がその部屋へ自動で移動する。
 // 遊んでいる途中の人は、そのゲームが終わって待機画面に戻ったときに移動する(「今すぐ移動」も押せる)。
 // パーティーの画面(/lobby)からは window.Party を使う。
-// ついでに、どの画面でも使える便利機能もここに置く: 招待リンクの「共有」ボタン(スマホの共有メニュー)と、
+// ついでに、どの画面でも使える便利機能もここに置く: 招待リンクの「共有」ボタン(LINE・Discord などの送り先を選ぶ)と、
 // 部屋に入っている間はスマホの画面が自動で消えないようにする(Screen Wake Lock)。
 (() => {
   const KEY = "tier:party", SEEN = "tier:party:seen";
@@ -139,16 +139,77 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     }
   }
 
-  // ---- 招待リンクの「共有」ボタン(navigator.share がある端末だけ) ----
+  // ---- 招待リンクの「共有」ボタン: 押すと送り先(LINE・Discord・X・メール・コピー・端末の共有メニュー)を選ぶ ----
+  const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch {}
+    try { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.append(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok; } catch { return false; }
+  }
+  // 送るときの文: 「○○で遊ぼう！」+ 招待リンク
+  const gameTitle = () => (document.title.split(/[（(｜]/)[0] || "みんなのあそびば").trim();
+  function shareSheet(url) {
+    document.querySelectorAll(".pb-sheet").forEach((x) => x.remove());
+    const text = `「${gameTitle()}」でいっしょに遊ぼう！ このリンクから部屋に入れます`;
+    const enc = encodeURIComponent;
+    const wrap = document.createElement("div");
+    wrap.className = "pb-sheet"; wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); wrap.setAttribute("aria-label", "招待リンクを送る");
+    const opts = [
+      ["line", "LINE で送る", "#06c755"],
+      ["discord", "Discord に送る", "#5865f2"],
+      ["x", "X(Twitter)に投稿", "#111111"],
+      ["mail", "メールで送る", "#596070"],
+      ["copy", "リンクをコピー", "#3446c4"],
+    ];
+    if (navigator.share) opts.push(["native", "そのほか(端末の共有メニュー)", "#3446c4"]);
+    wrap.innerHTML = `<div class="pb-sheet-box"><b>招待リンクを送る</b><div class="pb-sheet-url">${esc(url)}</div>${opts.map(([k, label, c]) => `<button type="button" data-to="${k}" style="--c:${c}">${label}</button>`).join("")}<p class="pb-sheet-msg" aria-live="polite"></p><button type="button" data-to="close" class="pb-sheet-close">閉じる</button></div>`;
+    const msg = (t) => { wrap.querySelector(".pb-sheet-msg").textContent = t; };
+    const close = () => { wrap.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    wrap.addEventListener("click", async (e) => {
+      if (e.target === wrap) return close();
+      const to = e.target.closest("[data-to]")?.dataset.to;
+      if (!to) return;
+      if (to === "close") return close();
+      if (to === "line") { window.open(MOBILE ? `https://line.me/R/share?text=${enc(text + "\n" + url)}` : `https://social-plugins.line.me/lineit/share?url=${enc(url)}&text=${enc(text)}`, "_blank", "noopener"); return close(); }
+      if (to === "x") { window.open(`https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`, "_blank", "noopener"); return close(); }
+      if (to === "mail") { location.href = `mailto:?subject=${enc(gameTitle() + "の招待")}&body=${enc(text + "\n" + url)}`; return close(); }
+      if (to === "native") { navigator.share({ title: document.title, text, url }).catch(() => {}); return close(); }
+      if (to === "copy") { msg(await copyText(url) ? "コピーしました。好きなアプリに貼り付けて送ってください" : "コピーできませんでした。上のリンクを長押しで選んでコピーしてください"); return; }
+      if (to === "discord") {
+        // Discord には外から送る仕組みがないので、コピーしてから Discord を開く(あとは貼り付けるだけ)
+        const ok = await copyText(text + " " + url);
+        msg(ok ? "リンクをコピーしました。Discord を開くので、送りたいチャットに貼り付けて送ってください" : "コピーできませんでした。上のリンクを長押しで選んでコピーしてください");
+        if (ok) setTimeout(() => window.open("https://discord.com/channels/@me", "_blank", "noopener"), 900);
+      }
+    });
+    document.body.append(wrap);
+    wrap.querySelector("button").focus();
+  }
+  let sheetCss = false;
   function addShare() {
-    if (!navigator.share) return;
-    for (const box of document.querySelectorAll(".invite")) {
+    const boxes = document.querySelectorAll(".invite");
+    if (boxes.length && !sheetCss) {
+      sheetCss = true;
+      const css = document.createElement("style");
+      css.textContent = `
+.pb-sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: grid; place-items: end center; padding: 12px; }
+@media (min-width: 600px) { .pb-sheet { place-items: center; } }
+.pb-sheet-box { width: min(420px, 100%); display: grid; gap: 8px; padding: 16px; border-radius: 14px; background: var(--surface, #fff); color: var(--fg, #181b23); border: 2px solid var(--fg, #181b23); font-family: var(--body, system-ui, sans-serif); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.pb-sheet-box b { font-size: 16px; }
+.pb-sheet-url { font-size: 12px; color: var(--muted, #596070); word-break: break-all; user-select: all; -webkit-user-select: all; }
+.pb-sheet-box button { font-family: inherit; font-size: 15px; font-weight: 700; padding: 11px 14px; border-radius: 8px; border: 2px solid var(--c, #181b23); background: var(--c, #181b23); color: #fff; cursor: pointer; text-align: center; }
+.pb-sheet-box button.pb-sheet-close { background: transparent; color: var(--fg, #181b23); border-color: var(--line, #cfd4de); }
+.pb-sheet-msg { margin: 0; font-size: 13px; color: var(--good, #1f8a4c); min-height: 1em; }`;
+      document.head.append(css);
+    }
+    for (const box of boxes) {
       if (box.querySelector(".pb-share")) continue;
       const inp = box.querySelector("input"), copy = box.querySelector("button");
       if (!inp) continue;
       const b = document.createElement("button");
       b.type = "button"; b.className = "pb-share " + (copy ? copy.className : ""); b.textContent = "共有";
-      b.addEventListener("click", () => navigator.share({ title: document.title, text: "いっしょに遊ぼう！", url: inp.value }).catch(() => {}));
+      b.addEventListener("click", () => shareSheet(inp.value));
       box.append(b);
     }
   }
