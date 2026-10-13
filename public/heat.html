@@ -86,6 +86,13 @@ button.hc { cursor: pointer; } button.hc:hover { transform: translateY(-2px); }
 .hc.dim { opacity: .45; } .hc.small { width: 40px; height: 54px; vertical-align: middle; } .hc.small b { font-size: 18px; } .hc.small .kn { display: none; }
 .gears { display: flex; gap: 6px; } .gearbtn { display: grid; justify-items: center; min-width: 64px; padding: 4px 8px; } .gearbtn b { font-family: var(--display); font-weight: 400; font-size: 22px; line-height: 1.1; } .gearbtn small { font-size: 11px; }
 .gearbtn.on { background: var(--fg); color: var(--surface); }
+.hc.garage { background: linear-gradient(#e7dcff, #fff); border-color: #6b4fc4; width: 74px; height: auto; min-height: 80px; }
+.hc.garage .kn { font-size: 10px; } .hc .sy { font-size: 9px; line-height: 1.2; text-align: center; color: #3a3f4b; }
+.hc.wide { width: 120px; min-height: 96px; } .hc.wide .sy { font-size: 11px; }
+.hc.garage.small { width: 46px; min-height: 54px; }
+.hand.draft { gap: 8px; } .b { font-weight: 700; color: var(--accent); }
+.toggle { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; } .toggle input { margin-top: 4px; }
+.mapnotes { display: grid; gap: 2px; }
 .planrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; font-weight: 700; }
 .prompt { border: 2px solid var(--accent); border-radius: 10px; padding: 8px; display: grid; gap: 6px; }
 .revealrow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; } .speed { font-family: var(--display); font-weight: 400; font-size: 20px; margin-left: 6px; }
@@ -252,7 +259,7 @@ $("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQ
 
 
 // ---- 共通 ----
-let DB = { tracks: {} };
+let DB = { tracks: {}, cards: {}, weather: [], road: [] };
 const player = (id) => S?.players.find((p) => p.id === id);
 const nameOf = (id) => player(id)?.name || "退出した人";
 const CAR = ["#e5484d", "#3e8ef7", "#f2c230", "#3fb36a", "#f2f0e6", "#9b6ef3"];
@@ -263,9 +270,18 @@ const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.
 const act = (a, x = {}) => send({ t: "game", a, ...x });
 const SVGNS = "http://www.w3.org/2000/svg";
 const s = (tag, attrs = {}, ...kids) => { const el = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) el.setAttribute(k, v); for (const c of kids.flat()) if (c != null) el.append(c.nodeType ? c : document.createTextNode(String(c))); return el; };
-const KN = { s1: "1", s2: "2", s3: "3", s4: "4", u0: "0", u5: "5", h: "ヒート", x: "ストレス" };
-const KV = { s1: 1, s2: 2, s3: 3, s4: 4, u0: 0, u5: 5 };
-const KEEP = new Set(["u5", "h", "x"]);
+const KN0 = { s1: "1", s2: "2", s3: "3", s4: "4", u0: "0", u5: "5", h: "ヒート", x: "ストレス" };
+const CD = (k) => DB.cards[k] || {};
+// カードの表示名・見えているスピード(選べる/＋は数えない)・捨てられないか
+const KN = new Proxy({}, { get: (_, k) => KN0[k] || (CD(k).name ? `${CD(k).name}${speedText(k)}` : String(k)) });
+const KV = new Proxy({}, { get: (_, k) => (CD(k).choices || CD(k).plus ? 0 : CD(k).v) || 0 });
+const KEEP = { has: (k) => !!CD(k).keep };
+const speedText = (k) => { const d = CD(k); if (d.choices) return d.choices.join("|"); if (d.plus) return "＋".repeat(d.sym?.boost || 1); return String(d.v ?? ""); };
+const SYMN = { boost: "＋めくる", heat: "🔥ヒート", scrap: "スクラップ", adjust: "制限", cool: "クールダウン", reduce: "ストレス捨て", slip: "スリップ+", salvage: "サルベージ", refresh: "リフレッシュ", direct: "直接出せる", accel: "加速", superCool: "スーパークール", draft: "ドラフト" };
+function symText(k) {
+  const d = CD(k); if (!d.sym) return "";
+  return Object.entries(d.sym).map(([key, v]) => key === "adjust" ? `制限${v > 0 ? "+" : ""}${v}` : key === "boost" ? (d.v || d.choices ? `＋${v}` : "") : ["direct", "refresh", "accel"].includes(key) ? SYMN[key] : `${SYMN[key]}${v}`).filter(Boolean).join("・");
+}
 // sel: 出す札 / shift: ギアの変え方 / dsel: 捨てる札 / zoom: 盤の拡大
 let local = { sel: new Set(), shift: 0, dsel: new Set(), zoom: 1, round: 0, follow: true };
 
@@ -290,7 +306,7 @@ function renderMeta() {
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
     h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
   const g = S.game;
-  if (g) m.append(h("span", { class: "pill" }, `${g.track.name}・${g.laps}周・ラウンド${g.round}`));
+  if (g) m.append(h("span", { class: "pill" }, `${g.track.name}・${g.laps}周・` + (g.step === "draft" ? "ガレージ" : `ラウンド${g.round}`)));
 }
 function lapOf(g, p) { return Math.min(g.laps, Math.max(0, Math.floor(p.pos / g.track.n)) + 1); }
 function renderSide() {
@@ -352,10 +368,11 @@ function renderMain() {
   if (local.round !== g.round) { local.round = g.round; local.sel.clear(); local.shift = 0; }
   if (g.turn?.pid !== me || g.turn?.phase !== "discard") local.dsel.clear();
   const mine = g.P[me];
-  const say = g.step === "end" ? "レース終了" : g.step === "plan" ? (mine && !mine.done ? (mine.ready ? "ほかの人を待っています" : "ギアを決めて、カードを伏せてください") : "みんながカードを選んでいます")
+  const say = g.step === "end" ? "レース終了" : g.step === "draft" ? (g.draft?.cur === me ? "アップグレードを1枚選んでください" : `${nameOf(g.draft?.cur)} さんがアップグレードを選んでいます`) : g.step === "plan" ? (mine && !mine.done ? (mine.ready ? "ほかの人を待っています" : "ギアを決めて、カードを伏せてください") : "みんながカードを選んでいます")
     : g.turn ? (g.turn.pid === me ? { react: "あなたの番: リアクト", slip: "スリップストリームしますか？", discard: "捨てる札を選んでターン終了" }[g.turn.phase] : `${nameOf(g.turn.pid)} さんが走っています`) : "";
   main.append(h("div", { class: "head" }, h("div", { class: "say" }, say), remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null));
   if (g.step === "end") renderResult(main, g);
+  if (g.step === "draft") renderDraft(main, g);
   if (g.turn) renderTurn(main, g);
   main.append(boardEl(g));
   const wrap = main.querySelector(".mapwrap");
@@ -365,7 +382,7 @@ function renderMain() {
   if (wrap && sx != null && !local.recenter) { wrap.scrollLeft = sx; wrap.scrollTop = sy; }
   else if (wrap) requestAnimationFrame(() => centerOn(g));
   local.recenter = false;
-  if (mine && !mine.done && g.step !== "end") renderDash(main, g);
+  if (mine && !mine.done && g.step !== "end" && g.step !== "draft") renderDash(main, g);
 }
 
 // ---- コース ----
@@ -380,11 +397,16 @@ function boardEl(g) {
   svg.append(s("path", { d, fill: "none", stroke: "#e9e4d4", "stroke-width": W + 14, "stroke-linejoin": "round" }));
   svg.append(s("path", { d, fill: "none", stroke: "#2b2d33", "stroke-width": W, "stroke-linejoin": "round" }));
   svg.append(s("path", { d, fill: "none", stroke: "#cfd3dc", "stroke-width": 2, "stroke-dasharray": "10 9", opacity: 0.6 }));
+  // 水たまり(青)・トンネル(暗い)
+  const seg = (i, color, w, op) => { const a = cells[(i + n - 1) % n], b = cells[i], c2 = cells[(i + 1) % n]; return s("path", { d: `M${(a[0] + b[0]) / 2},${(a[1] + b[1]) / 2} L${b[0]},${b[1]} L${(b[0] + c2[0]) / 2},${(b[1] + c2[1]) / 2}`, fill: "none", stroke: color, "stroke-width": w, opacity: op, "stroke-linecap": "butt" }); };
+  for (const i of g.track.flood || []) svg.append(seg(i, "#3fa6e0", W - 6, 0.75));
+  for (const i of g.track.tunnel || []) svg.append(seg(i, "#000", W + 16, 0.55));
   // マスの区切り
   for (let i = 0; i < n; i++) {
     const a = cells[i], b = cells[(i + 1) % n], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
     const isCorner = g.track.corners.some((c) => (c.at + n - 1) % n === i), isFinish = i === n - 1;
+    const isChicane = (g.track.chicanes || []).some((ch) => ch.some((at) => (at + n - 1) % n === i));
     if (isFinish) {
       for (let k = -2; k < 2; k++) for (let j = 0; j < 2; j++) {
         const cx = mx + nx * (k + 0.5) * (W / 4) + (dx / l) * (j - 0.5) * 9, cy = my + ny * (k + 0.5) * (W / 4) + (dy / l) * (j - 0.5) * 9;
@@ -392,7 +414,7 @@ function boardEl(g) {
       }
       continue;
     }
-    svg.append(s("line", { x1: mx + nx * W / 2, y1: my + ny * W / 2, x2: mx - nx * W / 2, y2: my - ny * W / 2, stroke: isCorner ? "#e5484d" : "#d8dbe2", "stroke-width": isCorner ? 7 : 2 }));
+    svg.append(s("line", { x1: mx + nx * W / 2, y1: my + ny * W / 2, x2: mx - nx * W / 2, y2: my - ny * W / 2, stroke: isChicane ? "#3e8ef7" : isCorner ? "#e5484d" : "#d8dbe2", "stroke-width": isCorner ? 7 : 2 }));
   }
   // コーナーの制限速度
   for (const c of g.track.corners) {
@@ -401,8 +423,17 @@ function boardEl(g) {
     // 盤の中心から遠い側(コースの外側)に看板を置く
     let nx = -dy / l, ny = dx / l; if ((mx + nx * 10 - 825) ** 2 + (my + ny * 10 - 550) ** 2 < (mx - 825) ** 2 + (my - 550) ** 2) { nx = -nx; ny = -ny; }
     const bx = mx + nx * 66, by = my + ny * 66;
-    svg.append(s("circle", { cx: bx, cy: by, r: 27, fill: "#fff", stroke: "#181b23", "stroke-width": 5 }),
+    const changed = c.lim !== c.printed;
+    svg.append(s("circle", { cx: bx, cy: by, r: 27, fill: changed ? "#ffe08a" : "#fff", stroke: c.overheat ? "#e5484d" : "#181b23", "stroke-width": 5 }),
       s("text", { x: bx, y: by + 11, "text-anchor": "middle", "font-size": 32, "font-weight": 700, fill: "#181b23" }, c.lim));
+  }
+  // 路面トークン(コーナーのそば)
+  for (const r of g.road || []) {
+    const rd = DB.road[r.t]; if (!rd) continue;
+    const c = cells[r.ats[r.ats.length - 1]];
+    const icon = { weather: "☁", overheat: "🔥", limDown: "−1", limUp: "+1", heatCtl: "⚡", slip1: "≫" }[rd.k];
+    svg.append(s("g", { transform: `translate(${c[0]} ${c[1]})` }, s("rect", { x: -20, y: -58, width: 40, height: 28, rx: 6, fill: rd.sector ? "#2f6fd6" : "#c4323a", stroke: "#fff", "stroke-width": 2 }),
+      s("text", { x: 0, y: -38, "text-anchor": "middle", "font-size": 18, "font-weight": 700, fill: "#fff" }, icon), s("title", {}, rd.name)));
   }
   // グリッドの番号
   for (let k = 0; k < 3; k++) {
@@ -427,10 +458,16 @@ function boardEl(g) {
   if (local.zoom === 1) svg.style.maxHeight = "70dvh";
   const zoomBtns = h("div", { class: "btns zoom" }, h("span", { class: "small muted" }, "拡大"),
     ...[[1, "全体"], [1.8, "×1.8"], [2.6, "×2.6"]].map(([z, t]) => h("button", { type: "button", class: "tiny" + (local.zoom === z ? " primary" : " ghost"), onclick: () => { local.zoom = z; local.recenter = true; render(); } }, t)),
-    h("span", { class: "small muted legend" }, "赤い線=コーナー(数字が制限速度)・白黒=ゴール"));
+    h("span", { class: "small muted legend" }, "赤い線=コーナー(数字が制限速度)・青い線=シケイン・白黒=ゴール" + ((g.track.flood || []).length ? "・水色=水たまり" : "") + ((g.track.tunnel || []).length ? "・暗い所=トンネル" : "")));
+  const notes = [];
+  if (g.weather != null && DB.weather[g.weather]) notes.push(h("span", {}, `☁ 天候: ${DB.weather[g.weather].setup}。天候の区間(青い☁)は「${DB.weather[g.weather].effName}」`));
+  if (g.road) notes.push(h("span", {}, "路面トークン: 赤=コーナー(🔥超過のヒート+1・±1制限速度) / 青=次のコーナーまでの区間(⚡ヒートなしでブースト・≫スリップストリーム+1・☁天候)"));
+  if ((g.track.flood || []).length) notes.push(h("span", {}, "水たまりで始まったラウンドは、ギアを下げるとヒート+1"));
+  if ((g.track.tunnel || []).length) notes.push(h("span", {}, "トンネルの中では手札を捨てられない"));
+  if (notes.length) return h("div", { class: "boardbox" }, wrap, zoomBtns, h("div", { class: "small muted mapnotes" }, ...notes));
   return h("div", { class: "boardbox" }, wrap, zoomBtns);
 }
-const TRACKBG = { usa: "#c9773b", italia: "#d9b77a", france: "#7fa457", gb: "#5e8f52" };
+const TRACKBG = { usa: "#c9773b", italia: "#d9b77a", france: "#7fa457", gb: "#5e8f52", japan: "#7fae4f", mexico: "#d8b84a", espana: "#6d7f86", nederland: "#9fbf6a" };
 // 拡大中は、動いている車(いなければ自分の車)が見えるように寄せる
 function centerOn(g) {
   const wrap = document.querySelector(".mapwrap"); if (!wrap || local.zoom === 1) return;
@@ -439,19 +476,24 @@ function centerOn(g) {
   wrap.scrollLeft = c[0] * sc - wrap.clientWidth / 2; wrap.scrollTop = c[1] * sc - wrap.clientHeight / 2;
 }
 
+// DOM の append は null を文字にしてしまうので、null と false を除いて足す
+function add(el, ...kids) { el.append(...kids.flat().filter((k) => k != null && k !== false)); }
 // ---- 手札とギア ----
 function cardEl(c, opt = {}) {
-  const k = c.k || c;
-  const cls = "hc " + (k[0] === "s" ? "spd" : k[0] === "u" ? "up" : k === "h" ? "heat" : "stress") + (opt.sel ? " sel" : "") + (opt.dim ? " dim" : "") + (opt.small ? " small" : "");
-  const label = k === "h" ? "🔥" : k === "x" ? "?" : KN[k];
-  return h(opt.onclick ? "button" : "span", { type: opt.onclick ? "button" : null, class: cls, onclick: opt.onclick || null, "aria-pressed": opt.onclick ? String(!!opt.sel) : null, title: KN[k] + (KEEP.has(k) ? "(捨てられない)" : "") },
-    h("b", {}, label), h("span", { class: "kn" }, k === "h" ? "ヒート" : k === "x" ? "ストレス" : k[0] === "u" ? "強化" : "スピード"));
+  const k = c.k || c, d = CD(k);
+  const garage = !!d.upg;
+  const cls = "hc " + (k[0] === "s" ? "spd" : garage ? "garage" : k[0] === "u" ? "up" : k === "h" ? "heat" : "stress") + (opt.sel ? " sel" : "") + (opt.dim ? " dim" : "") + (opt.small ? " small" : "") + (opt.wide ? " wide" : "");
+  const label = k === "h" ? "🔥" : k === "x" ? "?" : garage ? speedText(k) : KN0[k];
+  const tip = (garage ? `${d.name}(#${d.upg}) スピード${speedText(k)}${symText(k) ? "・" + symText(k) : ""}` : KN[k]) + (KEEP.has(k) ? "(捨てられない)" : "");
+  return h(opt.onclick ? "button" : "span", { type: opt.onclick ? "button" : null, class: cls, onclick: opt.onclick || null, "aria-pressed": opt.onclick ? String(!!opt.sel) : null, title: tip },
+    h("b", {}, label), h("span", { class: "kn" }, k === "h" ? "ヒート" : k === "x" ? "ストレス" : garage ? d.name : k[0] === "u" ? "強化" : "スピード"),
+    garage && !opt.small ? h("span", { class: "sy" }, symText(k)) : null);
 }
 function renderDash(main, g) {
   const p = g.P[me];
   const box = h("div", { class: "dash" });
   const nc = p.next;
-  box.append(h("div", { class: "gauges" },
+  add(box, h("div", { class: "gauges" },
     h("span", { class: "gauge" }, h("small", {}, "ギア"), h("b", {}, p.gear)),
     h("span", { class: "gauge heat" }, h("small", {}, "エンジンのヒート"), h("b", {}, p.engine)),
     h("span", { class: "gauge" }, h("small", {}, "周回"), h("b", {}, `${lapOf(g, p)}/${g.laps}`)),
@@ -459,14 +501,14 @@ function renderDash(main, g) {
     h("span", { class: "gauge" }, h("small", {}, "山札/捨て札"), h("b", {}, `${p.deck}/${p.discard}`))));
   if (g.step === "plan") {
     if (p.ready) {
-      box.append(h("div", { class: "prompt" }, h("div", {}, `${g.plan.gear}速で `, ...g.plan.ids.map((id) => cardEl(g.hand.find((c) => c.id === id) || { k: "h" }, { small: true }))),
+      add(box, h("div", { class: "prompt" }, h("div", {}, `${g.plan.gear}速で `, ...g.plan.ids.map((id) => cardEl(g.hand.find((c) => c.id === id) || { k: "h" }, { small: true }))),
         h("div", { class: "btns" }, h("button", { type: "button", class: "ghost", onclick: () => act("unplan") }, "選び直す"))));
     } else renderPlan(box, g, p);
   } else {
     const disc = g.turn?.pid === me && g.turn.phase === "discard";
-    box.append(h("div", { class: "small muted" }, disc ? "捨てる札を押して選ぶ(ヒート・ストレス・5は捨てられない)" : "手札"),
+    add(box, h("div", { class: "small muted" }, disc ? "捨てる札を押して選ぶ(ヒート・ストレス・5は捨てられない)" : "手札" + (p.tunnel ? "(トンネルの中: 捨てられない)" : "")),
       h("div", { class: "hand" }, ...g.hand.map((c) => cardEl(c, disc && !KEEP.has(c.k) ? { sel: local.dsel.has(c.id), onclick: () => { local.dsel.has(c.id) ? local.dsel.delete(c.id) : local.dsel.add(c.id); render(); } } : { dim: disc && KEEP.has(c.k) }))));
-    if (disc) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary big", onclick: () => { act("discard", { ids: [...local.dsel] }); local.dsel.clear(); } }, local.dsel.size ? `${local.dsel.size}枚捨ててターン終了` : "捨てずにターン終了")));
+    if (disc) add(box, h("div", { class: "btns" }, h("button", { type: "button", class: "primary big", onclick: () => { act("discard", { ids: [...local.dsel] }); local.dsel.clear(); } }, local.dsel.size ? `${local.dsel.size}枚捨ててターン終了` : "捨てずにターン終了")));
   }
   main.append(box);
 }
@@ -477,20 +519,21 @@ function renderPlan(box, g, p) {
   // 選んだ札が新しいギアの枚数より多ければ減らす
   for (const id of [...local.sel]) if (!g.hand.some((c) => c.id === id)) local.sel.delete(id);
   const gearBtns = h("div", { class: "gears", role: "group", "aria-label": "ギア" }, ...[1, 2, 3, 4].map((x) => {
-    const sh = x - p.gear, ok = Math.abs(sh) <= 2 && (Math.abs(sh) < 2 || p.engine > 0);
+    const sh = x - p.gear, cost = (Math.abs(sh) === 2 ? 1 : 0) + (sh < 0 && p.flooded ? 1 : 0), ok = Math.abs(sh) <= 2 && cost <= p.engine;
     return h("button", { type: "button", class: "gearbtn" + (x === gear ? " on" : ""), disabled: !ok, onclick: () => { local.shift = sh; while (local.sel.size > x) local.sel.delete([...local.sel].pop()); render(); } },
-      h("b", {}, x), h("small", {}, sh === 0 ? "そのまま" : Math.abs(sh) === 2 ? "ヒート1" : sh > 0 ? "上げる" : "下げる"));
+      h("b", {}, x), h("small", {}, sh === 0 ? "そのまま" : cost ? `ヒート${cost}` : sh > 0 ? "上げる" : "下げる"));
   }));
   const sel = [...local.sel].map((id) => g.hand.find((c) => c.id === id)).filter(Boolean);
-  const known = sel.reduce((a, c) => a + (KV[c.k] || 0), 0), unknown = sel.filter((c) => c.k === "x").length;
+  const known = sel.reduce((a, c) => a + (KV[c.k] || 0), 0), unknown = sel.filter((c) => c.k === "x" || CD(c.k).plus || CD(c.k).sym?.boost).length + sel.filter((c) => CD(c.k).choices).length;
   const cool = COOL[gear] || 0;
-  box.append(h("div", { class: "small muted" }, `ギア(1速=1枚・2速=2枚…)。1速はクールダウン3、2速は1。`), gearBtns,
+  add(box, h("div", { class: "small muted" }, `ギア(1速=1枚・2速=2枚…)。1速はクールダウン3、2速は1。`), gearBtns,
     h("div", { class: "small muted" }, clutter ? `出せる札が${playable.length}枚しかありません(オーバーヒート)。出せる札を全部出すと、足りない分はヒートになり今回は動けません。` : `${gear}枚選んでください`),
     h("div", { class: "hand" }, ...g.hand.map((c) => {
       const on = local.sel.has(c.id), dis = c.k === "h" && !clutter;
       return cardEl(c, dis ? { dim: true } : { sel: on, onclick: () => { if (on) local.sel.delete(c.id); else if (local.sel.size < gear) local.sel.add(c.id); render(); } });
     })),
-    h("div", { class: "planrow" }, h("span", {}, `スピード ${known}${unknown ? ` + ストレス${unknown}枚(1〜4)` : ""}`, cool ? `・クールダウン${cool}` : "", nextWarn(g, p, known, unknown)),
+    p.flooded ? h("div", { class: "small" }, "💧 水たまりの上: ギアを下げるとヒート+1") : null,
+    h("div", { class: "planrow" }, h("span", {}, `スピード ${known}${unknown ? ` + 決まっていない札${unknown}枚(ストレス・＋・選べる数)` : ""}`, cool ? `・クールダウン${cool}` : "", nextWarn(g, p, known, unknown)),
       h("button", { type: "button", class: "primary big", disabled: sel.length !== gear, onclick: () => act("plan", { shift: local.shift, ids: [...local.sel] }) }, "決定")));
 }
 const COOL = [0, 3, 1, 0, 0];
@@ -504,33 +547,65 @@ function nextWarn(g, p, known, unknown) {
 function renderTurn(main, g) {
   const t = g.turn, p = g.P[t.pid], mine = t.pid === me;
   const rev = p.revealed || [];
-  const flips = t.flips.map((f) => `${f.by === "boost" ? "ブースト" : "ストレス"}→${f.card ? KN[f.card] : "なし"}${f.skipped.length ? `(${f.skipped.map((k) => KN[k]).join("・")}をとばす)` : ""}`);
+  const flips = t.flips.map((f) => `${f.by === "boost" ? "ブースト" : f.by === "plus" ? "＋" : "ストレス"}→${f.card ? KN[f.card] : "なし"}${f.skipped.length ? `(${f.skipped.map((k) => KN[k]).join("・")}をとばす)` : ""}`);
   const box = h("div", { class: "prompt" }, h("div", { class: "revealrow" }, chip(t.pid), ` ${p.gear}速 `, ...rev.map((k) => cardEl({ k }, { small: true })), h("b", { class: "speed" }, `スピード${t.speed}`)),
     flips.length ? h("div", { class: "small" }, flips.join("・")) : null,
-    t.adrenaline ? h("div", { class: "small" }, "⚡ アドレナリン(最後尾): +1マスとクールダウン+1") : null);
-  if (t.corners) box.append(h("div", { class: "small" }, t.corners.length ? t.corners.map((c) => `コーナー(制限${c.lim}): ${c.spin ? `スピン！ヒート${c.paid}・ストレス+${c.stress}` : c.paid ? `ヒート${c.paid}` : "セーフ"}`).join("・") : "コーナーなし"));
+    t.adrenaline ? h("div", { class: "small" }, "⚡ アドレナリン(最後尾): +1マスとクールダウン+1") : null,
+    t.notes?.length ? h("div", { class: "small" }, t.notes.join("・")) : null,
+    t.pool && (t.pool.adjust || t.pool.scrap) ? h("div", { class: "small" }, [t.pool.adjust ? `このターンの制限速度${t.pool.adjust > 0 ? "+" : ""}${t.pool.adjust}` : "", t.pool.scrap ? `スクラップ${t.pool.scrap}(リアクトの終わりに山札の上から捨て札へ)` : ""].filter(Boolean).join("・")) : null);
+  if (mine && t.phase === "choose") {
+    local.choose = local.choose || [];
+    add(box, h("div", {}, "スピードを選んでください:"), ...t.choices.map((ch, i) => h("div", { class: "btns" }, h("span", { class: "small" }, KN[(p.revealed || []).find((k) => CD(k).choices?.join() === ch.opts.join())] || "ブレーキ"),
+      ...ch.opts.map((v) => h("button", { type: "button", class: (local.choose[i] ?? ch.opts[0]) === v ? "primary" : "ghost", onclick: () => { local.choose[i] = v; render(); } }, v)))),
+      h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => { act("choose", { vals: t.choices.map((ch, i) => local.choose[i] ?? ch.opts[0]) }); local.choose = []; } }, "決定")));
+  } else if (t.phase === "choose") add(box, h("p", { class: "small muted" }, "スピードを選んでいます…"));
+  if (t.corners) add(box, h("div", { class: "small" }, t.corners.length ? t.corners.map((c) => `コーナー(制限${c.lim}): ${c.spin ? `スピン！ヒート${c.paid}・ストレス+${c.stress}` : c.paid ? `ヒート${c.paid}` : "セーフ"}`).join("・") : "コーナーなし"));
   if (mine && t.phase === "react") {
     const heatHand = g.P[me].heatInHand || 0;
-    box.append(h("div", { class: "btns" },
+    add(box, h("div", { class: "btns" },
       h("button", { type: "button", disabled: t.boosted || !g.P[me].engine, onclick: () => act("boost") }, t.boosted ? "ブースト済み" : "ブースト(ヒート1・めくって進む)"),
       h("button", { type: "button", disabled: !(t.coolLeft > 0 && heatHand > 0), onclick: () => act("cool", { n: t.coolLeft }) }, `クールダウン(あと${t.coolLeft}・手札のヒート${heatHand})`),
       t.adrenaline ? h("button", { type: "button", disabled: t.adrUsed, onclick: () => act("adr") }, t.adrUsed ? "+1済み" : "アドレナリン +1マス") : null,
+      t.pool.reduce ? h("button", { type: "button", disabled: t.used.reduce >= t.pool.reduce, onclick: () => act("reduce", { n: t.pool.reduce }) }, `ストレスを捨てる(${t.pool.reduce - t.used.reduce}枚まで)`) : null,
+      t.pool.superCool ? h("button", { type: "button", disabled: t.used.superCool >= t.pool.superCool, onclick: () => act("supercool") }, `スーパークール(捨て札のヒート${t.pool.superCool}枚まで)`) : null,
+      t.pool.accel ? h("button", { type: "button", disabled: t.used.accel, onclick: () => act("accel") }, `加速(めくった${t.flipCount}枚 → +${t.flipCount * t.pool.accel})`) : null,
+      ...(t.draftTo || []).map((k) => h("button", { type: "button", onclick: () => act("draft", { k }) }, `ドラフト +${k}マス`)),
+      ...g.hand.filter((c) => CD(c.k).sym?.direct).map((c) => h("button", { type: "button", onclick: () => act("direct", { id: c.id }) }, `直接出す: ${KN[c.k]}`)),
       h("button", { type: "button", class: "primary", onclick: () => act("react") }, "次へ")),
+      t.pool.refresh?.length ? h("div", { class: "btns" }, h("span", { class: "small" }, "リフレッシュ(山札の上に戻す):"), ...t.pool.refresh.map((cid) => { const k = (t.playIds || []).find((x) => x.id === cid)?.k; return h("button", { type: "button", class: "tiny " + (t.refreshOn.includes(cid) ? "primary" : "ghost"), onclick: () => act("refresh", { id: cid }) }, KN[k] || "カード"); })) : null,
+      t.discardList && t.pool.salvage > t.used.salvage ? salvageEl(t) : null,
       h("div", { class: "small muted" }, cornerHint(g, t)));
   }
-  if (mine && t.phase === "slip") box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("slip", { yes: true }) }, "スリップストリーム(+2マス)"), h("button", { type: "button", class: "ghost", onclick: () => act("slip", { yes: false }) }, "しない")),
-    h("div", { class: "small muted" }, "+2マスはスピードに入りません(コーナーの判定は今のスピードのまま)。" + cornerHint(g, t, 2)));
+  if (mine && t.phase === "slip") add(box, h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("slip", { yes: true }) }, `スリップストリーム(+${t.slipBy || 2}マス)`), h("button", { type: "button", class: "ghost", onclick: () => act("slip", { yes: false }) }, "しない")),
+    h("div", { class: "small muted" }, "スリップストリームのマスはスピードに入りません(コーナーの判定は今のスピードのまま)。" + cornerHint(g, t, t.slipBy || 2)));
   main.append(box);
+}
+// サルベージ: 捨て札から選ぶ
+function salvageEl(t) {
+  local.salv = local.salv || new Set();
+  const n = t.pool.salvage;
+  return h("div", { class: "prompt" }, h("div", { class: "small" }, `サルベージ: 捨て札から${n}枚まで選んで山札に混ぜる`),
+    h("div", { class: "hand" }, ...t.discardList.map((c) => cardEl(c, { small: true, sel: local.salv.has(c.id), onclick: () => { if (local.salv.has(c.id)) local.salv.delete(c.id); else if (local.salv.size < n) local.salv.add(c.id); render(); } }))),
+    h("div", { class: "btns" }, h("button", { type: "button", onclick: () => { act("salvage", { ids: [...local.salv] }); local.salv.clear(); } }, local.salv.size ? `${local.salv.size}枚を山札へ` : "サルベージしない")));
 }
 // このあと通るコーナーの見込み
 function cornerHint(g, t, extra = 0) {
   const p = g.P[t.pid], n = g.track.n, out = [];
   for (let lap = Math.floor(Math.max(t.start, 0) / n) - 1; lap <= Math.floor((p.pos + extra) / n) + 1; lap++)
-    for (const c of g.track.corners) { const x = lap * n + c.at; if (x > t.start && x <= p.pos + extra && x <= g.goal) out.push(c.lim); }
+    for (const c of g.track.corners) { const x = lap * n + c.at; if (x > t.start && x <= p.pos + extra && x <= g.goal) out.push(c.lim + (t.pool?.adjust || 0)); }
   if (!out.length) return "今のところコーナーは通りません。";
   return "通るコーナー: " + out.map((lim) => `制限${lim}${t.speed > lim ? `(ヒート${t.speed - lim})` : "(セーフ)"}`).join("・") + `。エンジンのヒート${p.engine}。`;
 }
 
+function renderDraft(main, g) {
+  const d = g.draft; if (!d) return;
+  const mineTurn = d.cur === me;
+  main.append(h("div", { class: "prompt" },
+    h("div", {}, `ガレージ ${d.round}/3巡目(${d.round === 2 ? "前の車から" : "後ろの車から"}選ぶ): `, ...d.order.map((id, i) => h("span", { class: "small" + (id === d.cur ? " b" : "") }, (i ? " → " : "") + nameOf(id)))),
+    h("div", { class: "hand draft" }, ...d.market.map((k, i) => cardEl({ k }, { wide: true, onclick: mineTurn ? () => act("pick", { i }) : null }))),
+    h("div", { class: "small muted" }, "選んだカードはデッキに入ります(スタートアップグレードの代わり)。＋=山札からスピードカードが出るまでめくる。🔥ヒートは出したときに払う(払えないとストレス扱い)。制限=コーナーの制限速度が変わる。"),
+    h("div", {}, h("b", {}, "選んだカード: "), ...g.order.map((id) => h("div", { class: "small" }, chip(id), " ", ...(g.P[id].ups || []).map((k) => cardEl({ k }, { small: true })))))));
+}
 function renderResult(main, g) {
   const rows = g.result || [];
   main.append(h("div", { class: "say good" }, rows[0] ? `🏆 優勝は ${nameOf(rows[0])} さん！` : "レース終了"),
@@ -551,11 +626,14 @@ function renderLobby(main) {
       h("li", {}, "リアクト: ブースト(ヒート1でめくって進む)とクールダウン(1速3・2速1。手札のヒートをエンジンに戻す)。車の横か1マス後ろに着いたらスリップストリームで+2。"),
       h("li", {}, "コーナーを通るとき、スピードが制限を超えた分だけヒートを払います。払えないとスピン(コーナーの手前へ・ストレスが増える・1速)。決められた周回を先にゴールした人の勝ち！")),
     h("div", { class: "settings" },
-      sel("コース(本家の盤面)", "track", Object.entries(DB.tracks).map(([k, t]) => [k, `${t.name}(${t.n}マス・コーナー${t.corners}・${t.laps}周)`])),
+      sel("コース(本家の盤面)", "track", Object.entries(DB.tracks).map(([k, t]) => [k, `${t.exp === "hr" ? "【Heavy Rain】" : t.exp === "tv" ? "【Tunnel Vision】" : ""}${t.name}(${t.n}マス・${t.laps}周)`])),
+      sel("ガレージ(アップグレード)", "garage", [["off", "なし(スタートアップグレード)"], ["basic", "基本カード"], ["advanced", "上級カード(拡張のカードも)"], ["all", "全部"]]),
       sel("周回数", "laps", [[0, `盤の表示どおり${tr ? `(${tr.laps}周)` : ""}`], [1, "1周(練習)"], [2, "2周"], [3, "3周"]]),
       sel("カードを選ぶ時間", "planSecs", [[60, "60秒"], [45, "45秒"], [30, "30秒"], [90, "90秒"], [120, "120秒"]]),
       sel("1台の持ち時間", "turnSecs", [[45, "45秒"], [30, "30秒"], [20, "20秒"], [60, "60秒"], [90, "90秒"]])),
-    h("p", { class: "muted small" }, "2〜6人。約30〜60分(1周なら約15分)。はじめてならUSAの1周がおすすめ。基本ルールで遊びます(ガレージ・天候・レジェンドのモジュールは未対応)。"));
+    h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: !!st.weather, disabled: !gm, onchange: (e) => send({ t: "settings", s: { weather: e.target.checked } }) }), h("span", {}, h("b", {}, "天候と路面"), h("span", { class: "small muted" }, " 天候トークン1枚(ヒート・ストレスの数が変わる)と、コーナーごとの路面トークン(制限速度±1・オーバーヒート・区間の効果)。"))),
+    h("p", { class: "muted small" }, "2〜6人。約30〜60分(1周なら約15分)。はじめてならUSAの1周がおすすめ。拡張コースの水たまり(Japan)・トンネル(España)・シケインも入っています。レジェンド(ボット)とチャンピオンシップは未対応。"),
+    st.weather ? h("p", { class: "muted small" }, "※路面トークン12枚の種類ごとの内訳は資料がなく、6種類×2枚と推定しています。") : null);
   if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
     h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live > 6 ? "先に入った6人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
   else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
