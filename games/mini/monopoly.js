@@ -47,16 +47,33 @@ function boardFor(map) {
 // ---------------------------------------------------------------
 // 設定
 // ---------------------------------------------------------------
-const DEFAULTS = { map: "japan", startCash: 1500, turnSecs: 90 };
+// 細かいルール(ホストが1つずつ切り替えられる)。「本家どおり」「オリジナル」は一括で切り替えるときの組み合わせ
+const RULES = {
+  bankAuction: "銀行への破産で戻った土地を競売にする",
+  bankruptInterest: "破産で抵当中の土地を受け取ったら、すぐ利子(1割)を払う",
+  liftOnReceive: "抵当中の土地を受け取ったその番のうちは、利子なし(元金だけ)で抵当を外せる",
+  bidCredit: "競売で、売却・抵当で作れるお金まで入札できる(足りない分はあとで払う)",
+  houseAuction: "銀行の家が残り4軒以下のとき、ほかにも建てたい人がいれば家を競売にする",
+  multiSplit: "何人かに払えずに破産したら、現金は払う額に応じて分け、土地は銀行へ",
+  freeParking: "税金・罰金を無料駐車場に貯めて、止まった人がもらう(ハウスルール)",
+};
+const PRESETS = {
+  official: { bankAuction: true, bankruptInterest: true, liftOnReceive: true, bidCredit: true, houseAuction: true, multiSplit: true, freeParking: false },
+  original: { bankAuction: false, bankruptInterest: false, liftOnReceive: false, bidCredit: false, houseAuction: false, multiSplit: false, freeParking: false },
+};
+const DEFAULTS = { map: "japan", startCash: 1500, turnSecs: 90, rules: PRESETS.official };
 function normalize(raw) {
   const r = raw && typeof raw === "object" ? raw : {}, out = { ...DEFAULTS };
   if (MAP_NAMES[r.map]) out.map = r.map;
   if ([1000, 1500, 2000].includes(r.startCash)) out.startCash = r.startCash;
   if ([0, 60, 90, 120].includes(r.turnSecs)) out.turnSecs = r.turnSecs;
+  const rules = PRESETS[r.preset] || (r.rules && typeof r.rules === "object" ? r.rules : {});
+  out.rules = Object.fromEntries(Object.keys(RULES).map((k) => [k, typeof rules[k] === "boolean" ? rules[k] : DEFAULTS.rules[k]]));
   return out;
 }
+const rule = (c, k) => !!c.g.cfg.rules[k];
 const GO_PAY = 200, JAIL_FINE = 50, AUCTION_MS = 12000, AUCTION_FIRST_MS = 20000, AWAY_MS = 30000, LOG_MAX = 40;
-const BANK_HOUSES = 32, BANK_HOTELS = 12;
+const BANK_HOUSES = 32, BANK_HOTELS = 12, HOUSE_SHORT = 4;
 
 // ---------------------------------------------------------------
 // カード(16枚ずつ。本家と同じ内容)
@@ -74,7 +91,7 @@ const CHANCE = [
   { text: () => "3マス戻る", go: (c, id) => { const p = c.g.P[id], from = p.pos; p.pos = (p.pos + 37) % 40; ev(c, { type: "move", pid: id, from, to: p.pos, steps: -3 }); land(c, id); } },
   { text: () => "刑務所へ行く(スタートを通っても200万はもらえない)", go: (c, id) => toJail(c, id) },
   { text: () => "建物の修理: 家1軒につき25万、ホテル1軒につき100万払う", go: (c, id) => repairs(c, id, 25, 100) },
-  { text: () => "スピード違反の罰金 15万払う", go: (c, id) => pay(c, id, null, 15, "罰金") },
+  { text: () => "スピード違反の罰金 15万払う", go: (c, id) => pay(c, id, null, 15, "罰金", true) },
   { text: (b) => `${b[5].name}へ進む(スタートを通ったら200万)`, go: (c, id) => moveTo(c, id, 5) },
   { text: (b) => `${b[39].name}へ進む`, go: (c, id) => moveTo(c, id, 39) },
   { text: () => "議長に選ばれた: ほかのプレイヤー全員に50万ずつ払う", go: (c, id) => { for (const o of alive(c)) if (o !== id) pay(c, id, o, 50, "議長"); } },
@@ -83,7 +100,7 @@ const CHANCE = [
 const CHEST = [
   { text: () => "スタートへ進む(200万もらう)", go: (c, id) => moveTo(c, id, 0) },
   { text: () => "銀行のミスで 200万もらう", go: (c, id) => gain(c, id, 200) },
-  { text: () => "医者代 50万払う", go: (c, id) => pay(c, id, null, 50, "医者代") },
+  { text: () => "医者代 50万払う", go: (c, id) => pay(c, id, null, 50, "医者代", true) },
   { text: () => "株を売って 50万もらう", go: (c, id) => gain(c, id, 50) },
   { text: () => "刑務所から出られるカード(持っておける・取引できる)", jailCard: true },
   { text: () => "刑務所へ行く(スタートを通っても200万はもらえない)", go: (c, id) => toJail(c, id) },
@@ -91,8 +108,8 @@ const CHEST = [
   { text: () => "所得税の還付 20万もらう", go: (c, id) => gain(c, id, 20) },
   { text: () => "誕生日: ほかのプレイヤー全員から10万ずつもらう", go: (c, id) => { for (const o of alive(c)) if (o !== id) pay(c, o, id, 10, "誕生日のお祝い"); } },
   { text: () => "生命保険の満期 100万もらう", go: (c, id) => gain(c, id, 100) },
-  { text: () => "入院費 100万払う", go: (c, id) => pay(c, id, null, 100, "入院費") },
-  { text: () => "学費 50万払う", go: (c, id) => pay(c, id, null, 50, "学費") },
+  { text: () => "入院費 100万払う", go: (c, id) => pay(c, id, null, 100, "入院費", true) },
+  { text: () => "学費 50万払う", go: (c, id) => pay(c, id, null, 50, "学費", true) },
   { text: () => "相談料 25万もらう", go: (c, id) => gain(c, id, 25) },
   { text: () => "道路の修理: 家1軒につき40万、ホテル1軒につき115万払う", go: (c, id) => repairs(c, id, 40, 115) },
   { text: () => "美人コンテストで2位 10万もらう", go: (c, id) => gain(c, id, 10) },
@@ -148,17 +165,20 @@ function worth(c, id) {
 // ---------------------------------------------------------------
 function gain(c, id, n) { c.g.P[id].cash += n; }
 // 払う(to が null なら銀行)。足りなければ「借金」として残し、本人が売却・抵当でお金を作るのを待つ
-function pay(c, from, to, n, why) {
+// fine: 税金・罰金(無料駐車場に貯めるルールのとき、銀行ではなく駐車場へ)
+function pay(c, from, to, n, why, fine) {
   const g = c.g;
   if (n <= 0 || g.P[from].out) return;
   if (to && g.P[to].out) return;
+  const pot = !to && !!fine && rule(c, "freeParking");
   if (!g.debts.some((d) => d.pid === from) && g.P[from].cash >= n) {
     g.P[from].cash -= n;
     if (to) g.P[to].cash += n;
-    log(c, `${nm(c, from)} → ${to ? nm(c, to) : "銀行"} ${M(n)}(${why})`);
+    if (pot) g.pot += n;
+    log(c, `${nm(c, from)} → ${to ? nm(c, to) : pot ? "無料駐車場" : "銀行"} ${M(n)}(${why})`);
     return;
   }
-  g.debts.push({ pid: from, to, amount: n, why });
+  g.debts.push({ pid: from, to, amount: n, why, pot });
   log(c, `${nm(c, from)} は ${M(n)} 足りない…(${why})。売却・抵当でお金を作るか、破産するか`);
 }
 function settleDebt(c, id) {
@@ -168,7 +188,8 @@ function settleDebt(c, id) {
   g.debts.splice(g.debts.indexOf(d), 1);
   g.P[id].cash -= d.amount;
   if (d.to && !g.P[d.to].out) g.P[d.to].cash += d.amount;
-  log(c, `${nm(c, id)} → ${d.to ? nm(c, d.to) : "銀行"} ${M(d.amount)}(${d.why})`);
+  if (d.pot) g.pot += d.amount;
+  log(c, `${nm(c, id)} → ${d.to ? nm(c, d.to) : d.pot ? "無料駐車場" : "銀行"} ${M(d.amount)}(${d.why})`);
   return null;
 }
 // 自動でお金を作る(時間切れ・「自動で集める」): 建物を売る → 抵当に入れる、の順
@@ -188,7 +209,7 @@ function autoRaise(c, id, need) {
 // ---------------------------------------------------------------
 // 建物・抵当
 // ---------------------------------------------------------------
-function canBuild(c, id, i) {
+function canBuild(c, id, i, ignoreCash) {
   const g = c.g, o = g.own[i], s = SQ[i];
   if (!o || o.owner !== id || s.type !== "prop") return "自分の土地ではありません";
   if (!ownsAll(g, id, s.group)) return "同じ色を全部持つと建てられます";
@@ -196,7 +217,7 @@ function canBuild(c, id, i) {
   if (o.houses >= 5) return "これ以上建てられません";
   if (G[s.group].some((k) => g.own[k].houses < o.houses)) return "同じ色の土地に均等に建ててください";
   if (o.houses === 4 ? g.hotels < 1 : g.houses < 1) return o.houses === 4 ? "銀行にホテルが残っていません" : "銀行に家が残っていません";
-  if (g.P[id].cash < s.house) return "お金が足りません";
+  if (!ignoreCash && g.P[id].cash < s.house) return "お金が足りません";
   return null;
 }
 function doBuild(c, id, i) {
@@ -238,7 +259,21 @@ function doMortgage(c, id, i) {
   const g = c.g; g.own[i].mort = true; g.P[id].cash += priceOf(i) / 2;
   log(c, `${nm(c, id)} が ${sqName(c, i)} を抵当に入れた(+${M(priceOf(i) / 2)})`);
 }
-const unmortCost = (i) => Math.ceil(priceOf(i) * 11 / 20); // 抵当額(半額)+1割。小数の誤差が出ないよう整数で計算
+// 抵当額(半額)+1割。小数の誤差が出ないよう整数で計算。受け取ったばかり(fresh)なら利子は払い済みなので元金だけ
+const unmortCost = (c, i) => (c.g.own[i].fresh ? priceOf(i) / 2 : Math.ceil(priceOf(i) * 11 / 20));
+// 売却・抵当で作れるお金の上限(競売の入札上限に使う)
+function raisable(c, id) {
+  const g = c.g; let n = g.P[id].cash;
+  for (let i = 0; i < 40; i++) { const o = g.own[i]; if (!o || o.owner !== id) continue; n += (SQ[i].house / 2 || 0) * (o.houses || 0); if (!o.mort) n += priceOf(i) / 2; }
+  return n;
+}
+const bidLimit = (c, id) => (rule(c, "bidCredit") ? raisable(c, id) : c.g.P[id].cash);
+// 受け取った抵当中の土地: 利子を払い(pay=true のとき)、その番のうちは元金で外せる印を付ける
+function receiveMortgaged(c, to, props, payInterest, why) {
+  const g = c.g; let fee = 0;
+  for (const i of props) if (g.own[i].mort) { fee += Math.ceil(priceOf(i) / 20); if (rule(c, "liftOnReceive")) g.own[i].fresh = true; }
+  if (payInterest && fee) pay(c, to, null, fee, why);
+}
 
 // ---------------------------------------------------------------
 // 移動
@@ -281,8 +316,9 @@ function land(c, id, opt = {}) {
     pay(c, id, o.owner, rent, `${sqName(c, i)} の使用料`);
     return;
   }
-  if (s.type === "tax") return pay(c, id, null, s.tax, sqName(c, i));
+  if (s.type === "tax") return pay(c, id, null, s.tax, sqName(c, i), true);
   if (s.type === "gotojail") return toJail(c, id);
+  if (s.type === "free" && g.pot > 0 && rule(c, "freeParking")) { log(c, `${nm(c, id)} が無料駐車場の ${M(g.pot)} をもらった！`); g.P[id].cash += g.pot; g.pot = 0; return; }
   if (s.type === "chance" || s.type === "chest") return drawCard(c, id, s.type);
 }
 function drawCard(c, id, kind) {
@@ -298,7 +334,7 @@ function drawCard(c, id, kind) {
 function repairs(c, id, perHouse, perHotel) {
   const g = c.g; let n = 0;
   for (let i = 0; i < 40; i++) { const o = g.own[i]; if (o && o.owner === id && o.houses) n += o.houses === 5 ? perHotel : o.houses * perHouse; }
-  if (n) pay(c, id, null, n, "修理代"); else log(c, `${nm(c, id)} は建物がないので0万`);
+  if (n) pay(c, id, null, n, "修理代", true); else log(c, `${nm(c, id)} は建物がないので0万`);
 }
 
 // ---------------------------------------------------------------
@@ -314,7 +350,7 @@ function start(c, settings) {
     own: SQ.map((s, i) => (BUYABLE(i) ? { owner: null, houses: 0, mort: false } : null)),
     houses: BANK_HOUSES, hotels: BANK_HOTELS,
     decks: { chance: shuffle([...CHANCE.keys()]), chest: shuffle([...CHEST.keys()]) },
-    step: "roll", dice: null, dbl: 0, again: false, pending: null, auction: null, debts: [], trades: [], tradeSeq: 0,
+    step: "roll", dice: null, dbl: 0, again: false, pending: null, auction: null, debts: [], trades: [], tradeSeq: 0, queue: [], resume: null, pot: 0,
     log: [], ev: null, card: null, outOrder: [], turnNo: 1, rollSeq: 0,
   };
   log(c, `ゲーム開始！ 最初は ${nm(c, order[0])} の番`);
@@ -326,6 +362,7 @@ function beginTurn(c) {
   let guard = 0;
   do { g.cur = (g.cur + 1) % g.order.length; } while (g.P[curId(c)].out && guard++ < 20);
   Object.assign(g, { step: "roll", dbl: 0, again: false, pending: null, dice: null });
+  for (const o of g.own) if (o) o.fresh = false; // 「元金だけで外せる」のはその番のうちだけ
   g.turnNo++;
   log(c, `${nm(c, curId(c))} の番`);
 }
@@ -352,7 +389,7 @@ function roll(c, id) {
       // 3回目も失敗: 50万払って、出た目だけ進む
       log(c, `${nm(c, id)} は ${a}+${b}。3回失敗したので ${M(JAIL_FINE)} 払って出所`);
       p.jailed = false; p.jailTries = 0; g.again = false;
-      pay(c, id, null, JAIL_FINE, "保釈金");
+      pay(c, id, null, JAIL_FINE, "保釈金", true);
       advance(c, id, a + b);
       return afterMove(c);
     }
@@ -370,23 +407,55 @@ function roll(c, id) {
   if (p.jailed) g.again = false;
   afterMove(c);
 }
+// 競売が終わったら resume の段階に戻る(買わなかった土地なら「ターン終了」待ち)
 function startAuction(c, i) {
   const g = c.g;
+  if (g.step !== "auction") g.resume = g.step === "buy" ? "act" : g.step;
   g.pending = null;
-  g.auction = { sq: i, bid: 0, by: null, endsAt: Date.now() + AUCTION_FIRST_MS };
+  g.auction = { kind: "land", sq: i, bid: 0, by: null, endsAt: Date.now() + AUCTION_FIRST_MS };
   g.step = "auction";
   log(c, `${sqName(c, i)} の競売スタート(だれでも入札できます)`);
+}
+// 家の競売(在庫が少ないとき)。入札する人は自分の建てる土地(spots)を選ぶ
+function startHouseAuction(c, pid, sq) {
+  const g = c.g;
+  g.resume = g.step;
+  g.auction = { kind: "house", sq, bid: 0, by: null, spots: { [pid]: sq }, endsAt: Date.now() + AUCTION_FIRST_MS };
+  g.step = "auction";
+  log(c, `銀行の家が残り${g.houses}軒。家1軒の競売スタート(建てられる人はだれでも入札できます)`);
 }
 function endAuction(c) {
   const g = c.g, a = g.auction;
   g.auction = null;
-  if (a.by && !g.P[a.by].out && g.P[a.by].cash >= a.bid) {
-    g.P[a.by].cash -= a.bid;
-    g.own[a.sq].owner = a.by;
-    log(c, `${nm(c, a.by)} が ${sqName(c, a.sq)} を ${M(a.bid)} で落札`);
-    ev(c, { type: "buy", pid: a.by, sq: a.sq });
+  const w = a.by && !g.P[a.by].out ? a.by : null;
+  if (a.kind === "house") {
+    const sq = w && a.spots[w];
+    if (w && canBuild(c, w, sq, true) === null && g.P[w].cash >= a.bid) {
+      g.P[w].cash -= a.bid; g.houses--; g.own[sq].houses++;
+      log(c, `${nm(c, w)} が家1軒を ${M(a.bid)} で落札し、${sqName(c, sq)} に建てた`);
+      ev(c, { type: "buy", pid: w, sq });
+    } else log(c, "家の競売は成立しなかった");
+  } else if (w && (g.P[w].cash >= a.bid || rule(c, "bidCredit"))) {
+    g.own[a.sq].owner = w;
+    log(c, `${nm(c, w)} が ${sqName(c, a.sq)} を ${M(a.bid)} で落札`);
+    ev(c, { type: "buy", pid: w, sq: a.sq });
+    pay(c, w, null, a.bid, `${sqName(c, a.sq)} の落札代金`); // 足りなければ売却・抵当で払う
   } else log(c, `${sqName(c, a.sq)} はだれも入札せず、銀行のまま`);
-  g.step = "act";
+  if (g.step === "end") return;
+  // 続けて銀行の土地の競売(買うかどうか選んでいる途中なら、それが済んでから)
+  if (g.queue.length && g.resume !== "buy") return startAuction(c, g.queue.shift());
+  g.step = g.resume || "act"; g.resume = null;
+}
+// 破産で銀行に戻った土地の競売を、進行の切れ目(サイコロ前・ターン終了前)で始める
+function kickQueue(c) {
+  const g = c.g;
+  if (g.queue.length && (g.step === "roll" || g.step === "act") && !g.debts.length) startAuction(c, g.queue.shift());
+}
+// 家を建てられる自分の土地(お金は見ない)
+function houseSpots(c, id) {
+  const g = c.g, out = [];
+  for (let i = 0; i < 40; i++) if (g.own[i] && g.own[i].houses < 4 && canBuild(c, id, i, true) === null) out.push(i);
+  return out;
 }
 
 // 破産: to が プレイヤーならその人へ、null なら銀行へ全部
@@ -394,6 +463,10 @@ function bankrupt(c, id, to) {
   const g = c.g, p = g.P[id];
   if (p.out) return;
   if (to && g.P[to].out) to = null;
+  // 何人かに払えないとき: 現金は払う額に応じて分け、土地は銀行へ(ルール)
+  const creditors = [...new Set(g.debts.filter((d) => d.pid === id && d.to && !g.P[d.to].out).map((d) => d.to))];
+  const split = rule(c, "multiSplit") && creditors.length > 1;
+  if (split) to = null;
   // 建物は半額で銀行へ売る(その分も相手に渡る)
   for (let i = 0; i < 40; i++) {
     const o = g.own[i];
@@ -402,13 +475,22 @@ function bankrupt(c, id, to) {
     if (h === 5) { g.hotels++; } else g.houses += h;
     p.cash += (SQ[i].house / 2) * h; o.houses = 0;
   }
+  const got = [];
   for (let i = 0; i < 40; i++) {
     const o = g.own[i];
     if (!o || o.owner !== id) continue;
-    if (to) o.owner = to; else { o.owner = null; o.mort = false; }
+    got.push(i);
+    if (to) o.owner = to; else { o.owner = null; o.mort = false; o.fresh = false; }
+  }
+  if (split) {
+    const owed = g.debts.filter((d) => d.pid === id && d.to && !g.P[d.to].out), total = owed.reduce((n, d) => n + d.amount, 0);
+    let left = Math.max(0, p.cash);
+    owed.forEach((d, k) => { const part = k === owed.length - 1 ? left : Math.floor(Math.max(0, p.cash) * d.amount / total); left -= part; g.P[d.to].cash += part; });
+    log(c, `${nm(c, id)} の現金 ${M(Math.max(0, p.cash))} を ${creditors.map((x) => nm(c, x)).join("・")} で分けた`);
   }
   if (to) { g.P[to].cash += Math.max(0, p.cash); g.P[to].jailCards.push(...p.jailCards); }
   else for (const k of p.jailCards) g.decks[k].push(k === "chance" ? 7 : 4);
+  if (!to && rule(c, "bankAuction")) g.queue.push(...got); // 銀行に戻った土地は順に競売
   p.cash = 0; p.jailCards = []; p.out = true; p.jailed = false;
   g.outOrder.push(id);
   g.debts = g.debts.filter((d) => d.pid !== id && d.to !== id);
@@ -417,9 +499,12 @@ function bankrupt(c, id, to) {
   log(c, `${nm(c, id)} が破産… ${to ? `財産は ${nm(c, to)} へ` : "財産は銀行へ"}`);
   ev(c, { type: "bankrupt", pid: id });
   if (alive(c).length <= 1) return end(c);
+  if (to) receiveMortgaged(c, to, got, rule(c, "bankruptInterest"), "受け取った抵当の利子");
   if (curId(c) === id) {
-    g.auction = null; g.pending = null;
-    beginTurn(c);
+    // 番の人が破産: 競売中ならそのまま続け、終わったら次の人の番から
+    g.pending = null;
+    if (g.step === "auction") { beginTurn(c); g.resume = "roll"; g.step = "auction"; }
+    else beginTurn(c);
   }
 }
 function end(c) {
@@ -441,6 +526,7 @@ function end(c) {
 function arm(c) {
   const g = c.g;
   if (g.step === "end") return c.clearTimer();
+  kickQueue(c);
   const key = [g.step, g.cur, g.turnNo, g.dbl, g.again, g.debts.length, g.auction ? g.auction.endsAt : 0, c.live().join()].join("|");
   if (key === g.armKey) return;
   g.armKey = key;
@@ -507,6 +593,7 @@ function applyTrade(c, t) {
   move(t.to, t.from, t.get);
   const feeTo = mortFee(c, t.give), feeFrom = mortFee(c, t.get);
   g.P[t.to].cash -= feeTo; g.P[t.from].cash -= feeFrom;
+  receiveMortgaged(c, t.to, t.give.props, false); receiveMortgaged(c, t.from, t.get.props, false);
   const desc = (s) => [...s.props.map((i) => sqName(c, i)), s.cash ? M(s.cash) : null, s.cards ? `刑務所カード${s.cards}枚` : null].filter(Boolean).join("・") || "なし";
   log(c, `取引成立: ${nm(c, t.from)}(${desc(t.give)}) ⇄ ${nm(c, t.to)}(${desc(t.get)})` + (feeTo + feeFrom ? ` 抵当の利子 ${feeTo ? `${nm(c, t.to)} ${M(feeTo)}` : ""}${feeFrom ? ` ${nm(c, t.from)} ${M(feeFrom)}` : ""}` : ""));
 }
@@ -537,6 +624,7 @@ function act(c, pid, m) {
       if (!myTurn || g.step !== "roll" || !me.jailed) return;
       if (me.cash < JAIL_FINE) return "お金が足りません";
       me.cash -= JAIL_FINE; me.jailed = false; me.jailTries = 0;
+      if (rule(c, "freeParking")) g.pot += JAIL_FINE;
       log(c, `${nm(c, pid)} が保釈金 ${M(JAIL_FINE)} を払って出所`);
       return;
     case "useCard":
@@ -566,9 +654,18 @@ function act(c, pid, m) {
     case "bid": {
       if (g.step !== "auction") return;
       const a = g.auction, n = m.amount;
-      if (!Number.isInteger(n) || n <= a.bid) return `${M(a.bid + 1)}以上で入札してください`;
-      if (n > me.cash) return "持っているお金より多くは入札できません";
       if (myDebt) return "支払いが残っているので入札できません";
+      let spot = null;
+      if (a.kind === "house") {
+        // 家の競売: 建てる土地を選ぶ(その土地の家の値段以上で入札)
+        spot = sq >= 0 ? sq : a.spots[pid] ?? houseSpots(c, pid)[0];
+        if (spot == null || canBuild(c, pid, spot, true)) return "家を建てられる土地がありません";
+        if (Number.isInteger(n) && n < SQ[spot].house) return `${M(SQ[spot].house)}(家の値段)以上で入札してください`;
+      }
+      if (!Number.isInteger(n) || n <= a.bid) return `${M(a.bid + 1)}以上で入札してください`;
+      const lim = a.kind === "house" ? me.cash : bidLimit(c, pid);
+      if (n > lim) return rule(c, "bidCredit") && a.kind !== "house" ? `入札できるのは ${M(lim)}(売却・抵当で作れるお金)までです` : "持っているお金より多くは入札できません";
+      if (spot != null) a.spots[pid] = spot;
       a.bid = n; a.by = pid;
       a.endsAt = Math.max(a.endsAt, Date.now() + AUCTION_MS);
       log(c, `${nm(c, pid)} が ${M(n)} で入札`);
@@ -591,6 +688,7 @@ function act(c, pid, m) {
       if (g.step === "auction") return "競売中はできません";
       if (myDebt) return "支払いが残っています";
       { const e = canBuild(c, pid, sq); if (e) return e; }
+      if (rule(c, "houseAuction") && g.own[sq].houses < 4 && g.houses <= HOUSE_SHORT && alive(c).some((o) => o !== pid && houseSpots(c, o).length)) return startHouseAuction(c, pid, sq);
       return doBuild(c, pid, sq);
     case "sell":
       { const e = canSell(c, pid, sq); if (e) return e; }
@@ -602,9 +700,10 @@ function act(c, pid, m) {
       const o = g.own[sq];
       if (!o || o.owner !== pid || !o.mort) return;
       if (myDebt) return "支払いが残っています";
-      if (me.cash < unmortCost(sq)) return `お金が足りません(${M(unmortCost(sq))}必要)`;
-      me.cash -= unmortCost(sq); o.mort = false;
-      log(c, `${nm(c, pid)} が ${sqName(c, sq)} の抵当を外した(${M(unmortCost(sq))})`);
+      const cost = unmortCost(c, sq);
+      if (me.cash < cost) return `お金が足りません(${M(cost)}必要)`;
+      me.cash -= cost; o.mort = false; o.fresh = false;
+      log(c, `${nm(c, pid)} が ${sqName(c, sq)} の抵当を外した(${M(cost)})`);
       return;
     }
     // ---- 取引 ----
@@ -663,8 +762,10 @@ function view(c, me) {
     dice: g.dice, again: g.again, dbl: g.dbl, pending: g.pending, auction: g.auction, debts: g.debts,
     trades: g.trades, log: g.log.slice(-20), ev: g.ev, card: g.card, turnNo: g.turnNo, rollSeq: g.rollSeq,
     rents: g.own.map((o, i) => (o && o.owner && !o.mort && SQ[i].type !== "util" ? rentOf(c, i) : null)),
-    unmort: g.own.map((o, i) => (o ? unmortCost(i) : null)),
+    unmort: g.own.map((o, i) => (o ? unmortCost(c, i) : null)),
+    pot: g.pot, myLimit: g.P[me] && !g.P[me].out ? bidLimit(c, me) : 0,
+    mySpots: g.P[me] && !g.P[me].out ? houseSpots(c, me) : [],
   };
 }
 
-module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, MAP_NAMES, boardFor, SQ, G, RR, UT, _rentOf: rentOf, _test: { land, drawCard, advance, roll } };
+module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, RULES, PRESETS, MAP_NAMES, boardFor, SQ, G, RR, UT, _rentOf: rentOf, _test: { land, drawCard, advance, roll, beginTurn } };

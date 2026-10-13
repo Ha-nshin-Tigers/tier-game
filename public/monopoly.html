@@ -121,6 +121,15 @@ input[type=text], input[type=number] { font-family: var(--body); font-size: 16px
 .act .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .bidrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .bidrow input { width: 110px; }
+.ruleset { display: grid; gap: 6px; border: 1.5px solid var(--line); border-radius: 8px; padding: 10px; }
+.ruleset .presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ruleset button.on { background: var(--fg); color: var(--surface); }
+.ruleset label { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; font-size: 14px; }
+.ruleset label input { margin-top: 4px; width: 18px; height: 18px; }
+.ruleset .diff { font-size: 11px; color: var(--muted); }
+details.rulesnow summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+details.rulesnow ul { margin: 6px 0 0; padding-left: 1.2em; font-size: 13px; }
+.pot { font-weight: 700; color: #1f8a4c; }
 .debt { border: 2px solid var(--bad); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
 .plist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .plist li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 4px; border-bottom: 1px solid var(--line); }
@@ -416,6 +425,7 @@ function renderMeta() {
     h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
   const g = G();
   if (g) m.append(h("span", { class: "pill" }, `${g.cfg.map === "world" ? "世界" : "日本"}・${g.turnNo}手目`), h("span", { class: "pill" }, `銀行の家 ${g.houses}・ホテル ${g.hotels}`));
+  if (g?.cfg.rules.freeParking) m.append(h("span", { class: "pill" }, `🅿️ ${M(g.pot)}`));
 }
 function renderSide() {
   const side = $("side"); side.replaceChildren();
@@ -430,6 +440,11 @@ function renderSide() {
       ul.append(li);
     }
     side.append(h("h2", {}, "プレイヤー"), ul);
+  }
+  if (G()) {
+    const r = G().cfg.rules, cur = presetOf(r);
+    side.append(h("details", { class: "rulesnow" }, h("summary", {}, `このゲームのルール: ${cur === "official" ? "本家どおり" : cur === "original" ? "オリジナル" : "カスタム"}`),
+      h("ul", {}, ...Object.entries(S.ruleInfo).map(([k, t]) => h("li", {}, (r[k] ? "◯ " : "✕ ") + t)))));
   }
   side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
     const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
@@ -458,10 +473,30 @@ function renderLobby() {
       sel("地図", "map", [["japan", "日本"], ["world", "世界"]]),
       sel("最初のお金", "startCash", [[1500, "1500万(本家)"], [2000, "2000万(長め)"], [1000, "1000万(短め)"]]),
       sel("1手の持ち時間", "turnSecs", [[90, "90秒"], [60, "60秒"], [120, "120秒"], [0, "なし"]])),
+    rulesBox(st, gm),
     h("p", { class: "muted small" }, "2〜8人。最後の1人になるまで続きます(1〜2時間かかることがあります)。時間切れのときは自動で進めます(土地は買わずに競売、支払いは自動で売却・抵当)。"));
   if (gm) el.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 2, onclick: () => send({ t: "start" }) }, "スタート"),
     h("span", { class: "muted small" }, live < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live > 8 ? "先に入った8人で始めます(ほかの人は観戦)" : `${live}人で始められます`)));
   else el.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+
+// ---- 細かいルール(本家どおり / オリジナル / 1つずつ) ----
+const RULE_NOTE = {
+  bankAuction: "オリジナル: 競売せずに銀行のものに戻す", bankruptInterest: "オリジナル: 利子なし", liftOnReceive: "オリジナル: いつ外しても1割増し(利子が二重)",
+  bidCredit: "オリジナル: 持っている現金まで", houseAuction: "オリジナル: 早い者勝ち", multiSplit: "オリジナル: いちばん先に払うはずだった人に全部(本家に決まりはなく、公平な分け方にしています)",
+  freeParking: "本家にはないハウスルール。本家どおり・オリジナルともに「なし」",
+};
+function presetOf(rules) { for (const [k, v] of Object.entries(S.presets)) if (Object.keys(v).every((r) => v[r] === rules[r])) return k; return null; }
+function rulesBox(st, gm) {
+  const cur = presetOf(st.rules);
+  const setRule = (k, v) => send({ t: "settings", s: { rules: { [k]: v } } });
+  return h("div", { class: "ruleset" }, h("b", {}, "細かいルール"),
+    h("div", { class: "presets" },
+      h("button", { type: "button", class: cur === "official" ? "on" : "", disabled: !gm, "aria-pressed": cur === "official" ? "true" : "false", onclick: () => send({ t: "settings", s: { preset: "official" } }) }, "本家どおり"),
+      h("button", { type: "button", class: cur === "original" ? "on" : "", disabled: !gm, "aria-pressed": cur === "original" ? "true" : "false", onclick: () => send({ t: "settings", s: { preset: "original" } }) }, "オリジナル"),
+      h("span", { class: "small muted" }, cur === "official" ? "今は本家どおり" : cur === "original" ? "今はオリジナル(簡単め)" : "今はカスタム")),
+    ...Object.entries(S.ruleInfo).map(([k, text]) => h("label", {}, h("input", { type: "checkbox", checked: !!st.rules[k], disabled: !gm, onchange: (e) => setRule(k, e.target.checked) }),
+      h("span", {}, text, h("div", { class: "diff" }, RULE_NOTE[k] || "")))));
 }
 
 // ---- 盤面(2D) ----
@@ -508,13 +543,14 @@ function centerEl(g) {
   c.append(h("div", { class: "logo" }, "不動産王"));
   if (g.dice) c.append(h("div", { class: "dice" }, dieEl(g.dice[0], Date.now() < local.rollingUntil), dieEl(g.dice[1], Date.now() < local.rollingUntil)));
   c.append(h("div", { class: "stat" }, statusText(g)));
+  if (g.cfg.rules.freeParking) c.append(h("div", { class: "pot" }, `🅿️ 無料駐車場 ${M(g.pot)}`));
   if (g.card && Date.now() < local.cardUntil) c.append(h("div", { class: "cardpop " + g.card.kind }, h("b", {}, (g.card.kind === "chance" ? "チャンス" : "共同基金") + ` (${nameOf(g.card.pid)})`), g.card.text));
   return c;
 }
 function statusText(g) {
   if (S.phase === "finished") return "ゲーム終了";
   if (g.debts.length) return `${g.debts.map((d) => nameOf(d.pid)).join("・")} の支払い待ち`;
-  if (g.step === "auction") return `競売中: ${g.board[g.auction.sq].name}`;
+  if (g.step === "auction") return g.auction.kind === "house" ? "競売中: 家1軒" : `競売中: ${g.board[g.auction.sq].name}`;
   const who = g.cur === me ? "あなた" : nameOf(g.cur) + " さん";
   if (g.step === "buy") return `${who}: ${g.board[g.pending].name} を買う？`;
   if (g.P[g.cur].jailed && g.step === "roll") return `${who}の番(刑務所)`;
@@ -536,7 +572,7 @@ function renderInfo(i) {
       h("div", { class: "small muted" }, `値段 ${M(s.price)}・家1軒 ${M(s.house)}(ホテルは家4軒+${M(s.house)})・抵当 ${M(s.price / 2)}`));
   } else if (s.type === "rr") body.append(h("div", {}, `値段 ${M(s.price)}。持っている数で使用料: 1つ25万・2つ50万・3つ100万・4つ200万`), h("div", { class: "small muted" }, `抵当 ${M(s.price / 2)}`));
   else if (s.type === "util") body.append(h("div", {}, `値段 ${M(s.price)}。使用料はサイコロの目×4(2つとも持っていれば×10)`), h("div", { class: "small muted" }, `抵当 ${M(s.price / 2)}`));
-  else body.append(h("div", {}, { go: "通るか止まると200万もらえます", jail: "ただの見学なら何もありません。入ったら、ゾロ目・保釈金50万・出られるカードで出所", free: "何もありません(休憩)", gotojail: "止まったら刑務所へ(スタートは通らない)", chance: "チャンスカードを引きます", chest: "共同基金カードを引きます", tax: `${M(s.tax)}払います` }[s.type]));
+  else body.append(h("div", {}, { go: "通るか止まると200万もらえます", jail: "ただの見学なら何もありません。入ったら、ゾロ目・保釈金50万・出られるカードで出所", free: g.cfg.rules.freeParking ? `止まると貯まったお金(今 ${M(g.pot)})がもらえます` : "何もありません(休憩)", gotojail: "止まったら刑務所へ(スタートは通らない)", chance: "チャンスカードを引きます", chest: "共同基金カードを引きます", tax: `${M(s.tax)}払います` }[s.type]));
   if (o) {
     body.append(h("div", {}, o.owner ? h("span", {}, "持ち主: ", chip(o.owner), o.mort ? " (抵当中)" : "", o.houses ? ` ${o.houses === 5 ? "ホテル" : "家" + o.houses + "軒"}` : "") : h("span", { class: "muted" }, "持ち主なし")));
     if (o.owner === me) body.append(propBtns(i));
@@ -571,13 +607,24 @@ function renderAct(el) {
         twoStep("破産する", () => act("bankrupt")))));
   }
   if (g.step === "auction") {
-    const a = g.auction, s = g.board[a.sq];
-    el.append(h("div", {}, h("b", {}, s.name), ` (定価 ${M(s.price)}) 今の最高: `, a.by ? h("span", {}, M(a.bid) + " ", chip(a.by)) : "まだなし"));
-    const inp = h("input", { type: "number", min: a.bid + 1, max: mine.cash, step: 1, value: local.bidVal ?? "", placeholder: String(a.bid + 10), "aria-label": "入札額", oninput: (e) => { local.bidVal = e.target.value; } });
-    const bid = (n) => { if (n > mine.cash) return toast("持っているお金より多くは入札できません"); act("bid", { amount: n }); local.bidVal = ""; };
-    el.append(h("div", { class: "bidrow" }, ...[1, 10, 50, 100].map((k) => h("button", { type: "button", disabled: a.bid + k > mine.cash || a.by === me, onclick: () => bid(a.bid + k) }, `+${k}`)),
+    const a = g.auction, house = a.kind === "house", s = g.board[a.sq];
+    // 家の競売: 建てる土地を選ぶ(その土地の家の値段以上)
+    let spot = null, minBid = a.bid + 1;
+    const lim = house ? mine.cash : g.myLimit;
+    if (house) {
+      el.append(h("div", {}, h("b", {}, "🏠 家1軒の競売"), `(銀行の家が残り${g.houses}軒) 今の最高: `, a.by ? h("span", {}, M(a.bid) + " ", chip(a.by), ` → ${g.board[a.spots[a.by]].name}`) : "まだなし"));
+      if (!g.mySpots.length) { el.append(h("p", { class: "small muted" }, "あなたは家を建てられる土地がないので見守りましょう。")); return; }
+      if (!g.mySpots.includes(local.spot)) local.spot = a.spots[me] ?? g.mySpots[0];
+      spot = local.spot; minBid = Math.max(a.bid + 1, g.board[spot].house);
+      el.append(h("label", { class: "field" }, "建てる土地", h("select", { onchange: (e) => { local.spot = +e.target.value; e.target.blur(); render(); } },
+        ...g.mySpots.map((i) => h("option", { value: i, selected: i === spot }, `${g.board[i].name}(家の値段 ${M(g.board[i].house)})`)))));
+    } else el.append(h("div", {}, h("b", {}, s.name), ` (定価 ${M(s.price)}) 今の最高: `, a.by ? h("span", {}, M(a.bid) + " ", chip(a.by)) : "まだなし"));
+    const inp = h("input", { type: "number", min: minBid, max: lim, step: 1, value: local.bidVal ?? "", placeholder: String(minBid), "aria-label": "入札額", oninput: (e) => { local.bidVal = e.target.value; } });
+    const bid = (n) => { if (n > lim) return toast(`入札できるのは ${M(lim)} までです`); act("bid", house ? { amount: n, sq: spot } : { amount: n }); local.bidVal = ""; };
+    el.append(h("div", { class: "bidrow" }, house && minBid > a.bid + 1 ? h("button", { type: "button", disabled: minBid > lim || a.by === me, onclick: () => bid(minBid) }, `${M(minBid)}`) : null,
+      ...[1, 10, 50, 100].map((k) => h("button", { type: "button", disabled: Math.max(minBid, a.bid + k) > lim || a.by === me, onclick: () => bid(Math.max(minBid, a.bid + k)) }, `+${k}`)),
       inp, h("button", { class: "primary", type: "button", onclick: () => bid(parseInt(inp.value, 10) || 0) }, "入札")),
-      h("p", { class: "small muted" }, `だれでも入札できます。最後の入札から少しで締め切り。持っているお金 ${M(mine.cash)}`));
+      h("p", { class: "small muted" }, `だれでも入札できます。最後の入札から少しで締め切り。入札できるのは ${M(lim)} まで` + (!house && g.cfg.rules.bidCredit && lim > mine.cash ? `(現金 ${M(mine.cash)}。足りない分は落札後に売却・抵当で払う)` : "")));
     return;
   }
   if (g.cur !== me) { el.append(h("p", { class: "muted small" }, "自分の番でなくても、土地の管理や取引はいつでもできます。")); return; }
@@ -594,7 +641,7 @@ function renderAct(el) {
     el.append(h("p", {}, h("b", {}, s.name), ` は ${M(s.price)}。持っているお金 ${M(mine.cash)}`),
       h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: mine.cash < s.price, onclick: () => act("buy") }, `買う(${M(s.price)})`),
         h("button", { type: "button", onclick: () => act("decline") }, "買わない(競売へ)"), h("button", { type: "button", class: "ghost tiny", onclick: () => openInfo(g.pending) }, "使用料を見る")),
-      mine.cash < s.price ? h("p", { class: "small muted" }, "お金が足りません。抵当に入れてから買うこともできます。") : null);
+      mine.cash < s.price ? h("p", { class: "small muted" }, "お金が足りません。抵当に入れてから買うこともできます。") : "");
   } else if (g.step === "act") {
     el.append(h("div", { class: "btns" }, g.again ? h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("roll") }, "🎲 ゾロ目！もう一度振る")
       : h("button", { class: "primary big", type: "button", disabled: blocked, onclick: () => act("end") }, "ターン終了")),
@@ -634,11 +681,12 @@ function propBtns(i) {
   const b = h("div", { class: "btns" });
   if (s.type === "prop" && full && !o.mort) {
     const canB = o.houses < 5 && !grp.some((k) => g.own[k].mort) && grp.every((k) => g.own[k].houses >= o.houses);
-    b.append(h("button", { type: "button", class: "tiny", disabled: !canB || mine.cash < s.house, onclick: () => act("build", { sq: i }) }, `${o.houses === 4 ? "ホテル" : "家"}を建てる ${M(s.house)}`));
+    const short = g.cfg.rules.houseAuction && o.houses < 4 && g.houses <= 4;
+    b.append(h("button", { type: "button", class: "tiny", disabled: !canB || mine.cash < s.house, title: short ? "家が残り少ないので、ほかにも建てたい人がいれば競売になります" : "", onclick: () => act("build", { sq: i }) }, `${o.houses === 4 ? "ホテル" : "家"}を建てる ${M(s.house)}` + (short ? "(競売かも)" : "")));
     if (o.houses) b.append(h("button", { type: "button", class: "tiny ghost", disabled: grp.some((k) => g.own[k].houses > o.houses), onclick: () => act("sell", { sq: i }) }, `売る +${M(s.house / 2)}`));
   }
   if (!o.mort) b.append(h("button", { type: "button", class: "tiny ghost", disabled: groupBuilt, title: groupBuilt ? "同じ色の建物を先に売ってください" : "", onclick: () => act("mortgage", { sq: i }) }, `抵当 +${M(s.price / 2)}`));
-  else b.append(h("button", { type: "button", class: "tiny ghost", disabled: mine.cash < g.unmort[i], onclick: () => act("unmortgage", { sq: i }) }, `抵当を外す ${M(g.unmort[i])}`));
+  else b.append(h("button", { type: "button", class: "tiny ghost", disabled: mine.cash < g.unmort[i], onclick: () => act("unmortgage", { sq: i }) }, `抵当を外す ${M(g.unmort[i])}` + (o.fresh ? "(今なら利子なし)" : "")));
   return b;
 }
 function renderMine(el) {

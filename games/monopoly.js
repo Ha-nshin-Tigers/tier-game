@@ -73,7 +73,7 @@ function view(room, me) {
       roster: members(room),
       game: room.game && room.phase !== "lobby" ? core.view(ctxOf(room), me) : null,
       ranking: room.phase === "finished" ? room.ranking : null,
-      stamps: STAMPS,
+      stamps: STAMPS, ruleInfo: core.RULES, presets: core.PRESETS,
     },
   };
 }
@@ -151,9 +151,10 @@ function handle(ws, m) {
       return removePlayer(room, target.id);
     }
     case "settings":
-      // 地図・最初のお金・持ち時間(値の検証はルール本体の normalize で行う)
+      // 地図・最初のお金・持ち時間・細かいルール(値の検証はルール本体の normalize で行う)
       if (room.phase !== "lobby" || !m.s || typeof m.s !== "object") return;
-      room.settings = core.normalize({ ...room.settings, ...m.s });
+      // ルールは送られてきた項目だけ上書き(preset なら「本家どおり」「オリジナル」で一括)
+      room.settings = core.normalize({ ...room.settings, ...m.s, rules: { ...room.settings.rules, ...(m.s.rules && typeof m.s.rules === "object" ? m.s.rules : {}) } });
       break;
     case "start": {
       if (room.phase !== "lobby") return;
