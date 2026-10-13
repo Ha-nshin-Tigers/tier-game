@@ -17,6 +17,9 @@ const GAMES = [
   ["bridge", "ひとりじめ橋", "BR", 2, 8], ["bomb", "爆弾回し", "BO", 2, 8], ["memory", "おぼえて料理", "ME", 2, 8], ["party", "ドタバタ大会", "PA", 2, 8],
 ].map(([key, name, suffix, min, max]) => ({ key, name, suffix, min, max }));
 const GAME = Object.fromEntries(GAMES.map((g) => [g.key, g]));
+const BY_SUFFIX = Object.fromEntries(GAMES.map((g) => [g.suffix, g]));
+// 通算成績の順位点: 1位3点・2位2点・3位1点
+const RANK_PTS = [3, 2, 1];
 
 const BAD_CHARS = new RegExp("[" + [[0, 31], [127, 127], [8203, 8207], [8232, 8238], [8294, 8297]].map(([a, b]) => String.fromCharCode(a) + "-" + String.fromCharCode(b)).join("") + "]", "g");
 const cleanStr = (s, max) => typeof s === "string" ? s.replace(BAD_CHARS, "").trim().slice(0, max) : "";
@@ -24,13 +27,19 @@ const cleanStr = (s, max) => typeof s === "string" ? s.replace(BAD_CHARS, "").tr
 const rooms = new Map();
 const connected = (p) => p && p.sockets.size > 0;
 const order = (room) => [...room.members.values()].sort((a, b) => a.joinedAt - b.joinedAt);
-const hostOf = (room) => (order(room).find(connected) || order(room)[0] || {}).id || null;
+// ホスト: 渡された人(つながっていれば)。いなければ最初に入った人(つながっている人の中で)
+const hostOf = (room) => {
+  const h = room.hostId && room.members.get(room.hostId);
+  if (h && connected(h)) return h.id;
+  return (order(room).find(connected) || order(room)[0] || {}).id || null;
+};
 
 function view(room, me) {
   return {
     t: "state", me,
     room: {
       code: room.code, host: hostOf(room), game: room.game, games: GAMES,
+      scores: room.scores, history: room.history.slice(-15), mode: room.mode, votes: room.votes,
       members: order(room).map((p) => ({ id: p.id, name: p.name, connected: connected(p), where: connected(p) ? p.where : null })),
     },
   };
@@ -48,6 +57,20 @@ function detach(ws) {
   broadcast(room);
 }
 
+// 次のゲームへ(全員の画面が移動する)
+function go(room, g, by) {
+  room.seq++; room.votes = {};
+  room.game = { key: g.key, name: g.name, path: "/" + g.key, roomCode: room.code + g.suffix, seq: room.seq, by };
+}
+// 投票の集計: いちばん多いゲーム(同数ならその中からランダム)
+function decide(room) {
+  const count = {};
+  for (const k of Object.values(room.votes)) count[k] = (count[k] || 0) + 1;
+  const best = Math.max(...Object.values(count));
+  const top = Object.keys(count).filter((k) => count[k] === best);
+  go(room, GAME[top[Math.floor(Math.random() * top.length)]], null);
+}
+
 function handle(ws, m) {
   if (m.t === "join") {
     const code = String(m.room || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
@@ -61,7 +84,7 @@ function handle(ws, m) {
     if (!room) {
       if (m.create === false) return err(ws, "そのパーティーは見つかりませんでした(コードを確かめてください)");
       if (rooms.size >= MAX_ROOMS) return err(ws, "パーティーがいっぱいです。しばらくしてから試してください");
-      room = { code, members: new Map(), game: null, seq: 0, emptySince: null };
+      room = { code, members: new Map(), game: null, seq: 0, emptySince: null, scores: {}, history: [], hostId: null, mode: "host", votes: {} };
       rooms.set(code, room);
     }
     let p = room.members.get(pid);
@@ -79,27 +102,57 @@ function handle(ws, m) {
   }
   const room = ws.room, p = room && room.members.get(ws.pid);
   if (!p) return err(ws, "パーティーに入っていません");
+  const isHost = p.id === hostOf(room);
   switch (m.t) {
     case "pick": {
-      // 次のゲーム(ホストだけ)。全員の画面がそのゲームの部屋へ移動する
-      if (p.id !== hostOf(room)) return err(ws, "次のゲームを選べるのはホストだけです");
-      const g = GAME[m.game];
-      if (!g) return;
-      room.seq++;
-      room.game = { key: g.key, name: g.name, path: "/" + g.key, roomCode: room.code + g.suffix, seq: room.seq, by: p.id };
+      // 次のゲーム(ホストだけ。投票モードでもホストは決められる)。全員の画面がそのゲームの部屋へ移動する
+      if (!isHost) return err(ws, "次のゲームを選べるのはホストだけです");
+      if (!GAME[m.game]) return;
+      go(room, GAME[m.game], p.id);
       break;
     }
+    case "host": {
+      // ホストを渡す
+      if (!isHost) return err(ws, "ホストを渡せるのはホストだけです");
+      const to = room.members.get(m.to);
+      if (!to || to.id === p.id) return;
+      room.hostId = to.id;
+      break;
+    }
+    case "mode":
+      // 次のゲームの決め方: host=ホストが選ぶ / vote=みんなで投票
+      if (!isHost) return err(ws, "決め方を変えられるのはホストだけです");
+      if (!["host", "vote"].includes(m.mode)) return;
+      room.mode = m.mode; room.votes = {};
+      break;
+    case "vote": {
+      if (room.mode !== "vote") return err(ws, "いまは投票モードではありません");
+      if (m.game == null) delete room.votes[p.id];
+      else if (GAME[m.game]) room.votes[p.id] = m.game;
+      else return;
+      // つながっている全員が投票したら決まる
+      const live = order(room).filter(connected);
+      if (live.length && live.every((x) => room.votes[x.id])) decide(room);
+      break;
+    }
+    case "decide":
+      // ホスト: 投票を締め切る
+      if (!isHost) return err(ws, "投票を締め切れるのはホストだけです");
+      if (!Object.keys(room.votes).length) return err(ws, "まだだれも投票していません");
+      decide(room);
+      break;
     case "lobby":
       // ホスト: みんなでパーティーの画面へ戻る
       if (p.id !== hostOf(room)) return err(ws, "この操作はホストだけができます");
-      room.seq++;
+      room.seq++; room.votes = {};
       room.game = { key: null, name: "パーティーの画面", path: "/lobby", roomCode: room.code, seq: room.seq, by: p.id };
       break;
     case "where":
       p.where = typeof m.where === "string" && GAME[m.where] ? m.where : null;
       break;
     case "leave":
-      room.members.delete(p.id);
+      room.members.delete(p.id); delete room.votes[p.id];
+      if (room.hostId === p.id) room.hostId = null;
       ws.room = null;
       if (!room.members.size) { rooms.delete(room.code); return; }
       break;
@@ -107,6 +160,37 @@ function handle(ws, m) {
       return;
   }
   broadcast(room);
+}
+
+// 各ゲームの結果を受け取る(ゲームのサーバが終わったときに呼ぶ)。部屋コードが「パーティーのコード+ゲームの2文字」なら、
+// そのパーティーの通算成績に足す。rows: [{ id, name, rank }](rank が無い人は順位なし=0点。協力ゲームは全員 rank なし)
+function report(gameKey, roomCode, rows) {
+  try {
+    const code = String(roomCode || "");
+    if (code.length !== 6) return;
+    const room = rooms.get(code.slice(0, 4)), g = BY_SUFFIX[code.slice(4)];
+    if (!room || !g || g.key !== gameKey) return;
+    const res = [];
+    for (const r of rows || []) {
+      const m = room.members.get(r.id);
+      if (!m) continue; // パーティーのメンバーだけ
+      const pts = r.rank ? RANK_PTS[r.rank - 1] || 0 : 0;
+      const sc = room.scores[r.id] || (room.scores[r.id] = { name: m.name, pts: 0, wins: 0, games: 0 });
+      sc.name = m.name; sc.pts += pts; sc.games += 1; if (r.rank === 1) sc.wins += 1;
+      res.push({ name: m.name, rank: r.rank || null, pts });
+    }
+    if (!res.length) return;
+    res.sort((a, b) => (a.rank || 99) - (b.rank || 99));
+    room.history.push({ game: g.name, at: Date.now(), res });
+    if (room.history.length > 50) room.history.shift();
+    broadcast(room);
+  } catch (e) { console.error("パーティー 成績の記録エラー:", e); }
+}
+// 点数(大きいほど上)から順位をつける
+function rankByScore(list) {
+  const rows = [...list].sort((a, b) => b.score - a.score);
+  rows.forEach((r, i) => { r.rank = i > 0 && r.score === rows[i - 1].score ? rows[i - 1].rank : i + 1; });
+  return rows;
 }
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 });
@@ -126,4 +210,4 @@ setInterval(() => { for (const ws of wss.clients) ws.budget = Math.min(30, ws.bu
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, 30000);
 setInterval(() => { const now = Date.now(); for (const [code, room] of rooms) if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) rooms.delete(code); }, 60000);
 
-module.exports = { WS_PATH, wss, GAMES, _t: { rooms, handle } };
+module.exports = { WS_PATH, wss, GAMES, report, rankByScore, _t: { rooms, handle } };

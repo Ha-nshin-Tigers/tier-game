@@ -149,7 +149,11 @@ function reveal(room) {
   room.history.push({ round: room.round, topic: room.topic.name, success, n: entries.length, okN: ok.filter(Boolean).length });
   room.phase = "reveal";
 }
-function finish(room) { room.phase = "finished"; }
+function finish(room) {
+  room.phase = "finished";
+  // 協力ゲームなので順位はなし(パーティーの記録には「遊んだ」だけ残す)
+  require("./lobby").report("number", room.code, [...room.players.keys()].map((id) => ({ id, rank: null })));
+}
 
 // ---------------------------------------------------------------
 // 送信

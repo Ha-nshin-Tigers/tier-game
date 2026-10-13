@@ -22,6 +22,7 @@ const mortar = require("./games/mortar"); // モーターメイヘム(/mortar)
 const citychase = require("./games/citychase"); // シティチェイス(/citychase)
 const matchy = require("./games/matchy"); // マッチィマッチ(/matchy)
 const lobby = require("./games/lobby"); // パーティー: みんなでゲームを移動する(/lobby)
+const chat = require("./games/chat"); // 全ゲーム共通の文字チャット
 const heat = require("./games/heat"); // ヒート(/heat)
 const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
@@ -279,6 +280,8 @@ function finish(room) {
   }
   room.awards = computeAwards(room);
   room.phase = "finished";
+  // パーティーの通算成績へ(点数の順)
+  lobby.report("tier", room.code, lobby.rankByScore(order(room).map((p) => ({ id: p.id, score: p.score }))));
 }
 function allGuessed(room) {
   const gs = order(room).filter((p) => p.id !== room.hostId && connected(p));
@@ -594,6 +597,14 @@ const server = http.createServer((req, res) => {
   }
   // ブラウザが自動で取りにくるアイコン(無いと毎回 404 になる)
   if (url.pathname === "/favicon.ico" && serveStatic("/icons/favicon.ico", res)) return;
+  // ホーム画面に追加(PWA)のための設定ファイルとサービスワーカー
+  if (url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js") {
+    return fs.readFile(path.join(__dirname, "public", url.pathname.slice(1)), (e, buf) => {
+      if (e) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { "Content-Type": url.pathname === "/sw.js" ? "text/javascript; charset=utf-8" : "application/manifest+json; charset=utf-8", "Cache-Control": "no-cache" });
+      res.end(buf);
+    });
+  }
   if (serveStatic(url.pathname, res)) return;
   const page = PAGES[url.pathname];
   if (page) {
@@ -615,7 +626,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : p === chat.WS_PATH ? chat.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {

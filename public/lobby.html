@@ -8,6 +8,10 @@
 <meta name="theme-color" content="#3446c4">
 <link rel="icon" href="/icons/favicon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="みんなのあそびば">
 <meta property="og:title" content="パーティー（みんなで移動）｜みんなのあそびば">
@@ -51,11 +55,16 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .members { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .members li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .members li.off { opacity: .55; }
-.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 8px; }
 .games button { text-align: left; display: grid; gap: 2px; padding: 10px 12px; }
 .games button .n { font-family: var(--display); font-weight: 400; font-size: 16px; line-height: 1.25; }
 .games button .r { font-size: 12px; color: var(--muted); font-weight: 500; }
 .games button.out { opacity: .55; }
+.games button { position: relative; } .games button.voted { border-color: var(--accent); border-width: 3px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.games .vc { position: absolute; top: -8px; right: -6px; padding: 0 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; } .rank td { padding: 4px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.hist { margin: 4px 0 0; padding-left: 1.2em; display: grid; gap: 2px; }
 .now { padding: 10px 12px; border-radius: 10px; border: 2px solid var(--gold); background: color-mix(in srgb, var(--gold) 20%, var(--surface)); }
 .invite { display: flex; gap: 6px; } .invite button { white-space: nowrap; flex: none; }
 a { color: var(--accent); }
@@ -129,11 +138,36 @@ function render() {
     } }, "コピー"))));
   const gname = (k) => (st.games.find((x) => x.key === k) || {}).name || k;
   box.append(h("h2", {}, `メンバー(${n}人)`), h("ul", { class: "members" }, ...st.members.map((m) => h("li", { class: m.connected ? "" : "off" },
-    h("span", {}, m.name + (m.id === st.host ? " 👑ホスト" : "") + (m.id === P.me ? "(あなた)" : "")), h("span", { class: "small muted" }, m.connected ? (m.where ? gname(m.where) + "にいる" : "パーティーの画面") : "移動中/切断")))));
+    h("span", {}, m.name + (m.id === st.host ? " 👑ホスト" : "") + (m.id === P.me ? "(あなた)" : "")),
+    h("span", { class: "small muted" }, m.connected ? (m.where ? gname(m.where) + "にいる" : "パーティーの画面") : "移動中/切断",
+      host && m.id !== P.me && m.connected ? h("button", { type: "button", class: "tiny ghost", style: "margin-left:8px", onclick: () => P.giveHost(m.id) }, "ホストを渡す") : null)))));
+  // 通算成績(遊んだゲームの順位点: 1位3点・2位2点・3位1点)
+  const sc = Object.entries(st.scores || {}).map(([id, v]) => ({ id, ...v })).sort((a, b) => b.pts - a.pts || b.wins - a.wins);
+  if (sc.length) {
+    let rank = 0;
+    box.append(h("h2", {}, "通算成績"), h("table", { class: "rank" }, h("tbody", {}, ...sc.map((r, i) => {
+      if (!i || r.pts !== sc[i - 1].pts) rank = i + 1;
+      return h("tr", { class: r.id === P.me ? "me" : "" }, h("td", {}, rank === 1 ? "👑1位" : `${rank}位`), h("td", {}, r.name), h("td", {}, h("b", {}, `${r.pts}点`)), h("td", { class: "small muted" }, `${r.games}ゲーム・1位${r.wins}回`));
+    }))), h("p", { class: "small muted", style: "margin:0" }, "このパーティーで遊んだゲームの順位点(1位3点・2位2点・3位1点)の合計。"),
+    st.history.length ? h("details", {}, h("summary", { class: "small" }, `これまでのゲーム(${st.history.length})`), h("ul", { class: "hist small" }, ...[...st.history].reverse().map((x) => h("li", {}, h("b", {}, x.game), " … ", x.res.map((r) => `${r.rank ? r.rank + "位" : ""}${r.name}${r.pts ? "+" + r.pts : ""}`).join("・"))))) : null);
+  }
   if (st.game && st.game.key) box.append(h("div", { class: "now" }, `いまのゲーム: ${st.game.name} `, h("button", { type: "button", onclick: () => { location.href = `${st.game.path}?room=${st.game.roomCode}&party=1`; } }, "そのゲームへ行く")));
-  if (host) {
-    box.append(h("h2", {}, "次に遊ぶゲームを選ぶ"), h("p", { class: "small muted", style: "margin:0" }, "押すと、メンバー全員の画面がそのゲームの部屋へいっしょに移動します(遊んでいる途中の人は、そのゲームが終わってから)。"),
-      h("div", { class: "games" }, ...st.games.map((g) => h("button", { type: "button", class: n < g.min || n > g.max ? "out" : "", onclick: () => P.pick(g.key) }, h("span", { class: "n" }, g.name), h("span", { class: "r" }, `${g.min}〜${g.max}人` + (n < g.min ? "(人数が足りない)" : n > g.max ? "(多い人は観戦)" : ""))))));
+  const vote = st.mode === "vote", votes = st.votes || {}, myVote = votes[P.me];
+  const count = {}; for (const k of Object.values(votes)) count[k] = (count[k] || 0) + 1;
+  const live = st.members.filter((m) => m.connected).length, voted = Object.keys(votes).length;
+  box.append(h("h2", {}, "次に遊ぶゲーム"));
+  if (host) box.append(h("div", { class: "btns small" }, "決め方: ", h("button", { type: "button", class: "tiny" + (vote ? " ghost" : " primary"), onclick: () => P.setMode("host") }, "ホストが選ぶ"), h("button", { type: "button", class: "tiny" + (vote ? " primary" : " ghost"), onclick: () => P.setMode("vote") }, "みんなで投票")));
+  const gameBtn = (g) => h("button", { type: "button", class: (n < g.min || n > g.max ? "out" : "") + (vote && myVote === g.key ? " voted" : ""), "aria-pressed": vote ? String(myVote === g.key) : null,
+    onclick: () => vote ? P.vote(myVote === g.key ? null : g.key) : P.pick(g.key) },
+    h("span", { class: "n" }, g.name), h("span", { class: "r" }, `${g.min}〜${g.max}人` + (n < g.min ? "(人数が足りない)" : n > g.max ? "(多い人は観戦)" : "")),
+    vote && count[g.key] ? h("span", { class: "vc" }, `${count[g.key]}票`) : null);
+  if (vote) {
+    box.append(h("p", { class: "small muted", style: "margin:0" }, `遊びたいゲームに投票してください(押し直すと変えられます)。全員が投票すると、いちばん多いゲームに決まって移動します(同数ならその中からランダム)。いま ${voted}/${live}人が投票。`),
+      h("div", { class: "games" }, ...st.games.map(gameBtn)));
+    if (host) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", disabled: !voted, onclick: () => P.decide() }, "投票を締め切って決める"), h("span", { class: "small muted" }, "ホストは投票の途中でも締め切れます")));
+  } else if (host) {
+    box.append(h("p", { class: "small muted", style: "margin:0" }, "押すと、メンバー全員の画面がそのゲームの部屋へいっしょに移動します(遊んでいる途中の人は、そのゲームが終わってから)。"),
+      h("div", { class: "games" }, ...st.games.map(gameBtn)));
   } else box.append(h("p", { class: "muted" }, `ホストの ${st.members.find((m) => m.id === st.host)?.name || ""} さんが次のゲームを選ぶのを待っています。選ばれると自動で移動します。`));
   let armed = 0;
   box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "ghost danger", onclick: (e) => {

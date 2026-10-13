@@ -8,6 +8,10 @@
 <meta name="theme-color" content="#3446c4">
 <link rel="icon" href="/icons/favicon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="みんなのあそびば">
 <meta property="og:title" content="みんなのあそびば">
@@ -65,6 +69,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
 .game:hover .go { background: var(--accent); }
 .partylink { display: inline-block; font-weight: 700; padding: 6px 14px; border-radius: 999px; background: var(--fg); color: var(--surface); text-decoration: none; margin-right: 6px; }
 .partylink:hover { background: var(--accent); }
+.installbtn { font-family: var(--body); font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; margin-right: 6px; }
 .note { font-size: 13px; color: var(--muted); border-top: 1.5px solid var(--line); padding-top: 14px; margin: 0; }
 .filters { display: grid; gap: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -92,6 +97,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <div class="eyebrow">ログインなしで遊べるオンラインパーティーゲーム</div>
     <h1>みんなのあそびば</h1>
     <p class="lead">遊ぶゲームを選んで、部屋を作って友達に招待リンクを送るだけ。</p>
+    <p class="lead" id="installRow" hidden><button type="button" class="installbtn" id="installBtn" hidden>📱 ホーム画面に追加</button><span class="small" id="installHint"></span></p>
     <p class="lead"><a class="partylink" href="/lobby">🎉 パーティーを作る</a> 先にみんなで集まって、ホストが選んだゲームへ全員でいっしょに移動。いくつも続けて遊ぶならこちら。</p>
   </header>
 
@@ -332,5 +338,17 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
   <p class="note">友達から招待リンクが届いたときは、そのリンクを開けばそのまま部屋に入れます。部屋はゲームごとに別々です。</p>
 </div>
 <script src="/js/partybar.js" defer></script>
+<script>
+// ホーム画面に追加: Android などは「追加」ボタン、iPhone は手順のお知らせ。もうアプリとして開いていれば出さない
+(() => {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (standalone) return;
+  const row = document.getElementById("installRow"), btn = document.getElementById("installBtn"), hint = document.getElementById("installHint");
+  let ev = null;
+  addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); ev = e; row.hidden = false; btn.hidden = false; hint.textContent = " アプリのように、ブラウザのバーなしで開けます"; });
+  btn.addEventListener("click", async () => { if (!ev) return; ev.prompt(); await ev.userChoice.catch(() => {}); ev = null; row.hidden = true; });
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) { row.hidden = false; hint.textContent = "📱 iPhone は、下の共有ボタン(□↑)→「ホーム画面に追加」で、アプリのように開けます"; }
+})();
+</script>
 </body>
 </html>

@@ -180,6 +180,8 @@ function finish(room) {
   room.winner = a.length === 1 ? a[0] : null;
   room.phase = "finished";
   if (room.winner) pushLog(room, `${nameOf(room, room.winner)} の勝ち！`);
+  // パーティーの通算成績へ(勝った人だけ1位。ほかの人は順位なし)
+  require("./lobby").report("liar", room.code, room.seats.map((id) => ({ id, rank: id === room.winner ? 1 : null })));
 }
 
 // 席から人がいなくなった(退出・追い出し)ときの後始末

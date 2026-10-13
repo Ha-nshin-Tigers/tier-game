@@ -8,6 +8,10 @@
 <meta name="theme-color" content="#3446c4">
 <link rel="icon" href="/icons/favicon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="みんなのあそびば">
 <meta property="og:title" content="ドタバタ大会（Pummel Party風）">
@@ -602,7 +606,7 @@ function renderLobby(main, isGM) {
   if (SINGLE) {
     const info = GAME_INFO[MODE];
     main.append(h("div", { class: "intro" }, h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name, info.orig ? origEl(info.orig) : null),
-      h("ol", {}, ...info.rules.map((r) => h("li", {}, r)))),
+      h("ol", { class: "rules" }, ...info.rules.map((r) => h("li", {}, r)))),
       h("p", { class: "muted small" }, "1試合ごとに順位で 1位10点・2位7点・3位5点… がもらえ、「もう一度遊ぶ」で通算点を競えます。2〜8人。"));
   } else {
     main.append(h("h2", {}, "大会で遊ぶ試合"),

@@ -60,6 +60,7 @@ function finish(room, raw) {
   rows.forEach((r, i) => { r.rank = i > 0 && r.raw === rows[i - 1].raw ? rows[i - 1].rank : i + 1; });
   room.ranking = rows;
   room.phase = "finished";
+  require("./lobby").report("eshiri", room.code, rows); // パーティーの通算成績へ
 }
 function toLobby(room) {
   clearTimer(room);

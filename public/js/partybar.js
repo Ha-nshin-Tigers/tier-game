@@ -47,7 +47,10 @@
     try {
       // eslint-disable-next-line no-undef
       const s = typeof S !== "undefined" ? S : null;
-      return !!(s && s.phase && !["lobby", "finished", "final"].includes(s.phase));
+      if (!s || !s.phase) return false;
+      // ミニゲームを単独で遊ぶ画面(ひとりじめ橋など)は、結果画面がそのまま終わりの画面
+      if (["bridge", "bomb", "memory"].includes(page) && s.phase === "result") return false;
+      return !["lobby", "finished", "final"].includes(s.phase);
     } catch { return false; }
   }
   const here = (g) => g.path === "/" + page && (!g.key || params.get("room") === g.roomCode);
@@ -100,6 +103,7 @@
 .partybar .pb-games { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .partybar button.pb-b { font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 8px; border-radius: 6px; border: 1.5px solid var(--fg, #181b23); background: var(--surface, #fff); color: var(--fg, #181b23); cursor: pointer; text-align: left; }
 .partybar button.pb-b.cur { background: var(--fg, #181b23); color: var(--surface, #fff); }
+.partybar button.pb-b.voted { border-color: var(--accent, #3446c4); border-width: 3px; }
 .partybar a { color: var(--accent, #3446c4); font-weight: 700; }
 body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important; }`;
       document.head.append(css);
@@ -114,7 +118,16 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       if (lastErr) html += `<div class="pb-muted" style="color:#c4323a">${esc(lastErr)}</div>`;
       if (st) {
         html += `<ul>${st.members.map((p) => `<li><span>${esc(p.name)}${p.id === st.host ? " 👑" : ""}${p.id === me ? "(あなた)" : ""}</span><span class="pb-muted">${p.connected ? (p.where ? esc(gname(p.where)) : "パーティーの画面") : "移動中/切断"}</span></li>`).join("")}</ul>`;
-        if (isHost()) html += `<div class="pb-muted">ホストのあなたが次のゲームを選ぶと、みんなの画面がいっしょに移動します:</div><div class="pb-games">${st.games.map((x) => `<button class="pb-b${x.key === page ? " cur" : ""}" data-game="${x.key}">${esc(x.name)}<span class="pb-muted"> ${x.min}〜${x.max}人</span></button>`).join("")}</div><button class="pb-b" data-act="lobbyall">みんなでパーティーの画面へ戻る</button>`;
+        // 通算成績(上位3人)
+        const sc = Object.values(st.scores || {}).sort((a, b) => b.pts - a.pts).slice(0, 3);
+        if (sc.length) html += `<div class="pb-muted">通算成績: ${sc.map((r, i) => `${i + 1}位 ${esc(r.name)} ${r.pts}点`).join(" / ")}</div>`;
+        const vote = st.mode === "vote", votes = st.votes || {}, cnt = {};
+        for (const k of Object.values(votes)) cnt[k] = (cnt[k] || 0) + 1;
+        const btns = () => `<div class="pb-games">${st.games.map((x) => `<button class="pb-b${x.key === page ? " cur" : ""}${vote && votes[me] === x.key ? " voted" : ""}" data-game="${x.key}">${esc(x.name)}<span class="pb-muted"> ${x.min}〜${x.max}人${vote && cnt[x.key] ? ` ・${cnt[x.key]}票` : ""}</span></button>`).join("")}</div>`;
+        if (vote) {
+          html += `<div class="pb-muted">次のゲームは投票で決めます(押すと投票・もう一度押すと取り消し)。全員が投票すると決まります。</div>${btns()}`;
+          if (isHost()) html += `<button class="pb-b" data-act="decide">投票を締め切って決める</button><button class="pb-b" data-act="lobbyall">みんなでパーティーの画面へ戻る</button>`;
+        } else if (isHost()) html += `<div class="pb-muted">ホストのあなたが次のゲームを選ぶと、みんなの画面がいっしょに移動します:</div>${btns()}<button class="pb-b" data-act="lobbyall">みんなでパーティーの画面へ戻る</button>`;
         else html += `<div class="pb-muted">次のゲームはホスト(👑)が選びます。選ばれると自動で移動します。</div>`;
       }
       html += `<div style="display:flex;gap:10px;flex-wrap:wrap"><a href="/lobby" data-act="hub">パーティーの画面</a><a href="#" data-act="leave">パーティーを抜ける</a></div></div>`;
@@ -127,10 +140,16 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     const t = e.target.closest("[data-act],[data-game]");
     if (!t) return;
     const a = t.dataset.act;
-    if (t.dataset.game) { e.preventDefault(); api.pick(t.dataset.game); return; }
+    if (t.dataset.game) {
+      e.preventDefault();
+      if (st && st.mode === "vote") api.vote(st.votes && st.votes[me] === t.dataset.game ? null : t.dataset.game);
+      else api.pick(t.dataset.game);
+      return;
+    }
     if (a === "toggle") { open = !open; drawBar(); }
     else if (a === "gonow" && pending) go(pending);
     else if (a === "lobbyall") api.backAll();
+    else if (a === "decide") api.decide();
     else if (a === "hub") { if (st && st.game) markSeen(st.game.seq); }
     else if (a === "leave") {
       e.preventDefault();
@@ -187,9 +206,9 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     wrap.querySelector("button").focus();
   }
   let sheetCss = false;
-  function addShare() {
+  function addShare(force) {
     const boxes = document.querySelectorAll(".invite");
-    if (boxes.length && !sheetCss) {
+    if ((boxes.length || force) && !sheetCss) {
       sheetCss = true;
       const css = document.createElement("style");
       css.textContent = `
@@ -200,7 +219,14 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
 .pb-sheet-url { font-size: 12px; color: var(--muted, #596070); word-break: break-all; user-select: all; -webkit-user-select: all; }
 .pb-sheet-box button { font-family: inherit; font-size: 15px; font-weight: 700; padding: 11px 14px; border-radius: 8px; border: 2px solid var(--c, #181b23); background: var(--c, #181b23); color: #fff; cursor: pointer; text-align: center; }
 .pb-sheet-box button.pb-sheet-close { background: transparent; color: var(--fg, #181b23); border-color: var(--line, #cfd4de); }
-.pb-sheet-msg { margin: 0; font-size: 13px; color: var(--good, #1f8a4c); min-height: 1em; }`;
+.pb-sheet-msg { margin: 0; font-size: 13px; color: var(--good, #1f8a4c); min-height: 1em; }
+.pb-sheet-box button:disabled { opacity: .4; cursor: default; }
+.pb-guide-step { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; min-height: 110px; }
+.pb-guide-step p { margin: 0; font-size: 16px; line-height: 1.7; }
+.pb-guide-no { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent, #3446c4); color: #fff; font-weight: 700; font-size: 18px; }
+.pb-guide-dots { display: flex; gap: 6px; justify-content: center; } .pb-guide-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line, #cfd4de); } .pb-guide-dots i.on { background: var(--accent, #3446c4); }
+.pb-guide-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pb-help { position: fixed; right: 12px; bottom: calc(62px + env(safe-area-inset-bottom, 0px)); z-index: 36; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--fg, #181b23); background: var(--surface, #fff); color: var(--fg, #181b23); font-weight: 700; font-size: 18px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.18); }`;
       document.head.append(css);
     }
     for (const box of boxes) {
@@ -230,7 +256,154 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       else if (!want && lock) { const l = lock; lock = null; await l.release(); }
     } catch { lock = null; } finally { locking = false; }
   }
-  setInterval(() => { addShare(); wake(); }, 1500);
+  // ---- 文字チャット(部屋ごと。パーティーの画面ではパーティーごと) ----
+  let cws = null, ckey = null, clog = [], copen = false, cunread = 0, cbox = null, cpeek = null;
+  function chatKey() {
+    if (HUB) return info && st ? "lobby:" + info.code : null;
+    if (!/^[a-z]{2,12}$/.test(page) || !inRoom()) return null;
+    // eslint-disable-next-line no-undef
+    return page + ":" + S.code;
+  }
+  function chatName() {
+    try {
+      // eslint-disable-next-line no-undef
+      const p = typeof S !== "undefined" && S && Array.isArray(S.players) ? S.players.find((x) => x.id === ident.pid) : null;
+      if (p && p.name) return p.name;
+    } catch {}
+    return (info && info.name) || (store.get("tier:last") || {}).name || "だれか";
+  }
+  function chatConnect(key) {
+    if (cws) { try { cws.close(); } catch {} cws = null; }
+    ckey = key; clog = []; cunread = 0;
+    if (!key) return drawChat();
+    const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/chat/ws");
+    cws = ws;
+    ws.onopen = () => ws.send(JSON.stringify({ t: "join", key, pid: ident.pid, name: chatName() }));
+    ws.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.t === "log") { clog = m.log; drawChat(); }
+      else if (m.t === "msg") {
+        clog.push(m.msg); if (clog.length > 40) clog.shift();
+        if (!copen && m.msg.pid !== ident.pid) { cunread++; peek(m.msg); }
+        drawChat();
+      }
+    };
+    ws.onclose = () => { if (cws === ws) { cws = null; setTimeout(() => { if (!cws && ckey === key) chatConnect(key); }, 2000); } };
+  }
+  function peek(msg) {
+    if (!cpeek) { cpeek = document.createElement("div"); cpeek.className = "pb-peek"; document.body.append(cpeek); cpeek.addEventListener("click", () => { copen = true; cunread = 0; drawChat(); cpeek.hidden = true; }); }
+    cpeek.textContent = `${msg.name}: ${msg.text}`; cpeek.hidden = false;
+    clearTimeout(peek.t); peek.t = setTimeout(() => { cpeek.hidden = true; }, 4000);
+  }
+  let chatCss = false;
+  function drawChat() {
+    if (!chatCss) {
+      chatCss = true;
+      const css = document.createElement("style");
+      css.textContent = `
+.pb-chat { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 36; display: grid; justify-items: end; gap: 6px; font-family: var(--body, system-ui, sans-serif); color: var(--fg, #181b23); }
+.pb-chat .pb-cbtn { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--fg, #181b23); background: var(--surface, #fff); font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.pb-chat .pb-badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.pb-chat .pb-cpanel { width: min(340px, calc(100vw - 16px)); max-height: min(60vh, 420px); display: grid; grid-template-rows: auto 1fr auto; border-radius: 12px; border: 2px solid var(--fg, #181b23); background: var(--surface, #fff); box-shadow: 0 4px 16px rgba(0,0,0,.25); overflow: hidden; }
+.pb-chat .pb-chead { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-weight: 700; font-size: 13px; border-bottom: 1px solid var(--line, #cfd4de); }
+.pb-chat .pb-chead button { border: none; background: none; font-size: 18px; cursor: pointer; color: inherit; }
+.pb-chat .pb-clog { overflow: auto; padding: 8px 10px; display: grid; gap: 4px; align-content: start; font-size: 14px; min-height: 120px; }
+.pb-chat .pb-cm { justify-self: start; max-width: 85%; padding: 4px 9px; border-radius: 10px; background: var(--bg, #e9ecf2); overflow-wrap: anywhere; }
+.pb-chat .pb-cm.me { justify-self: end; background: var(--accent, #3446c4); color: #fff; }
+.pb-chat .pb-cm small { display: block; font-size: 11px; opacity: .75; }
+.pb-chat form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line, #cfd4de); }
+.pb-chat input { flex: 1; min-width: 0; font-family: inherit; font-size: 16px; padding: 6px 8px; border: 1.5px solid var(--line, #cfd4de); border-radius: 6px; background: var(--surface, #fff); color: var(--fg, #181b23); }
+.pb-chat form button { font-family: inherit; font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 6px; border: 1.5px solid var(--fg, #181b23); background: var(--fg, #181b23); color: var(--surface, #fff); cursor: pointer; }
+.pb-chat form button:hover, .pb-chat form button:active { background: var(--accent, #3446c4) !important; border-color: var(--accent, #3446c4); color: #fff; }
+.pb-peek { position: fixed; right: 62px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 36; max-width: min(260px, calc(100vw - 80px)); padding: 6px 10px; border-radius: 10px; background: var(--fg, #181b23); color: var(--surface, #fff); font-size: 13px; font-family: var(--body, system-ui, sans-serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }`;
+      document.head.append(css);
+    }
+    if (!ckey) { if (cbox) { cbox.remove(); cbox = null; document.body.classList.remove("has-pbchat"); } return; }
+    if (!cbox) {
+      cbox = document.createElement("div"); cbox.className = "pb-chat"; document.body.append(cbox); document.body.classList.add("has-pbchat");
+      cbox.addEventListener("click", (e) => {
+        const a = e.target.closest("[data-c]")?.dataset.c;
+        if (a === "toggle") { copen = !copen; cunread = 0; if (cpeek) cpeek.hidden = true; drawChat(); if (copen) cbox.querySelector("input")?.focus(); }
+        else if (a === "close") { copen = false; drawChat(); }
+      });
+      cbox.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const inp = cbox.querySelector("input"), text = inp.value.trim();
+        if (!text || !cws || cws.readyState !== 1) return;
+        cws.send(JSON.stringify({ t: "say", text, name: chatName() })); inp.value = ""; inp.focus();
+      });
+    }
+    const draft = cbox.querySelector("input")?.value || "", hadFocus = document.activeElement && cbox.contains(document.activeElement);
+    let html = "";
+    if (copen) {
+      html += `<div class="pb-cpanel" role="dialog" aria-label="チャット"><div class="pb-chead"><span>💬 チャット(この部屋の人だけ)</span><button type="button" data-c="close" aria-label="閉じる">×</button></div><div class="pb-clog">${clog.length ? clog.map((m) => `<div class="pb-cm${m.pid === ident.pid ? " me" : ""}"><small>${esc(m.name)}</small>${esc(m.text)}</div>`).join("") : '<div class="pb-muted" style="color:var(--muted,#596070);font-size:13px">まだメッセージはありません</div>'}</div><form><input type="text" maxlength="80" placeholder="メッセージ(80文字まで)" aria-label="メッセージ" enterkeyhint="send"><button type="submit">送る</button></form></div>`;
+    }
+    html += `<button type="button" class="pb-cbtn" data-c="toggle" aria-label="チャット" aria-expanded="${copen}">💬${cunread ? `<span class="pb-badge">${cunread}</span>` : ""}</button>`;
+    cbox.innerHTML = html;
+    if (copen) { const inp = cbox.querySelector("input"); inp.value = draft; if (hadFocus) inp.focus(); const lg = cbox.querySelector(".pb-clog"); lg.scrollTop = lg.scrollHeight; }
+  }
+  setInterval(() => { const k = chatKey(); if (k !== ckey) chatConnect(k); }, 1500);
+
+  // ---- 遊び方ガイド: 待機画面の「遊び方」を覚えておき、はじめての人には手順で案内・いつでも「？」で開ける ----
+  const GKEY = "tier:guide:" + page, GSEEN = "tier:guide:seen:" + page;
+  let gbtn = null, gopen = null;
+  function guideSteps() { const g = store.get(GKEY); return Array.isArray(g) && g.length ? g : null; }
+  function guideTick() {
+    if (HUB || HOME || page === "party") return; // 大会は試合ごとに遊び方が出る
+    let s = null;
+    // eslint-disable-next-line no-undef
+    try { s = typeof S !== "undefined" ? S : null; } catch {}
+    const ol = document.querySelector("ol.rules");
+    if (ol && s && s.phase === "lobby") {
+      const items = [...ol.children].map((li) => li.textContent.trim()).filter(Boolean);
+      if (items.length && JSON.stringify(items) !== JSON.stringify(guideSteps())) store.set(GKEY, items);
+      // 部屋に入って待っているときに、はじめての人へ1回だけ
+      if (items.length && s.code && !store.get(GSEEN) && !gopen) { store.set(GSEEN, 1); openGuide(0); }
+    }
+    const steps = guideSteps();
+    if (steps && s && s.code && !gbtn) {
+      gbtn = document.createElement("button"); gbtn.type = "button"; gbtn.className = "pb-help"; gbtn.textContent = "？"; gbtn.setAttribute("aria-label", "遊び方");
+      gbtn.addEventListener("click", () => openGuide(0)); document.body.append(gbtn);
+    } else if (gbtn && !(steps && s && s.code)) { gbtn.remove(); gbtn = null; }
+  }
+  function openGuide(i) {
+    const steps = guideSteps(); if (!steps) return;
+    if (!gopen) {
+      gopen = document.createElement("div"); gopen.className = "pb-sheet"; gopen.setAttribute("role", "dialog"); gopen.setAttribute("aria-modal", "true"); gopen.setAttribute("aria-label", "遊び方");
+      gopen.addEventListener("click", (e) => {
+        const a = e.target.closest("[data-g]")?.dataset.g;
+        if (e.target === gopen || a === "close") { gopen.remove(); gopen = null; return; }
+        if (a === "prev") openGuide(+gopen.dataset.i - 1);
+        if (a === "next") openGuide(+gopen.dataset.i + 1);
+      });
+      document.body.append(gopen); addShare(true);
+    }
+    i = Math.max(0, Math.min(steps.length - 1, i)); gopen.dataset.i = i;
+    const title = (document.title.split(/[（(｜]/)[0] || "").trim();
+    gopen.innerHTML = `<div class="pb-sheet-box"><span class="pb-sheet-url">${esc(title)}の遊び方 ${i + 1} / ${steps.length}</span><div class="pb-guide-step"><span class="pb-guide-no">${i + 1}</span><p>${esc(steps[i])}</p></div><div class="pb-guide-dots">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div><div class="pb-guide-nav"><button type="button" data-g="prev" style="--c:#596070" ${i === 0 ? "disabled" : ""}>← 前へ</button>${i < steps.length - 1 ? '<button type="button" data-g="next" style="--c:#3446c4">次へ →</button>' : '<button type="button" data-g="close" style="--c:#1f8a4c">わかった！</button>'}</div><button type="button" data-g="close" class="pb-sheet-close">閉じる(右下の「？」でいつでも見られます)</button></div>`;
+    gopen.querySelector("[data-g=next],[data-g=close]")?.focus();
+  }
+  // ---- 観戦中のお知らせ: ゲームの途中で入った人(このゲームの参加者でない人)に、いまの立場と次にどうなるかを出す ----
+  let wbar = null;
+  function watchTick() {
+    let s = null;
+    // eslint-disable-next-line no-undef
+    try { s = typeof S !== "undefined" ? S : null; } catch {}
+    const meP = s && Array.isArray(s.players) ? s.players.find((x) => x.id === ident.pid) : null;
+    const playing = s && s.phase && !["lobby", "finished", "final"].includes(s.phase);
+    const watching = !!(playing && meP && meP.inGame === false);
+    if (watching && !wbar) {
+      wbar = document.createElement("div"); wbar.className = "pb-watch"; wbar.setAttribute("role", "status");
+      const n = s.players.filter((x) => x.inGame).length;
+      wbar.innerHTML = `👀 <b>観戦中</b>: いまのゲームは ${n}人で遊んでいます。終わって待機画面に戻ったら、次のゲームから参加できます(そのまま待っていればOK)。`;
+      document.body.append(wbar);
+      if (!document.getElementById("pb-watch-css")) { const css = document.createElement("style"); css.id = "pb-watch-css"; css.textContent = ".pb-watch { position: fixed; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 34; width: min(560px, calc(100vw - 16px)); padding: 8px 12px; border-radius: 10px; background: #fff3c4; color: #181b23; border: 2px solid #d69e00; font-size: 13px; line-height: 1.5; font-family: var(--body, system-ui, sans-serif); box-shadow: 0 2px 8px rgba(0,0,0,.15); } body.has-pbwatch { padding-top: 76px !important; }"; document.head.append(css); }
+      document.body.classList.add("has-pbwatch");
+    } else if (!watching && wbar) { wbar.remove(); wbar = null; document.body.classList.remove("has-pbwatch"); }
+  }
+  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); }, 1500);
+  // ホーム画面に追加(PWA)のためのサービスワーカー(キャッシュはしない)
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("/sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => wake());
 
   const api = {
@@ -243,6 +416,10 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       connect(); notify();
     },
     pick(game) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "pick", game })); },
+    giveHost(to) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "host", to })); },
+    setMode(mode) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "mode", mode })); },
+    vote(game) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "vote", game })); },
+    decide() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "decide" })); },
     backAll() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "lobby" })); },
     leave() {
       if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "leave" }));

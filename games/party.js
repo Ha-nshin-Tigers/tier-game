@@ -151,6 +151,7 @@ function finishGame(room, raw) {
     r.name = nameOf(room, r.id);
   });
   room.result = { key: room.game.key, rows, last: room.gi >= room.seq.length - 1 };
+  if (room.mode !== "party") require("./lobby").report(room.mode, room.code, rows); // 単独ゲームはパーティーの通算成績へ
   room.phase = "result";
   // 単独ゲームは結果のまま止めて「もう一度遊ぶ」を待つ。大会は少し見せてから次の試合へ
   if (room.mode === "party") setTimer(room, RESULT_MS, () => next(room));
@@ -159,7 +160,12 @@ function next(room) {
   if (room.phase !== "result") return;
   clearTimer(room);
   room.gi += 1;
-  if (room.gi >= room.seq.length) { room.phase = "final"; room.game = null; return; }
+  if (room.gi >= room.seq.length) {
+    room.phase = "final"; room.game = null;
+    // 大会の総合順位をパーティーの通算成績へ
+    require("./lobby").report("party", room.code, require("./lobby").rankByScore(members(room).map((id) => ({ id, score: room.total[id] || 0 }))));
+    return;
+  }
   intro(room);
 }
 
