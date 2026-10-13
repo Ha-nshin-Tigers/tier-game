@@ -2,6 +2,8 @@
 // パーティーに入っていれば /lobby/ws につながり、ホストが次のゲームを選ぶと全員の画面がその部屋へ自動で移動する。
 // 遊んでいる途中の人は、そのゲームが終わって待機画面に戻ったときに移動する(「今すぐ移動」も押せる)。
 // パーティーの画面(/lobby)からは window.Party を使う。
+// ついでに、どの画面でも使える便利機能もここに置く: 招待リンクの「共有」ボタン(スマホの共有メニュー)と、
+// 部屋に入っている間はスマホの画面が自動で消えないようにする(Screen Wake Lock)。
 (() => {
   const KEY = "tier:party", SEEN = "tier:party:seen";
   const store = {
@@ -64,12 +66,18 @@
   setInterval(() => { if (pending && !busy()) go(pending); }, 1000);
 
   // パーティーから来たとき(URL に party=1): ゲームの入室画面に名前と部屋コードを入れて自動で入る
-  function autoJoin(tries = 0) {
+  // パーティーのホストがゲームの部屋でもホスト(スタートや設定を押せる人=最初に入った人)になるように、
+  // ほかの人は少し遅れて入る
+  function autoJoin(tries = 0, delayed = false) {
     if (!info || params.get("party") !== "1") return;
+    if (!delayed) {
+      if (!st && tries < 10) { setTimeout(() => autoJoin(tries + 1), 300); return; }
+      if (st && st.host !== me) { setTimeout(() => autoJoin(0, true), 1500); return; }
+    }
     const login = document.getElementById("login"), btn = document.getElementById("lJoin"), nm = document.getElementById("lName"), rm = document.getElementById("lRoom");
     if (!login || !btn || !nm || !rm) return;
     if (login.hidden) return; // もう入っている
-    if (btn.disabled) { if (tries < 20) setTimeout(() => autoJoin(tries + 1), 300); return; } // 前回の部屋に戻っている途中
+    if (btn.disabled) { if (tries < 20) setTimeout(() => autoJoin(tries + 1, true), 300); return; } // 前回の部屋に戻っている途中
     if (!nm.value) nm.value = info.name;
     rm.value = params.get("room") || "";
     btn.click();
@@ -130,6 +138,39 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       api.leave();
     }
   }
+
+  // ---- 招待リンクの「共有」ボタン(navigator.share がある端末だけ) ----
+  function addShare() {
+    if (!navigator.share) return;
+    for (const box of document.querySelectorAll(".invite")) {
+      if (box.querySelector(".pb-share")) continue;
+      const inp = box.querySelector("input"), copy = box.querySelector("button");
+      if (!inp) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "pb-share " + (copy ? copy.className : ""); b.textContent = "共有";
+      b.addEventListener("click", () => navigator.share({ title: document.title, text: "いっしょに遊ぼう！", url: inp.value }).catch(() => {}));
+      box.append(b);
+    }
+  }
+  // ---- 部屋に入っている間は画面を消さない(画面が消えると接続が切れて、手番や時間切れを逃しやすい) ----
+  let lock = null, locking = false;
+  function inRoom() {
+    try {
+      // eslint-disable-next-line no-undef
+      const s = typeof S !== "undefined" ? S : null;
+      return !!(s && s.code);
+    } catch { return false; }
+  }
+  async function wake() {
+    if (!navigator.wakeLock || locking) return;
+    const want = document.visibilityState === "visible" && inRoom();
+    try {
+      if (want && !lock) { locking = true; lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); }
+      else if (!want && lock) { const l = lock; lock = null; await l.release(); }
+    } catch { lock = null; } finally { locking = false; }
+  }
+  setInterval(() => { addShare(); wake(); }, 1500);
+  document.addEventListener("visibilitychange", () => wake());
 
   const api = {
     get state() { return st; }, get me() { return me; }, get info() { return info; }, get error() { return lastErr; }, isHost,

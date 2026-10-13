@@ -565,8 +565,9 @@ const STATIC = [
   ["/vendor/three/examples/jsm/", path.join(__dirname, "node_modules", "three", "examples", "jsm")],
   ["/models/", path.join(__dirname, "public", "models")],
   ["/js/", path.join(__dirname, "public", "js")], // 画面どうしで共通のスクリプト(お絵かきなど)
+  ["/icons/", path.join(__dirname, "public", "icons")], // サイトのアイコン・共有したときの画像
 ];
-const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary" };
+const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary", ".png": "image/png", ".ico": "image/x-icon" };
 function serveStatic(pathname, res) {
   for (const [prefix, root] of STATIC) {
     if (!pathname.startsWith(prefix)) continue;
@@ -591,13 +592,18 @@ const server = http.createServer((req, res) => {
     res.writeHead(302, { Location: "/tier" + url.search });
     return res.end();
   }
+  // ブラウザが自動で取りにくるアイコン(無いと毎回 404 になる)
+  if (url.pathname === "/favicon.ico" && serveStatic("/icons/favicon.ico", res)) return;
   if (serveStatic(url.pathname, res)) return;
   const page = PAGES[url.pathname];
   if (page) {
     fs.readFile(path.join(__dirname, "public", page), (e, buf) => {
       if (e) { res.writeHead(500); return res.end(page + " が見つかりません"); }
+      // 共有したときのプレビュー画像は絶対URLが必要なので、アクセスされたホスト名を入れる
+      const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim() === "https" ? "https" : "http";
+      const host = String(req.headers.host || "").replace(/[^A-Za-z0-9.:-]/g, "");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(buf);
+      res.end(buf.toString("utf8").replaceAll("%%ORIGIN%%", host ? `${proto}://${host}` : ""));
     });
     return;
   }
