@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>シティチェイス（City Chase風）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=街の盤面と操作、下=プレイヤーと招待 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+.say.good { color: var(--good); } .say.red { color: var(--bad); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+.chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #181b23; border: 1.5px solid #181b23; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.word { font-family: var(--display); font-size: 18px; }
+.need { display: inline-block; font-family: var(--display); font-size: 18px; padding: 0 8px; border-radius: 6px; background: var(--gold); color: var(--ink); }
+
+/* 街(ビル5×5・交差点4×4) */
+.city { display: block; width: min(100%, 480px); margin: 0 auto; touch-action: manipulation; }
+.city .bld { cursor: default; } .city .can { cursor: pointer; }
+.city .can rect.top { stroke: #ffd36b; stroke-width: 4; animation: pulse 1.2s ease-in-out infinite; }
+.city circle.ix.can { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.rounds { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.rounds span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); font-weight: 700; font-size: 13px; }
+.rounds span.done { background: var(--line); color: var(--muted); } .rounds span.now { border-color: var(--fg); background: var(--gold); color: #181b23; }
+.helis { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.helis button.sel { background: var(--fg); color: var(--surface); }
+.role { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; }
+.role.thief { color: var(--bad); } .role.police { color: var(--accent); }
+.players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 180px; overflow: auto; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; } .rank td { padding: 4px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; animation: pop .25s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (max-width: 520px) {
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .slot .n { font-size: 15px; }
+  .answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">ビルに隠れる犯人を、ヘリで追いつめろ</div><h1>シティチェイス <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（City Chase）</small></h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">ビルに隠れる犯人を、ヘリで追いつめろ</div><h1>シティチェイス <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（City Chase）</small></h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0", "#ee7fc0", "#5fd0c8"];
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); }
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+// ---- 効果音 ----
+const Sound = {
+  ctx: null, on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {} },
+  seq: { tap: [[880, 0, .06]], join: [[660, 0, .08], [880, .08, .12]], turn: [[784, 0, .1], [988, .1, .1], [1318, .2, .18]], done: [[1046, 0, .07]],
+    reveal: [[392, 0, .14], [523, .14, .14], [659, .28, .14], [1046, .42, .4]], tick: [[1000, 0, .05]] },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    const t0 = this.ctx.currentTime, soft = name === "tick" || name === "done";
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = soft ? "square" : "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s); g.gain.exponentialRampToValueAtTime(soft ? 0.05 : 0.14, t0 + s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/citychase/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("citychase:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/citychase?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (!el) return toast(msg); el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null; 
+  store.set("citychase:last", { room: "", name: myName });
+  history.replaceState(null, "", "/citychase");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("citychase:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+
+// ---- 共通 ----
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
+const isGM = () => S.gameHostId === me;
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const act = (a, x = {}) => send({ t: "game", a, ...x });
+let local = { h: null };
+const isThief = () => S.game?.thief === me;
+const isPolice = () => !!S.game?.police.includes(me);
+
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (!g || !pg) return;
+  if (g.step !== pg.step && ((g.step === "thief" && g.thief === me) || (g.step === "police" && g.police.includes(me)))) Sound.play("turn");
+  if (g.last && JSON.stringify(g.last) !== JSON.stringify(pg.last) && g.last.kind === "search") Sound.play(g.last.hit ? "reveal" : "tap");
+  if (g.step === "end" && pg.step !== "end") Sound.play("reveal");
+  if (g.step !== pg.step || g.round !== pg.round) local.h = null;
+}
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  const g = S.game;
+  if (g && local.h != null && g.acted.includes(local.h)) local.h = null;
+  renderMeta(); renderSide(); renderMain();
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g && g.step !== "end" && g.round) m.append(h("span", { class: "pill" }, `ラウンド${g.round}/${g.rounds}`));
+}
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  const g = S.game;
+  side.append(h("h2", {}, "プレイヤー"));
+  const ul = h("ul", { class: "players" });
+  if (g) {
+    for (const id of g.order) ul.append(h("li", {}, h("span", { class: "sw2", style: `background:${colorOf(id)}` }), h("span", { class: "pname" }, nameOf(id) + (id === me ? "(あなた)" : "")),
+      h("span", { class: "pinfo" }, h("span", { class: "role " + (id === g.thief ? "thief" : "police") }, id === g.thief ? "犯人" : "警察"))));
+  } else {
+    for (const p of S.players) {
+      const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+      if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+      const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm, h("span", { class: "pinfo" }, p.connected ? (S.settings.thief === p.id ? "犯人役" : "") : "切断中"));
+      if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+  }
+  side.append(ul);
+  const link = location.origin + "/citychase?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  if (g?.log?.length) side.append(h("details", { open: true }, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => { if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; } clearTimeout(t); action(); };
+  return b;
+}
+
+function renderMain() {
+  const main = $("main"); main.replaceChildren();
+  if (S.phase === "lobby") return renderLobby(main);
+  const g = S.game; if (!g) return;
+  const thief = isThief(), police = isPolice();
+  const say = g.step === "end" ? (g.winner === "thief" ? `🏆 犯人 ${nameOf(g.thief)} さんが逃げ切った！` : "🏆 警察チームが犯人を捕まえた！")
+    : g.step === "place" ? (police ? "ヘリコプター3機を交差点に置いてください" : "警察がヘリコプターを置いています")
+    : g.step === "thief" ? (thief ? (g.round === 1 ? "車を隠すビルを選んでください" : "逃げるビルを選んでください(タテヨコのとなり・痕跡のないビル)") : "犯人が逃げています…")
+    : police ? "警察の番: ヘリを選んで、移動か捜索" : "警察がヘリで捜索しています";
+  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say), remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null),
+    h("p", { class: "small muted", style: "margin:0" }, "あなたは ", h("span", { class: "role " + (thief ? "thief" : "police") }, thief ? "犯人" : police ? "警察" : "観戦"), thief ? "。車の場所と痕跡はあなたにだけ見えています。" : police ? "。犯人の車は見えません。見つけた痕跡の番号が手がかりです。" : ""));
+  main.append(h("div", { class: "rounds", "aria-label": "ラウンド" }, ...Array.from({ length: g.rounds }, (_, i) => h("span", { class: i + 1 < g.round ? "done" : i + 1 === g.round && g.step !== "end" ? "now" : "" }, String(i + 1)))));
+  main.append(cityEl(g));
+  if (g.step === "police" && police) {
+    main.append(h("div", { class: "helis" }, ...g.helis.map((_, i) => h("button", { type: "button", class: local.h === i ? "sel" : "", disabled: g.acted.includes(i), onclick: () => { local.h = local.h === i ? null : i; render(); } }, `🚁${i + 1}` + (g.acted.includes(i) ? "(行動済み)" : ""))),
+      local.h != null ? h("button", { type: "button", class: "ghost", onclick: () => { act("heli", { h: local.h, kind: "pass" }); local.h = null; } }, `🚁${local.h + 1}は何もしない`) : null),
+      h("p", { class: "small muted", style: "text-align:center;margin:0" }, local.h == null ? "動かすヘリ(盤のヘリか上のボタン)を選んでください。" : "光っている交差点へ移動、または光っているビルを捜索。"));
+  }
+  if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+}
+// 街: ビル(正方形)とそのあいだの交差点(丸)
+function cityEl(g) {
+  const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+  const el = (t, a, kids) => { const e = document.createElementNS(NS, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); for (const c of kids || []) e.append(c); return e; };
+  const txt = (x, y, s, a = {}) => { const t = el("text", { x, y, "text-anchor": "middle", "font-weight": 700, ...a }); t.textContent = s; return t; };
+  const C = 80, G = 26, W = g.B * C + (g.B + 1) * G;
+  svg.setAttribute("viewBox", `0 0 ${W} ${W}`); svg.setAttribute("class", "city"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "街の盤面");
+  svg.append(el("rect", { x: 0, y: 0, width: W, height: W, rx: 14, fill: "#5d6470" }));
+  const bx = (x) => G + x * (C + G), ix = (x) => G + C + G / 2 + x * (C + G);
+  const thief = isThief(), police = isPolice();
+  // 押せるもの
+  const canB = new Set(), canI = new Set();
+  if (g.step === "thief" && thief) for (const k of g.moves || []) canB.add(k);
+  if (g.step === "place" && police) for (let x = 0; x < g.I; x++) for (let y = 0; y < g.I; y++) if (!g.helis.includes(`${x},${y}`)) canI.add(`${x},${y}`);
+  if (g.step === "police" && police && local.h != null) {
+    const [x, y] = g.helis[local.h].split(",").map(Number);
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = `${x + a},${y + b}`; if (x + a >= 0 && y + b >= 0 && x + a < g.I && y + b < g.I && !g.helis.includes(k)) canI.add(k); }
+    for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) canB.add(`${x + a},${y + b}`);
+  }
+  for (let y = 0; y < g.B; y++) for (let x = 0; x < g.B; x++) {
+    const k = `${x},${y}`, hgt = g.heights[k], X = bx(x), Y = bx(y), sh = hgt * 4;
+    const gr = el("g", { class: "bld" + (canB.has(k) ? " can" : ""), "data-b": k });
+    gr.append(el("rect", { x: X + sh, y: Y + sh, width: C, height: C, rx: 6, fill: "rgba(0,0,0,.35)" }));
+    const lastHit = g.last && g.last.kind === "search" && g.last.to === k;
+    gr.append(el("rect", { class: "top", x: X, y: Y, width: C, height: C, rx: 6, fill: ["#d8dde6", "#b9c3d3", "#98a6bd"][hgt - 1], stroke: lastHit ? "#e5484d" : "#3b4250", "stroke-width": lastHit ? 4 : 1.5 }));
+    for (let w = 0; w < 3; w++) gr.append(el("rect", { x: X + 12 + w * 20, y: Y + 10, width: 12, height: 8, fill: "rgba(255,255,255,.6)" }));
+    const tr = g.traces[k];
+    if (tr) { gr.append(el("circle", { cx: X + C / 2, cy: Y + C / 2 + 6, r: 17, fill: g.found[k] ? "#f2c14e" : "#fff2b8", stroke: "#181b23", "stroke-width": 2 })); gr.append(txt(X + C / 2, Y + C / 2 + 13, String(tr), { "font-size": 20, fill: "#181b23" })); }
+    else if (g.empty[k]) gr.append(txt(X + C / 2, Y + C / 2 + 10, `空R${g.empty[k]}`, { "font-size": 15, fill: "#3b4250" }));
+    if (g.car === k) gr.append(txt(X + C - 16, Y + C - 8, "🚗", { "font-size": 26 }));
+    if (canB.has(k)) gr.addEventListener("click", () => tapB(g, k));
+    svg.append(gr);
+  }
+  for (let y = 0; y < g.I; y++) for (let x = 0; x < g.I; x++) {
+    const k = `${x},${y}`, X = ix(x), Y = ix(y), hi = g.helis.indexOf(k);
+    const c = el("circle", { class: "ix" + (canI.has(k) ? " can" : ""), cx: X, cy: Y, r: canI.has(k) ? 12 : 6, fill: canI.has(k) ? "#ffd36b" : "#c7ccd6", stroke: "#181b23", "stroke-width": 1 });
+    if (canI.has(k)) c.addEventListener("click", () => tapI(g, k));
+    svg.append(c);
+    if (hi >= 0) {
+      const hg = el("g", { style: police && g.step === "police" && !g.acted.includes(hi) ? "cursor:pointer" : "" });
+      hg.append(el("circle", { cx: X, cy: Y, r: 20, fill: local.h === hi ? "#3446c4" : g.acted.includes(hi) ? "#8a909c" : "#2a7de1", stroke: "#fff", "stroke-width": 2.5 }));
+      hg.append(txt(X, Y + 6, `🚁${hi + 1}`, { "font-size": 14, fill: "#fff" }));
+      if (police && g.step === "police" && !g.acted.includes(hi)) hg.addEventListener("click", () => { local.h = local.h === hi ? null : hi; render(); });
+      svg.append(hg);
+    }
+  }
+  return svg;
+}
+function tapB(g, k) {
+  if (g.step === "thief") return act("hide", { to: k });
+  if (g.step === "police" && local.h != null) { act("heli", { h: local.h, kind: "search", to: k }); local.h = null; }
+}
+function tapI(g, k) {
+  if (g.step === "place") return act("place", { at: k });
+  if (g.step === "police" && local.h != null) { act("heli", { h: local.h, kind: "move", to: k }); local.h = null; }
+}
+function renderLobby(main) {
+  const st = S.settings, gm = isGM();
+  const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); send({ t: "settings", s: { [key]: o[0] } });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected);
+  main.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "犯人1人と警察チーム(ほかの全員)に分かれます。街は5×5のビル。警察はヘリコプター3機をビルのあいだの交差点に置きます。"),
+      h("li", {}, "犯人の番: 車をビルに隠します(1ラウンド目はどこでも、2ラウンド目からはタテヨコのとなりのビル)。通ったビルにはラウンドの番号の「痕跡」が残り、痕跡のあるビルには戻れません。"),
+      h("li", {}, "警察の番: ヘリ1機につき1回、となりの交差点へ移動するか、まわりの4つのビルのどれか1つを捜索。痕跡が見つかれば番号が手がかりになります。"),
+      h("li", {}, "車を見つけるか、犯人が動けなくなったら警察の勝ち。11ラウンド逃げ切ったら犯人の勝ち！")),
+    h("div", { class: "settings" },
+      sel("犯人役", "thief", [["random", "ランダム"], ...live.map((p) => [p.id, p.name])]),
+      sel("犯人の持ち時間", "thiefSecs", [[60, "60秒"], [30, "30秒"], [90, "90秒"], [0, "なし"]]),
+      sel("警察の持ち時間", "policeSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]])),
+    h("p", { class: "muted small" }, "2〜4人。約20分。警察が2人以上なら、3機のヘリをみんなで相談して動かします(だれが動かしてもOK)。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live.length < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live.length < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live.length > 4 ? "先に入った4人で始めます(ほかの人は観戦)" : `${live.length}人で始められます`)));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  if (r !== lastSec) { lastSec = r; const g = S.game; if (g && ((g.step === "thief" && g.thief === me) || (g.step === "police" && g.police.includes(me))) && r != null && r <= 5 && r >= 1) Sound.play("tick"); }
+}, 250);
+
+connect();
+</script>
+</body>
+</html>
