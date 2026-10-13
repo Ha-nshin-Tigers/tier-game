@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>パーティー（みんなで移動）｜みんなのあそびば</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* パーティーの画面: 先に集まってから、ホストが選んだゲームへみんなで移動する */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 880px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 6vw, 36px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); } button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); } button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; } button.danger { color: var(--bad); border-color: var(--bad); }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.big { font-family: var(--display); font-size: 34px; letter-spacing: .2em; }
+.members { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.members li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.members li.off { opacity: .55; }
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.games button { text-align: left; display: grid; gap: 2px; padding: 10px 12px; }
+.games button .n { font-family: var(--display); font-weight: 400; font-size: 16px; line-height: 1.25; }
+.games button .r { font-size: 12px; color: var(--muted); font-weight: 500; }
+.games button.out { opacity: .55; }
+.now { padding: 10px 12px; border-radius: 10px; border: 2px solid var(--gold); background: color-mix(in srgb, var(--gold) 20%, var(--surface)); }
+.invite { display: flex; gap: 6px; } .invite button { white-space: nowrap; flex: none; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div><div class="eyebrow">先に集まって、いろんなゲームをみんなで続けて遊ぶ</div><h1>パーティー</h1></div>
+
+  <form class="panel" id="joinBox" hidden>
+    <p class="small" style="margin:0">パーティーを作って友達を招待すると、ホストが選んだゲームへ全員の画面がいっしょに移動します。ゲームが終わったら、次のゲームへまたみんなで移動できます。</p>
+    <label class="field">ニックネーム<input type="text" id="jName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+    <label class="field">パーティーのコード(友達から聞いた4文字)<input type="text" id="jCode" class="code" maxlength="4" autocomplete="off" placeholder="ABCD"></label>
+    <div class="btns"><button class="primary" type="submit" id="jJoin">このパーティーに入る</button><button type="button" id="jCreate">新しいパーティーを作る</button></div>
+    <p class="status" id="jMsg" aria-live="polite"></p>
+  </form>
+
+  <main class="panel" id="partyBox" hidden></main>
+  <p class="small muted"><a href="/">← ゲームを選ぶ(ホーム)</a></p>
+</div>
+<script src="/js/partybar.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const P = window.Party;
+const q = new URLSearchParams(location.search).get("code");
+$("jName").value = store.get("tier:last")?.name || "";
+if (q) $("jCode").value = q.toUpperCase().slice(0, 4);
+// 招待リンクで来た人は、前のパーティーではなくそのパーティーへ
+if (q && P.info && P.info.code !== q.toUpperCase()) P.leave();
+
+function start(code, create) {
+  const name = $("jName").value.trim().slice(0, 12), msg = $("jMsg");
+  msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  if (code.length !== 4) { msg.textContent = "パーティーのコードは4文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = create ? "パーティーを作っています…" : "入っています…";
+  const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name });
+  history.replaceState(null, "", "/lobby?code=" + code);
+  P.start(code, name, create);
+}
+$("joinBox").addEventListener("submit", (e) => { e.preventDefault(); start($("jCode").value, false); });
+$("jCreate").addEventListener("click", () => { const a = new Uint8Array(4); crypto.getRandomValues(a); start([...a].map((x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32]).join(""), true); });
+
+function render() {
+  const st = P.state, info = P.info;
+  $("joinBox").hidden = !!info;
+  $("partyBox").hidden = !info;
+  if (!info && P.error) { $("jMsg").textContent = P.error; $("jMsg").classList.add("warn"); }
+  if (!info) return;
+  const box = $("partyBox"); box.replaceChildren();
+  if (!st) { box.append(h("p", { class: "muted" }, "パーティーにつないでいます…")); return; }
+  const host = P.isHost(), n = st.members.length;
+  const link = location.origin + "/lobby?code=" + st.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  box.append(h("div", {}, h("div", { class: "small muted" }, "パーティーのコード"), h("div", { class: "big" }, st.code)),
+    h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+      const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+    } }, "コピー"))));
+  const gname = (k) => (st.games.find((x) => x.key === k) || {}).name || k;
+  box.append(h("h2", {}, `メンバー(${n}人)`), h("ul", { class: "members" }, ...st.members.map((m) => h("li", { class: m.connected ? "" : "off" },
+    h("span", {}, m.name + (m.id === st.host ? " 👑ホスト" : "") + (m.id === P.me ? "(あなた)" : "")), h("span", { class: "small muted" }, m.connected ? (m.where ? gname(m.where) + "にいる" : "パーティーの画面") : "移動中/切断")))));
+  if (st.game && st.game.key) box.append(h("div", { class: "now" }, `いまのゲーム: ${st.game.name} `, h("button", { type: "button", onclick: () => { location.href = `${st.game.path}?room=${st.game.roomCode}&party=1`; } }, "そのゲームへ行く")));
+  if (host) {
+    box.append(h("h2", {}, "次に遊ぶゲームを選ぶ"), h("p", { class: "small muted", style: "margin:0" }, "押すと、メンバー全員の画面がそのゲームの部屋へいっしょに移動します(遊んでいる途中の人は、そのゲームが終わってから)。"),
+      h("div", { class: "games" }, ...st.games.map((g) => h("button", { type: "button", class: n < g.min || n > g.max ? "out" : "", onclick: () => P.pick(g.key) }, h("span", { class: "n" }, g.name), h("span", { class: "r" }, `${g.min}〜${g.max}人` + (n < g.min ? "(人数が足りない)" : n > g.max ? "(多い人は観戦)" : ""))))));
+  } else box.append(h("p", { class: "muted" }, `ホストの ${st.members.find((m) => m.id === st.host)?.name || ""} さんが次のゲームを選ぶのを待っています。選ばれると自動で移動します。`));
+  let armed = 0;
+  box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "ghost danger", onclick: (e) => {
+    if (Date.now() - armed > 3000) { armed = Date.now(); e.currentTarget.textContent = "もう一度押すと抜けます"; return; }
+    P.leave(); history.replaceState(null, "", "/lobby"); $("jMsg").textContent = ""; render();
+  } }, "パーティーを抜ける")));
+}
+P.onChange(render);
+render();
+</script>
+</body>
+</html>

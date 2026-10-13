@@ -53,6 +53,8 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
 .tag { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--muted); }
 .go { justify-self: start; margin-top: 4px; font-weight: 700; font-size: 15px; padding: 9px 18px; border-radius: 4px; background: var(--fg); color: var(--surface); }
 .game:hover .go { background: var(--accent); }
+.partylink { display: inline-block; font-weight: 700; padding: 6px 14px; border-radius: 999px; background: var(--fg); color: var(--surface); text-decoration: none; margin-right: 6px; }
+.partylink:hover { background: var(--accent); }
 .note { font-size: 13px; color: var(--muted); border-top: 1.5px solid var(--line); padding-top: 14px; margin: 0; }
 .filters { display: grid; gap: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -80,6 +82,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <div class="eyebrow">ログインなしで遊べるオンラインパーティーゲーム</div>
     <h1>みんなのあそびば</h1>
     <p class="lead">遊ぶゲームを選んで、部屋を作って友達に招待リンクを送るだけ。</p>
+    <p class="lead"><a class="partylink" href="/lobby">🎉 パーティーを作る</a> 先にみんなで集まって、ホストが選んだゲームへ全員でいっしょに移動。いくつも続けて遊ぶならこちら。</p>
   </header>
 
   <div class="filters" role="group" aria-label="ゲームの絞り込み">
@@ -318,5 +321,6 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
   <p class="note">かっこ内は、参考にした元のゲームの名前です(イメージしやすいように書いています)。このサイトは元のゲームの公式・関係者とは関係のないファンメイドです。</p>
   <p class="note">友達から招待リンクが届いたときは、そのリンクを開けばそのまま部屋に入れます。部屋はゲームごとに別々です。</p>
 </div>
+<script src="/js/partybar.js" defer></script>
 </body>
 </html>

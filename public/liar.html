@@ -271,6 +271,8 @@ if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(3
 let ws = null, retry = 0, everOpen = false;
 let wantRoom = null, myName = "", joined = false;
 let S = null, me = null, offset = 0;
+// パーティーのバー(js/partybar.js)が「遊んでいる途中か」を見られるように(この画面はモジュールなので変数が外から見えない)
+Object.defineProperty(window, "S", { get: () => S, configurable: true });
 
 // ---- 効果音(Web Audio で合成。ファイル不要) ----
 const Sound = {
@@ -1196,5 +1198,6 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
 
 connect();
 </script>
+<script src="/js/partybar.js" defer></script>
 </body>
 </html>
