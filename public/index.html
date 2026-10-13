@@ -48,6 +48,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
 .body { padding: 16px 18px 18px; display: grid; gap: 10px; align-content: start; }
 .name { font-family: var(--display); font-size: 22px; line-height: 1.25; }
 .desc { margin: 0; }
+.orig { font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--muted); }
 .go { justify-self: start; margin-top: 4px; font-weight: 700; font-size: 15px; padding: 9px 18px; border-radius: 4px; background: var(--fg); color: var(--surface); }
@@ -109,7 +110,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
         <span>7</span><span class="q">?</span><span>58</span><span class="q">?</span><span>93</span>
       </div>
       <div class="body">
-        <div class="name">かくれナンバー</div>
+        <div class="name">かくれナンバー <small class="orig">（ito）</small></div>
         <p class="desc">こっそり配られた1〜100の数字を、お題に沿った「ことば」で表現。話し合ってみんなで小さい順に並べる。</p>
         <div class="tags"><span class="tag">協力</span><span class="tag">2〜12人</span><span class="tag">ライフ制</span><span class="tag">約10〜20分</span></div>
         <span class="go">あそぶ</span>
@@ -120,7 +121,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
         <span style="color:#b3261e">K</span><span class="bk">?</span><span class="bk">?</span><span style="color:#1f5fb3">A</span>
       </div>
       <div class="body">
-        <div class="name">ウソつき酒場</div>
+        <div class="name">ウソつき酒場 <small class="orig">（Liar's Bar）</small></div>
         <p class="desc">指定のカードだと言い張って伏せて出す。ウソを見抜いて「ウソつき！」と指摘されたら、ロシアンルーレット。最後まで生き残った人の勝ち。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜6人</span><span class="tag">3D表示</span><span class="tag">通話向き</span><span class="tag">約10〜20分</span></div>
         <span class="go">あそぶ</span>
@@ -129,7 +130,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/shotgun" data-cat="bluff" data-min="2" data-max="6" data-time="20">
       <div class="art liar" aria-hidden="true" style="font-size:44px;gap:10px">🔫<span style="background:#c8322f;width:22px;height:46px"></span><span class="bk" style="background:#7d8a98;width:22px;height:46px"></span></div>
       <div class="body">
-        <div class="name">散弾ルーレット</div>
+        <div class="name">散弾ルーレット <small class="orig">（Buckshot Roulette）</small></div>
         <p class="desc">実弾と空砲が込められたショットガンで、自分か相手を撃つ。11種類のアイテムを駆使して、最後まで生き残った人の勝ち。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜6人</span><span class="tag">3D表示</span><span class="tag">通話向き</span><span class="tag">約10〜20分</span></div>
         <span class="go">あそぶ</span>
@@ -147,7 +148,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/monopoly" data-cat="board" data-min="2" data-max="8" data-time="120">
       <div class="art party" aria-hidden="true">🏠</div>
       <div class="body">
-        <div class="name">不動産王</div>
+        <div class="name">不動産王 <small class="orig">（モノポリー）</small></div>
         <p class="desc">サイコロで進んで土地を買い、色をそろえて家やホテルを建てる。取引・競売・抵当も本格的。最後まで破産せずに残った人の勝ち。地図は日本と世界から選べます。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜8人</span><span class="tag">2D/3D表示</span><span class="tag">じっくり</span><span class="tag">約60〜120分</span></div>
         <span class="go">あそぶ</span>
@@ -156,7 +157,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/bridge" data-cat="mini" data-min="2" data-max="8" data-time="5">
       <div class="art party" aria-hidden="true">🌉</div>
       <div class="body">
-        <div class="name">ひとりじめ橋</div>
+        <div class="name">ひとりじめ橋 <small class="orig">（Pummel Party「Selfish Stride」）</small></div>
         <p class="desc">点数の書かれた橋をこっそり1本選ぶ。自分だけならその点、だれかとかぶったら橋が崩れて0点。読み合いのミニゲーム。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜8人</span><span class="tag">ミニゲーム</span><span class="tag">約3〜5分</span></div>
         <span class="go">あそぶ</span>
@@ -165,7 +166,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/bomb" data-cat="mini" data-min="2" data-max="8" data-time="5">
       <div class="art party" aria-hidden="true">💣</div>
       <div class="body">
-        <div class="name">爆弾回し</div>
+        <div class="name">爆弾回し <small class="orig">（Pummel Party「Explosive Exchange」）</small></div>
         <p class="desc">爆弾をだれかに押し付け合う。いつ爆発するかは秘密。爆発したときに持っていた人が脱落、最後まで残った人の勝ち。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜8人</span><span class="tag">ミニゲーム</span><span class="tag">約3〜5分</span></div>
         <span class="go">あそぶ</span>
@@ -174,7 +175,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/memory" data-cat="mini" data-min="2" data-max="8" data-time="5">
       <div class="art party" aria-hidden="true">🍳</div>
       <div class="body">
-        <div class="name">おぼえて料理</div>
+        <div class="name">おぼえて料理 <small class="orig">（Pummel Party「Memory Menu」）</small></div>
         <p class="desc">4秒だけ見える料理の材料を覚えて、並んだ12個の食材から正しく選ぶ。正確さと速さで勝負。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜8人</span><span class="tag">ミニゲーム</span><span class="tag">約3〜5分</span></div>
         <span class="go">あそぶ</span>
@@ -183,7 +184,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <a class="game" href="/party" data-cat="mini" data-min="2" data-max="8" data-time="30">
       <div class="art party" aria-hidden="true">🌉💣🍳</div>
       <div class="body">
-        <div class="name">ドタバタ大会</div>
+        <div class="name">ドタバタ大会 <small class="orig">（Pummel Party）</small></div>
         <p class="desc">ミニゲームに加えて、ティア表・かくれナンバー・ウソつき酒場・散弾ルーレット・絵しりとり(大会版)も、好きな順番・好きな数だけ並べて続けて遊び、試合ごとの順位点の合計で総合優勝を決める。</p>
         <div class="tags"><span class="tag">対戦</span><span class="tag">2〜8人</span><span class="tag">ミニゲームを選んで大会</span><span class="tag">約15〜30分</span></div>
         <span class="go">あそぶ</span>
@@ -233,6 +234,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
   })();
   </script>
 
+  <p class="note">かっこ内は、参考にした元のゲームの名前です(イメージしやすいように書いています)。このサイトは元のゲームの公式・関係者とは関係のないファンメイドです。</p>
   <p class="note">友達から招待リンクが届いたときは、そのリンクを開けばそのまま部屋に入れます。部屋はゲームごとに別々です。</p>
 </div>
 </body>

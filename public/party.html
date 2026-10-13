@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ドタバタ大会</title>
+<title>ドタバタ大会（Pummel Party風）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
@@ -29,6 +29,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--bo
 .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
 h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; text-wrap: balance; }
 h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.orig { font-family: var(--body); font-size: max(11px, .5em); font-weight: 700; opacity: .75; margin-left: 4px; white-space: nowrap; }
 .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
 .top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -248,7 +249,7 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
   <div class="wrap">
     <div>
       <div class="eyebrow modeEyebrow">好きなミニゲームを並べて総合優勝を決める大会</div>
-      <h1 class="modeTitle">ドタバタ大会</h1>
+      <h1 class="modeTitle">ドタバタ大会 <small class="orig">（Pummel Party）</small></h1>
     </div>
     <form class="panel" id="loginForm">
       <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
@@ -267,7 +268,7 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
   <div class="top">
     <div>
       <div class="eyebrow modeEyebrow">好きなミニゲームを並べて総合優勝を決める大会</div>
-      <h1 class="modeTitle">ドタバタ大会</h1>
+      <h1 class="modeTitle">ドタバタ大会 <small class="orig">（Pummel Party）</small></h1>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -291,25 +292,27 @@ const h = (tag, attrs = {}, ...kids) => {
 };
 const COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0", "#ee7fc0", "#5fd0c8"];
 const GAME_INFO = {
-  bridge: { icon: "🌉", name: "ひとりじめ橋", short: "こっそり橋を選ぶ。かぶったら崩れて0点",
+  bridge: { orig: "Pummel Party「Selfish Stride」", icon: "🌉", name: "ひとりじめ橋", short: "こっそり橋を選ぶ。かぶったら崩れて0点",
     rules: ["点数の書かれた橋の中から、全員がこっそり1本選びます(15秒)。", "自分だけが選んだ橋なら、その点数がもらえます。", "同じ橋を選んだ人がいると橋が崩れて、全員0点！", "これを3ラウンド。合計点で順位が決まります。"] },
-  bomb: { icon: "💣", name: "爆弾回し", short: "持っているときに爆発したら脱落",
+  bomb: { orig: "Pummel Party「Explosive Exchange」", icon: "💣", name: "爆弾回し", short: "持っているときに爆発したら脱落",
     rules: ["爆弾を持っている人は、渡したい人を押して押し付けます。", "爆発までの時間は秘密。毎回ちがいます。", "爆発したときに持っていた人は脱落。新しい爆弾で続きます。", "最後まで残った人が1位！"] },
-  memory: { icon: "🍳", name: "おぼえて料理", short: "材料を覚えて、正しく選ぶ",
+  memory: { orig: "Pummel Party「Memory Menu」", icon: "🍳", name: "おぼえて料理", short: "材料を覚えて、正しく選ぶ",
     rules: ["料理の材料が4秒だけ表示されます。しっかり覚えて！", "並んだ12個の食材から、材料だけを選んで「完成！」。", "正解1つ+2点、まちがい1つ−1点、全部正解でボーナス。", "全部正解の中で早かった人はさらにボーナス。材料は3→4→5個と増えます。"] },
   // ここから下は大会だけで遊べる「大会版」(元のゲームは /tier /number /liar)
   tier: { icon: "📊", name: "ティア表", short: "親の並びを予想する(全員1回ずつ親)", extra: true,
     rules: ["全員が1回ずつ親になります。親は5つのワードを自分の本音で1位〜5位に並べます(60秒)。", "ほかの人は親の並びを予想します(45秒)。", "順位ぴったり3点・1つずれ1点・全部ぴったりでボーナス5点。", "全員が親をやり終えたら、予想で取った点の合計で順位が決まります。"] },
-  number: { icon: "🔢", name: "かくれナンバー", short: "数字をことばで伝えて並べる(正しい位置で得点)", extra: true,
+  number: { orig: "ito", icon: "🔢", name: "かくれナンバー", short: "数字をことばで伝えて並べる(正しい位置で得点)", extra: true,
     rules: ["全員に1〜100の数字がこっそり配られます。お題に沿って、数字の大きさを「ことば」で表します。", "全員のヒントがそろったら、話し合って小さい順に並べます(誰が動かしてもOK)。", "公開して、自分のカードが正しい位置なら+2点。全員そろったら全員+1点。", "これを3ラウンド。"] },
-  liar: { icon: "🃏", name: "ウソつき酒場", short: "ブラフとロシアンルーレット(大会は2D版)", extra: true,
+  liar: { orig: "Liar's Bar", icon: "🃏", name: "ウソつき酒場", short: "ブラフとロシアンルーレット(大会は2D版)", extra: true,
     rules: ["テーブルカード(キング・クイーン・エース)が決まり、5枚ずつ配られます。ジョーカーは何にでもなります。", "自分の番に1〜3枚を伏せて出し「全部テーブルカード」と言い張ります(ウソでもOK)。", "次の人は出すか「ウソつき！」。ウソなら出した人、本当なら指摘した人が引き金を引きます(6発中1発が実弾)。", "撃たれたら脱落。脱落が遅いほど上位、最後の1人が1位。時間がかかることがあります。"] },
-  shotgun: { icon: "🔫", name: "散弾ルーレット", short: "実弾か空砲か。アイテムを使って生き残る(大会は2D版)", extra: true,
+  shotgun: { orig: "Buckshot Roulette", icon: "🔫", name: "散弾ルーレット", short: "実弾か空砲か。アイテムを使って生き残る(大会は2D版)", extra: true,
     rules: ["ショットガンに実弾と空砲が込められます。発数は公開、順番は秘密。", "自分の番に、ほかの人か自分を撃ちます。自分を撃って空砲なら、もう一度自分の番。", "実弾でライフ−1(ライフ4)。弾がなくなると込め直して、アイテムが2つずつ配られます。", "脱落が遅いほど上位、最後の1人が1位。"] },
   eshiri: { icon: "🎨", name: "絵しりとり", short: "絵だけでしりとりをつなぐ(大会は1本・1周)", extra: true,
     rules: ["順番に、前の人の絵を見て「何の絵か」を推理し、その最後の文字から始まる言葉を絵だけで描きます(60秒・文字は描かない)。", "最初の人はお題の言葉から。「ん」で終わる言葉はだめ。描いた言葉は答え合わせまで秘密。", "答え合わせで、前の絵を読み取れたら+2点、自分の絵を読み取ってもらえたら+1点。", "全員が1回ずつ描いたら答え合わせ(90秒)。点数の順で順位が決まります。"] },
 };
 const ALL_GAMES = Object.keys(GAME_INFO);
+// 参考にした元のゲームの名前(かっこで小さく出す)
+const origEl = (o) => { const e = document.createElement("small"); e.className = "orig"; e.textContent = `（${o}）`; return e; };
 const RANK_NAME = { K: "キング", Q: "クイーン", A: "エース", J: "ジョーカー" };
 const TIERS = ["S", "A", "B", "C", "D"];
 
@@ -319,8 +322,8 @@ const BASE = MODE === "party" ? "/party" : "/" + MODE;
 const SINGLE = MODE !== "party";
 if (SINGLE) {
   const info = GAME_INFO[MODE];
-  document.title = info.name;
-  document.querySelectorAll(".modeTitle").forEach((el) => { el.textContent = info.icon + " " + info.name; });
+  document.title = info.name + (info.orig ? `（${info.orig}風）` : "");
+  document.querySelectorAll(".modeTitle").forEach((el) => { el.textContent = info.icon + " " + info.name + " "; if (info.orig) el.append(origEl(info.orig)); });
   document.querySelectorAll(".modeEyebrow").forEach((el) => { el.textContent = info.short + "(2〜8人)"; });
 }
 
@@ -588,7 +591,7 @@ function renderLobby(main, isGM) {
   const live = S.players.filter((p) => p.connected).length;
   if (SINGLE) {
     const info = GAME_INFO[MODE];
-    main.append(h("div", { class: "intro" }, h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name),
+    main.append(h("div", { class: "intro" }, h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name, info.orig ? origEl(info.orig) : null),
       h("ol", {}, ...info.rules.map((r) => h("li", {}, r)))),
       h("p", { class: "muted small" }, "1試合ごとに順位で 1位10点・2位7点・3位5点… がもらえ、「もう一度遊ぶ」で通算点を競えます。2〜8人。"));
   } else {
@@ -598,7 +601,7 @@ function renderLobby(main, isGM) {
     const ul = h("ol", { class: "playlist", "aria-label": "試合の並び" });
     list.forEach((key, i) => {
       const info = GAME_INFO[key];
-      ul.append(h("li", {}, h("span", { class: "ico", "aria-hidden": "true" }, info.icon), h("span", { class: "nm" }, info.name),
+      ul.append(h("li", {}, h("span", { class: "ico", "aria-hidden": "true" }, info.icon), h("span", { class: "nm" }, info.name, info.orig ? origEl(info.orig) : null),
         isGM ? h("span", { class: "btns" },
           h("button", { type: "button", class: "ghost tiny", disabled: i === 0, "aria-label": `${i + 1}試合目を上へ`, onclick: () => { const l = [...list]; [l[i - 1], l[i]] = [l[i], l[i - 1]]; send({ t: "setPlaylist", list: l }); } }, "↑"),
           h("button", { type: "button", class: "ghost tiny danger", disabled: list.length <= 1, "aria-label": `${i + 1}試合目を外す`, onclick: () => send({ t: "setPlaylist", list: list.filter((_, j) => j !== i) }) }, "外す")) : h("span")));
@@ -619,7 +622,7 @@ function renderIntro(main) {
   const info = GAME_INFO[S.game.key];
   main.append(h("div", { class: "intro" },
     SINGLE ? null : h("div", { class: "muted small" }, `第${S.gi + 1}試合 / 全${S.seq.length}試合`),
-    h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name),
+    h("div", { class: "ico", "aria-hidden": "true" }, info.icon), h("div", { class: "ttl" }, info.name, info.orig ? origEl(info.orig) : null),
     h("ol", {}, ...info.rules.map((r) => h("li", {}, r)))), countdown(7000));
 }
 
