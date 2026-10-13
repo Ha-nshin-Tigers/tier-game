@@ -128,7 +128,7 @@ function handle(ws, m) {
     ws.room = room; ws.pid = pid;
     room.emptySince = null;
     send(ws, { t: "joined", room: code });
-    send(ws, { t: "db", cards: core.CARDS, tokens: core.TOKENS, curses: core.CURSES, courses: Object.fromEntries(Object.entries(core.COURSES).map(([k, c]) => [k, { name: c.name, diff: c.diff, exp: c.exp || null }])) }); // カードとコースの一覧(最初に1回)
+    send(ws, { t: "db", cards: core.CARDS, tokens: core.TOKENS, curses: core.CURSES, guards: core.GUARDS, courses: Object.fromEntries(Object.entries(core.COURSES).map(([k, c]) => [k, { name: c.name, diff: c.diff, exp: c.exp || null }])) }); // カードとコースの一覧(最初に1回)
     return broadcast(room);
   }
 

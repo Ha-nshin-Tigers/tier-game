@@ -44,6 +44,37 @@ const CARDS = {
   gertrude: { name: "ガートルード・エヴァディーン", a: true, hero: true, once: true, exp: "hh", text: "6回まで1マスずつ進む。ほかのコマのマス・空いている山も可。条件無視・バリケードも壊せる。使ったらゲームから除外" },
   isabella: { name: "イザベラ・ジョーンズ", a: true, hero: true, exp: "hh", text: "1マス進む。ほかのコマのマス・空いている山も可。条件無視・バリケードも壊せる" },
   lara: { name: "ララ・オマリー", a: true, hero: true, exp: "hh", text: "ほかの人のコマ全部を、それぞれとなりの空いているマスへ動かす(条件無視)" },
+  // 「黄金の神殿」(The Quest for El Dorado: The Golden Temples)のカード。f=たいまつ(遺跡のマス)
+  // 内訳・コスト・効果は公式ルールブック(ポーランド語版2024・独語版2019)とカード写真から
+  g_student: { name: "学生", s: ["f"], p: 1, exp: "gt" }, g_photo: { name: "写真記者", s: ["v"], p: 2, exp: "gt" },
+  g_tourist: { name: "観光客", s: ["v"], p: 1, exp: "gt" }, g_scout: { name: "斥候", s: ["j"], p: 2, exp: "gt" },
+  g_skipper: { name: "船頭", s: ["w", "f"], p: 1, exp: "gt" },
+  g_healer: { name: "治療師", s: ["j", "v"], p: 3, cost: 4, exp: "gt" }, g_jeep: { name: "ジープ", s: ["j", "w", "v", "f"], p: 5, cost: 5, once: true, exp: "gt" },
+  g_gentleman: { name: "紳士", s: ["j", "f"], p: 2, cost: 3, exp: "gt" }, g_canteen: { name: "水筒", s: ["j", "w", "v", "f"], p: 3, cost: 3, once: true, exp: "gt" },
+  g_smuggler: { name: "密輸人", s: ["w", "v"], p: 2, cost: 3, exp: "gt" }, g_pilot: { name: "パイロット", s: ["j", "w", "v", "f"], p: 2, cost: 6, exp: "gt" },
+  g_master: { name: "名人", s: ["w", "f"], p: 3, cost: 5, exp: "gt" }, g_professor: { name: "教授", s: ["f"], p: 5, cost: 7, exp: "gt" },
+  g_sponsor: { name: "出資者", s: ["v"], p: 5, cost: 7, exp: "gt" }, g_tutor: { name: "家庭教師", s: ["f"], p: 2, cost: 2, exp: "gt" },
+  g_arch: { name: "考古学者", a: true, cost: 4, exp: "gt", text: "となりの遺跡(たいまつ)のマスへ2回まで進む(パワーは無視)。たいまつのバリケードも取れる" },
+  g_scroll: { name: "巻物", a: true, cost: 4, once: true, exp: "gt", text: "となりのマスへ2回まで進む(条件無視。山・守護者・ほかのコマのマスは不可)。バリケードも取れる" },
+  g_tracker: { name: "追跡者", a: true, cost: 5, exp: "gt", text: "記号1つのマスへ2回まで進む(条件無視)。記号1つ(たいまつ1)のバリケードも取れる" },
+  g_gatherer: { name: "採集者", a: true, cost: 5, exp: "gt", text: "エルドを1つもらい、カードを1枚引く" },
+  g_outfit: { name: "装備屋", a: true, cost: 6, exp: "gt", text: "エルドを1〜3つ払い、払った数だけとなりのマスへ進む(条件無視)。バリケードも取れる" },
+  g_hunter: { name: "狩人", a: true, cost: 3, exp: "gt", text: "エルドを1つもらい、手札1枚をゲームから除外してよい" },
+  g_map: { name: "宝の地図", a: true, cost: 3, once: true, exp: "gt", text: "エルドを1つもらい、となりのマスへ1マス進む(条件無視)。バリケードも取れる" },
+  g_hat: { name: "新しい装備", a: true, cost: 5, once: true, exp: "gt", text: "エルドを3つもらう。このターンは市場の外のカードも買える(山は動かさない)" },
+};
+const GT_MARKET0 = ["g_smuggler", "g_pilot", "g_tutor", "g_arch", "g_map", "g_hat"];
+const GT_RESERVE0 = ["g_healer", "g_jeep", "g_gentleman", "g_canteen", "g_master", "g_professor", "g_sponsor", "g_scroll", "g_tracker", "g_gatherer", "g_outfit", "g_hunter"];
+const GT_START = ["g_student", "g_student", "g_photo", "g_photo", "g_tourist", "g_tourist", "g_scout", "g_skipper"];
+const ELDO_MAX = 3;
+// 黄金の神殿のバリケード(9〜14)。x〜 はカードを使わずに取れる(効果つき)
+const BLOCKADES_GT = [{ n: 9, t: "f", v: 1 }, { n: 10, t: "f", v: 2 }, { n: 11, t: "xdraw", v: 0 }, { n: 12, t: "xtrash", v: 0 }, { n: 13, t: "xeldo", v: 0 }, { n: 14, t: "xpay", v: 1 }];
+// 守護者トークン(8枚 = 4種類×2)。守護者のとなりに止まると表にして効果
+const GUARDS = {
+  lose: { name: "強欲", text: "止まった人はエルドをすべて失う" },
+  give: { name: "施し", text: "ほかの全員がエルドを1つもらう" },
+  draw: { name: "知恵", text: "ほかの全員が山札から1枚引いてよい" },
+  trash: { name: "浄化", text: "ほかの全員が手札1枚をゲームから除外してよい" },
 };
 const MARKET0 = ["scout", "trailblazer", "jack", "photographer", "chest", "transmitter"];
 const RESERVE0 = ["pioneer", "giant", "captain", "journalist", "millionaire", "adventurer", "plane", "cartographer", "scientist", "compass", "travellog", "native"];
@@ -138,25 +169,49 @@ const COURSES = {
   pilgrims: { name: "巡礼者の道", diff: "むずかしい", exp: "hh", p: [["B", 0, 0, 2], ["R", 5, -2, 4], ["T", 10, -5, 2], ["L", 13, -1, 4], ["F", 16, 3, 1], ["V", 19, 7, 2], ["X", 16, 14, 1]], g: ["12,15", "12,14", "13,13"], s: "j", tv: ["11,-9", "12,-9", "13,-9"], tt: "r" },
   pass: { name: "峠越え", diff: "むずかしい", exp: "hh", p: [["B", 0, 0, 4], ["R", -3, 5, 0], ["M", -5, 10, 0], ["W", -9, 17, 0], ["O", -15, 19, 3], ["D", -13, 14, 2], ["U", -20, 17, 2], ["T", -23, 13, 4]], g: ["-24,10", "-23,9", "-22,9"], s: "w", tv: ["-8,9", "-7,8", "-6,7"], tt: "r" },
 };
+// 黄金の神殿の地形タイル(スタート 1a/1b は61マス、2a〜4b は37マス)。f=遺跡(たいまつ) / qq 守護者 / gt エルドラドの門
+// 2019年版のタイル写真から1マスずつ写し、2024年版ルールブックの配置図と画像照合して同じ地形であることを確認。
+// コース(p は基本と同じ形式)と神殿(tp: 色 c・面 s・3マス h=[真ん中(3), 両はし(1)])は、ルールブック4・12ページの図から換算
+const GT_BOARDS = {
+  "1a": ["j2 j2 f1 f1 f1", "j2 v2 v1 f1 mm mm", "f2 v2 v1 f1 f1 w1 w3", "f2 c1 f1 f1 f1 f1 w1 mm", "mm mm mm mm j2 f1 f1 j1 j3", "w1 f1 f1 f1 v2 v1 f1 j1", "w1 f1 f1 f1 v1 f1 w1", "w1 j2 f1 f1 f1 f1", "gt s1 s2 s3 s4"],
+  "1b": ["f3 f1 f1 f1 f3", "v1 v2 f1 j2 f2 f2", "v2 v1 f1 j2 c1 f1 f1", "v1 w1 j2 mm mm w1 w1 f1", "w1 w1 f1 w3 gt mm w1 w1 w1", "f1 f1 f1 f1 f1 mm f1 f1", "f1 v1 f1 f1 mm f1 f1", "f1 v1 f1 f1 mm f1", "s4 s3 s2 s1 mm"],
+  "2a": ["v1 f1 f2 mm", "v1 w1 mm f3 f2", "j1 v1 w1 w1 f1 f1", "mm j1 qq f2 f1 f2 f3", "j1 f1 f1 c1 f1 f2", "f1 f2 f1 qq f1", "f3 f2 f1 f1"],
+  "2b": ["qq w1 w2 w2", "f2 w1 j2 v1 v1", "f1 j2 j2 mm j2 v2", "v2 f1 mm c1 j2 f1 qq", "v2 j2 j2 mm j2 f1", "v1 v1 j2 w1 f2", "qq w2 w1 f2"],
+  "3a": ["f1 f1 f1 f1", "f2 f1 w1 w3 w2", "j2 j2 f2 f1 f1 f1", "mm mm mm qq f1 f2 f3", "j2 j2 f2 f1 f1 f1", "f2 f1 v1 v3 v2", "f1 f1 f1 f1"],
+  "3b": ["v3 v1 f1 f3", "w1 v2 j2 f2 w1", "w1 w1 j1 j1 w1 w1", "j3 j2 v1 qq f1 v2 v3", "j1 v2 v1 f1 f2 v1", "f1 f2 w1 j2 j1", "f3 w1 w1 j3"],
+  "4a": ["f1 v1 j1 mm", "qq v2 f1 j2 f1", "v1 v2 f1 qq j1 f2", "f1 f1 f2 f1 j1 f1 qq", "mm mm f2 j1 f1 f2", "v2 f2 w1 w1 c1", "v2 w1 v2 mm"],
+  "4b": ["w2 w1 w1 w1", "v2 mm w2 mm f1", "v2 v1 j2 f1 f2 f1", "f1 qq f2 j3 f2 qq f1", "f1 f2 f1 j2 v1 v2", "f1 mm w2 mm v2", "w1 w1 w1 w2"],
+};
+const GT_COURSES = {
+  first: { name: "はじめての神殿", diff: "かんたん", p: [["1a", 0, 0, 0], ["3b", 4, -8, 5], ["2b", -4, -4, 0], ["4b", 8, -4, 0]], tp: [{"c": "green", "s": "e", "h": ["4,-12", "5,-12", "3,-11"]}, {"c": "red", "s": "t", "h": ["-8,-4", "-7,-5", "-8,-3"]}, {"c": "blue", "s": "c", "h": ["12,-4", "12,-5", "11,-3"]}] },
+  easy: { name: "結び目", diff: "かんたん", p: [["1b", 0, 0, 0], ["2b", 8, -4, 0], ["3a", 12, -1, 1], ["4b", 5, 3, 1]], tp: [{"c": "red", "s": "v", "h": ["12,-8", "11,-8", "12,-7"]}, {"c": "green", "s": "j", "h": ["16,-5", "15,-5", "16,-4"]}, {"c": "blue", "s": "w", "h": ["1,7", "2,7", "1,6"]}] },
+  medium: { name: "迷いの道", diff: "ふつう", p: [["1b", 0, 0, 0], ["4a", -11, 0, 2], ["2a", -8, 4, 1], ["3b", 8, -4, 1]], tp: [{"c": "blue", "s": "c", "h": ["-11,-4", "-12,-3", "-10,-4"]}, {"c": "green", "s": "e", "h": ["12,-4", "12,-5", "11,-3"]}, {"c": "red", "s": "t", "h": ["-12,8", "-11,8", "-12,7"]}] },
+  valley: { name: "失望の谷", diff: "むずかしい", p: [["1b", 0, 0, 0], ["4a", -4, -4, 1], ["3b", 8, -5, 0], ["2a", 3, 5, 3]], tp: [{"c": "red", "s": "t", "h": ["-8,-4", "-8,-3", "-7,-5"]}, {"c": "green", "s": "e", "h": ["12,-5", "12,-6", "11,-4"]}, {"c": "blue", "s": "w", "h": ["7,1", "6,1", "7,2"]}] },
+  triangle: { name: "謎の三角地帯", diff: "むずかしい", p: [["1a", 0, 0, 0], ["2a", 4, -8, 3], ["4a", -8, 4, 1], ["3a", 4, 4, 0]], tp: [{"c": "red", "s": "v", "h": ["8,-12", "7,-12", "8,-11"]}, {"c": "green", "s": "j", "h": ["-12,4", "-12,5", "-11,3"]}, {"c": "blue", "s": "w", "h": ["0,8", "1,8", "0,7"]}] },
+};
+for (const [k, c] of Object.entries(GT_COURSES)) COURSES["gt_" + k] = { ...c, exp: "gt" };
 const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 const K = (q, r) => q + "," + r;
 const rot = (q, r, k) => { for (let i = 0; i < k; i++) [q, r] = [-r, q + r]; return [q, r]; };
 function parseTok(t) {
   if (t === "mm") return { t: "m", v: 0 };
+  if (t === "qq") return { t: "q", v: 0 };
+  if (t === "gt") return { t: "g", v: 0, gate: true };
   if (t === "cv") return { t: "m", v: 0, cave: true };
   if (t[0] === "s") return { t: "s", v: 0, n: +t[1] };
   return { t: t[0], v: +t.slice(1) };
 }
-// タイルのマス(基準マスからの相対 q,r)。37マスのタイルは中央、帯タイルは真ん中の行の3つ目が基準
+// タイルのマス(基準マスからの相対 q,r)。六角形のタイル(37マス・61マス)は中央、帯タイルは真ん中の行の3つ目が基準
 function localHexes(rows) {
   const out = [];
-  if (rows.length === 7) rows.forEach((row, i) => { const r = i - 3, qmin = Math.max(-3, -r - 3); row.split(" ").forEach((t, j) => out.push([qmin + j, r, t])); });
+  if (rows.length >= 7) { const R = (rows.length - 1) / 2; rows.forEach((row, i) => { const r = i - R, qmin = Math.max(-R, -r - R); row.split(" ").forEach((t, j) => out.push([qmin + j, r, t])); }); }
   else rows.forEach((row, i) => { const r = i - 1, q0 = r === -1 ? -1 : -2; row.split(" ").forEach((t, j) => out.push([q0 + j, r, t])); });
   return out;
 }
 const shuffle = (a, rnd = Math.random) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // コースを組み立てる: マス・ボードの境目(バリケード)・スタート・ゴール・酒場・洞窟・トンネル
 function buildCourse(id, opts = {}, rnd = Math.random) {
+  if (COURSES[id].exp === "gt") return buildGT(id, opts, rnd);
   const C = COURSES[id], hex = {};
   C.p.forEach(([name, cq, cr, k], ti) => {
     for (const [lq, lr, tok] of localHexes(BOARDS[name])) { const [a, b] = rot(lq, lr, k); const q = cq + a, r = cr + b; hex[K(q, r)] = { q, r, ...parseTok(tok), tile: ti }; }
@@ -176,16 +231,64 @@ function buildCourse(id, opts = {}, rnd = Math.random) {
   return { id, name: C.name, hex, blockades, starts, goals: [...C.g], tavern: [...(C.tv || [])], caves, tunnels, endSym: C.s };
 }
 
-const DEFAULTS = { course: "first", turnSecs: 120, caves: false, hh: false };
+// 黄金の神殿のコース: 地形タイル・神殿(3マス)・スタートとの境目のバリケード・守護者トークン
+// モジュール: エルドのタイル(4枚)・小さい柵(2枚)を地形タイルの上にランダムに置く
+function buildGT(id, opts = {}, rnd = Math.random) {
+  const C = COURSES[id], hex = {};
+  C.p.forEach(([name, cq, cr, k], ti) => {
+    for (const [lq, lr, tok] of localHexes(GT_BOARDS[name])) { const [a, b] = rot(lq, lr, k); const q = cq + a, r = cr + b; hex[K(q, r)] = { q, r, ...parseTok(tok), tile: ti }; }
+  });
+  const nT = C.p.length;
+  // 神殿: 真ん中が3、両はしが1。面 t=遺跡 / v / j / w / c=キャンプ(除外) / e=エルド1つ払って入る。緑の両はしは2人用の印
+  C.tp.forEach((t, i) => t.h.forEach((key, j) => {
+    const [q, r] = key.split(",").map(Number), typ = t.s === "t" ? "f" : t.s;
+    hex[key] = { q, r, t: typ, v: typ === "e" ? 1 : j === 0 ? 3 : 1, tile: nT + i, temple: t.c, two: t.c === "green" && j > 0 };
+  }));
+  const touches = (a, b) => Object.values(hex).some((h) => h.tile === a && nb(K(h.q, h.r)).some((n) => hex[n] && hex[n].tile === b));
+  // バリケード: スタートのタイルと地形タイルの境目に1つずつ(9〜14からランダム)
+  const pool = shuffle([...BLOCKADES_GT], rnd), blockades = [];
+  for (let i = 1; i < nT && pool.length; i++) if (touches(0, i)) blockades.push({ ...pool.shift(), a: 0, b: i, by: null });
+  // 守護者トークン(裏向き)
+  const gpool = shuffle(Object.keys(GUARDS).flatMap((k) => [k, k]), rnd), guards = {};
+  for (const key of Object.keys(hex)) if (hex[key].t === "q") guards[key] = { k: gpool.shift() || "give", open: false };
+  // 置いてよいマス: 地形タイルのふつうの地形で、ほかのタイルと接していないもの
+  const plain = (key, tile) => { const h = hex[key]; return h && h.tile === tile && "fjwv".includes(h.t) && !h.eldo && !h.pal && nb(key).every((n) => !hex[n] || hex[n].tile === tile); };
+  const tiles = shuffle(Array.from({ length: nT - 1 }, (_, i) => i + 1), rnd);
+  if (opts.eldoMod) ["f", "j", "v", "w"].forEach((t, i) => {
+    const tile = tiles[i % tiles.length], keys = shuffle(Object.keys(hex).filter((k) => plain(k, tile)), rnd);
+    if (keys.length) Object.assign(hex[keys[0]], { t, v: 1, eldo: true });
+  });
+  // 小さい柵: 3マス(1つ目→東→南東)。とがった側(上=北東・北西と右=東)からは入れない。向きはランダム
+  if (opts.palMod) ["w", "j"].forEach((t, i) => {
+    const tile = tiles[(i + 2) % tiles.length], k = Math.floor(rnd() * 6);
+    const shape = [[0, 0, [1, 2]], [1, 0, [0, 1, 2]], [1, 1, [0, 1]]].map(([q, r, d]) => [...rot(q, r, k), d.map((x) => (x + k) % 6)]);
+    for (const key of shuffle(Object.keys(hex).filter((x) => plain(x, tile)), rnd)) {
+      const { q, r } = hex[key], cells = shape.map(([a, b, d]) => [K(q + a, r + b), d]);
+      if (!cells.every(([x]) => plain(x, tile))) continue;
+      for (const [x, d] of cells) Object.assign(hex[x], { t, v: 1, pal: d });
+      break;
+    }
+  });
+  const starts = Object.values(hex).filter((h) => h.t === "s").sort((x, y) => x.n - y.n).map((h) => K(h.q, h.r));
+  const gate = Object.keys(hex).find((k) => hex[k].gate);
+  return { id, name: C.name, hex, blockades, starts, goals: [gate], tavern: [], caves: [], tunnels: {}, endSym: null, gt: true, gate, guards };
+}
+
+const DEFAULTS = { course: "first", turnSecs: 120, caves: false, hh: false, eldoMod: false, palMod: false };
 function normalize(raw) {
   const r = raw && typeof raw === "object" ? raw : {}, out = { ...DEFAULTS };
   if (COURSES[r.course]) out.course = r.course;
   if ([0, 60, 120, 180].includes(r.turnSecs)) out.turnSecs = r.turnSecs;
   if (typeof r.caves === "boolean") out.caves = r.caves;
   if (typeof r.hh === "boolean") out.hh = r.hh;
+  if (typeof r.eldoMod === "boolean") out.eldoMod = r.eldoMod;
+  if (typeof r.palMod === "boolean") out.palMod = r.palMod;
   // 英雄と呪いのコースは拡張が必要。拡張はいつも洞窟ルールで遊ぶ(公式)
   if (COURSES[out.course].exp === "hh") out.hh = true;
   if (out.hh) out.caves = true;
+  // 黄金の神殿は別のゲーム(洞窟・英雄と呪いは混ぜない)
+  out.gt = COURSES[out.course].exp === "gt";
+  if (out.gt) { out.caves = false; out.hh = false; }
   return out;
 }
 
@@ -197,8 +300,8 @@ function start(c, settings, rnd = Math.random) {
   const cfg = normalize(settings);
   const order = shuffle([...c.members()], rnd);
   const course = buildCourse(cfg.course, cfg, rnd);
-  const reserve = Object.fromEntries([...RESERVE0, ...(cfg.hh ? RESERVE_HH : [])].map((k) => [k, COPIES]));
-  const g = c.g = { cfg, course, order, cur: 0, P: {}, uid: 0, market: MARKET0.map((k) => ({ k, n: COPIES })), reserve,
+  const reserve = Object.fromEntries((cfg.gt ? GT_RESERVE0 : [...RESERVE0, ...(cfg.hh ? RESERVE_HH : [])]).map((k) => [k, COPIES]));
+  const g = c.g = { cfg, course, order, cur: 0, P: {}, uid: 0, market: (cfg.gt ? GT_MARKET0 : MARKET0).map((k) => ({ k, n: COPIES })), reserve, used: false, anyBuy: false,
     bought: false, move: null, steps: null, pending: null, q: [], change: false, passAll: false, lastItem: null, keepToken: false,
     finalRound: false, endIdx: null, log: [], turnNo: 1, step: "play", result: null,
     caveTok: {}, supply: [], tokBox: [], curses: [], curseBox: [], demons: cfg.hh ? DEMONS : 0, heroes: cfg.hh ? shuffle([...HEROES], rnd) : [] };
@@ -216,10 +319,10 @@ function start(c, settings, rnd = Math.random) {
   // 2人は1人2コマ(スタート1・3 と 2・4)。3〜4人は1人1コマ
   const two = order.length === 2;
   order.forEach((id, i) => {
-    const ks = [...Array(3).fill("explorer"), ...Array(4).fill("traveler"), "sailor", ...(cfg.hh ? [pets[i]] : [])];
+    const ks = cfg.gt ? GT_START : [...Array(3).fill("explorer"), ...Array(4).fill("traveler"), "sailor", ...(cfg.hh ? [pets[i]] : [])];
     const deck = shuffle(ks.map((k) => ({ id: ++g.uid, k })), rnd);
     const pieces = two ? [course.starts[i], course.starts[i + 2]] : [course.starts[i]];
-    g.P[id] = { deck, hand: [], discard: [], played: [], gone: [], pieces, done: pieces.map(() => false), blockades: [], tokens: [], curses: [], near: pieces.map(() => []), hero: false };
+    g.P[id] = { deck, hand: [], discard: [], played: [], gone: [], pieces, done: pieces.map(() => false), blockades: [], tokens: [], curses: [], near: pieces.map(() => []), hero: false, eldo: 0, gems: [], gnear: pieces.map(() => []), eldoAt: pieces.map(() => null) };
     draw(g, id, HAND);
   });
   log(g, `コース「${course.name}」。${nm(c, order[0])} からスタート`);
@@ -238,12 +341,29 @@ const curId = (g) => g.order[g.cur];
 const piecesAt = (g, key) => g.order.filter((id) => g.P[id].pieces.some((k, i) => !g.P[id].done[i] && k === key));
 const occupied = (g, key) => piecesAt(g, key).length > 0;
 const isMountain = (h) => h && h.t === "m";
+// 入れないマス: 山・守護者(黄金の神殿)
+const isWall = (h) => h && (h.t === "m" || h.t === "q");
+// ほかのコマで入れないか。2人の黄金の神殿だけ、緑の神殿の2人用マスには自分のもう1つのコマと一緒に入れる
+function blockedByPiece(g, id, to) {
+  const ids = piecesAt(g, to);
+  if (!ids.length || g.passAll) return false;
+  const h = g.course.hex[to];
+  return !(g.cfg.gt && g.order.length === 2 && h && h.two && ids.every((x) => x === id));
+}
+// 柵: とがった側のとなりからは入れない
+function palBlocked(g, from, to) {
+  const h = g.course.hex[to];
+  if (!h || !h.pal) return false;
+  const [q1, r1] = from.split(",").map(Number), d = DIRS.findIndex(([a, b]) => q1 === h.q + a && r1 === h.r + b);
+  return h.pal.includes(d) && !(g.course.hex[from] || {}).pal;
+}
+const gainEldo = (g, id, n) => { const p = g.P[id]; if (p) p.eldo = Math.min(ELDO_MAX, p.eldo + n); };
 // 空いている山: 洞窟の無い山か、洞窟トークンがもう無い山
 const emptyMountain = (g, key) => isMountain(g.course.hex[key]) && !(g.course.hex[key].cave && (g.caveTok[key] || []).length);
 // ボードの境目にバリケードが残っていれば、その間は通れない
 function blockadeBetween(g, a, b) {
   const ha = g.course.hex[a], hb = g.course.hex[b];
-  if (!ha || !hb || Math.abs(ha.tile - hb.tile) !== 1) return null;
+  if (!ha || !hb || ha.tile === hb.tile) return null;
   const bl = g.course.blockades.find((x) => x.a === Math.min(ha.tile, hb.tile) && x.b === Math.max(ha.tile, hb.tile));
   return bl && !bl.by ? bl : null;
 }
@@ -270,6 +390,7 @@ function playFromHand(g, id, cardId, useEffect) {
   const p = g.P[id], i = p.hand.findIndex((x) => x.id === cardId);
   if (i < 0) return null;
   const [card] = p.hand.splice(i, 1);
+  g.used = true;
   if (useEffect && cardDef(card).once) { removeCard(g, id, card); g.lastItem = card.id; }
   else p.played.push(card);
   return card;
@@ -287,7 +408,7 @@ function pieceAt(g, id, piece) { const p = g.P[id]; return Number.isInteger(piec
 function canPlayCards(p) { return curse(p, "misfortune") ? "不運の呪い: 先に手札2枚を捨てて解いてください" : null; }
 function canPlayAction(p) { return canPlayCards(p) || (curse(p, "misery") ? "苦悩の呪い: 先に紫のカード1枚を捨てて解いてください" : null); }
 function canPlayToken(p) { return curse(p, "cavefever") ? "洞窟恐怖症の呪い: 先に洞窟トークン1つを箱へ戻して解いてください" : null; }
-const SYMJ = { j: "ナタ", w: "パドル", v: "コイン" };
+const SYMJ = { j: "ナタ", w: "パドル", v: "コイン", f: "たいまつ" };
 
 // 移動に使う「パワーの出どころ」: 手札のカード(m.card)か、洞窟の記号トークン(m.token)
 function powerSource(g, id, m) {
@@ -349,9 +470,13 @@ function moveWithCard(c, id, m) {
   const from = p.pieces[mv.piece], to = m.to, h = hex[to];
   if (!h || !nb(from).includes(to)) return "となりのマスを選んでください";
   if (h.t === "m") return "山には入れません";
+  if (h.t === "q") return "守護者のマスには入れません";
   if (h.t === "s") return "スタートのマスには戻れません";
-  if (occupied(g, to) && !g.passAll) return "ほかのコマがいるマスには入れません";
+  if (h.gate) return "門は、宝石3つを持ってとなりに来ると自動で通ります";
+  if (blockedByPiece(g, id, to)) return "ほかのコマがいるマスには入れません";
   if (blockadeBetween(g, from, to)) return "先にバリケードを取り除いてください";
+  if (palBlocked(g, from, to)) return "柵のとがった側からは入れません";
+  if (h.t === "e") return "このマスはエルド1つを払って入ります(「エルドで進む」)";
   if (h.t === "r" || h.t === "c") return "荒地・ベースキャンプは手札を選んで入ります";
   if (h.t === "d" || h.t === "t") return "魔物マスはカードを使わずに入ります(呪いを引きます)";
   const need = h.t === "g" ? h.sym : h.t;
@@ -385,6 +510,7 @@ function stopAt(c, id, piece) {
     }
     p.near[piece] = now;
   }
+  if (g.cfg.gt) gtStop(c, id, piece);
   if (g.cfg.hh && g.course.tavern.includes(pos) && !p.hero && g.heroes.length) {
     p.hero = true;
     const opts = g.heroes.splice(0, 3);
@@ -392,12 +518,48 @@ function stopAt(c, id, piece) {
     log(g, `${nm(c, id)} が酒場で英雄を探している`);
   }
 }
+// 黄金の神殿: 止まったマスでの出来事(エルドのタイル・神殿の宝石・守護者)
+function gtStop(c, id, piece) {
+  const g = c.g, p = g.P[id], pos = p.pieces[piece], h = g.course.hex[pos];
+  if (h.eldo) {
+    // エルドのタイル: 止まると1つ。もう一度もらうには、ほかのマスに止まってから戻る
+    if (p.eldoAt[piece] !== pos && p.eldo < ELDO_MAX) { gainEldo(g, id, 1); log(g, `${nm(c, id)} がエルドのタイルでエルドを1つもらった`); }
+    p.eldoAt[piece] = pos;
+  } else p.eldoAt[piece] = null;
+  if (h.temple && !p.gems.includes(h.temple)) {
+    // 2人のときの緑の宝石: 自分の2つのコマが同じ2人用マスに止まっているときだけ
+    const pair = g.order.length === 2 && h.temple === "green";
+    if (!pair || (h.two && p.pieces.every((k, i) => !p.done[i] && k === pos))) { p.gems.push(h.temple); log(g, `${nm(c, id)} が${GEMJ[h.temple]}の宝石を手に入れた(${p.gems.length}/3)`); }
+    else log(g, "2人のときの緑の宝石は、自分の2つのコマを同じ「2人用」のマスにそろえて止まると取れます");
+  }
+  // 守護者: となりに止まると表にして効果(バリケードをはさむと、となりではない)。一度離れてから戻るとまた起きる
+  const now = nb(pos).filter((k) => g.course.guards[k] && !blockadeBetween(g, pos, k));
+  for (const k of now) if (!p.gnear[piece].includes(k)) triggerGuard(c, id, k);
+  p.gnear[piece] = now;
+}
+const GEMJ = { red: "赤", green: "緑", blue: "青" };
+function othersOpt(g, id, kind) {
+  const i0 = g.order.indexOf(id);
+  for (let k = 1; k < g.order.length; k++) g.q.push({ t: "opt", kind, pid: g.order[(i0 + k) % g.order.length] });
+}
+function triggerGuard(c, id, key) {
+  const g = c.g, gd = g.course.guards[key], p = g.P[id];
+  gd.open = true;
+  log(g, `守護者「${GUARDS[gd.k].name}」: ${GUARDS[gd.k].text}`);
+  if (gd.k === "lose") p.eldo = 0;
+  else if (gd.k === "give") { for (const o of g.order) if (o !== id) gainEldo(g, o, 1); }
+  else othersOpt(g, id, gd.k);
+}
+// 門を通れるか: 宝石3つ(3色)を持って門のとなりにいる
+const canExit = (g, id, piece) => { const p = g.P[id]; return !!g.cfg.gt && p.gems.length >= 3 && !p.done[piece] && nb(p.pieces[piece]).includes(g.course.gate); };
 function enter(c, id, piece, to) {
   const g = c.g, p = g.P[id], h = g.course.hex[to];
   p.pieces[piece] = to;
+  // 3〜4人: 宝石3つで門のとなりに来たら、カードを使わずにそのまま門へ(2人は「門を通る」で好きなときに)
+  if (h.t !== "g" && g.order.length > 2 && canExit(g, id, piece)) return enter(c, id, piece, g.course.gate);
   if (h.t === "g") {
     p.done[piece] = true; if (g.move && g.move.piece === piece) g.move = null;
-    log(g, `${nm(c, id)} のコマがエルドラドに到着！`);
+    log(g, g.cfg.gt ? `${nm(c, id)} のコマが宝石を持って門からエルドラドを脱出！` : `${nm(c, id)} のコマがエルドラドに到着！`);
     if (p.done.every(Boolean) && !g.finalRound) {
       // 最後のラウンド: このラウンドの最後の人まで遊んで終わり(最後の人なら今すぐ終わり)
       g.finalRound = true; g.endIdx = g.order.length - 1;
@@ -413,16 +575,18 @@ function enterWithCards(c, id, m) {
   const from = p.pieces[piece], h = hex[m.to];
   if (!h || !nb(from).includes(m.to)) return "となりのマスを選んでください";
   if (h.t !== "r" && h.t !== "c") return "このマスはカードの種類とパワーで入ります";
-  if (occupied(g, m.to) && !g.passAll) return "ほかのコマがいるマスには入れません";
+  if (blockedByPiece(g, id, m.to)) return "ほかのコマがいるマスには入れません";
   if (blockadeBetween(g, from, m.to)) return "先にバリケードを取り除いてください";
+  if (palBlocked(g, from, m.to)) return "柵のとがった側からは入れません";
   const ids = Array.isArray(m.cards) ? [...new Set(m.cards)] : [];
   if (ids.length !== h.v || !ids.every((x) => p.hand.some((y) => y.id === x))) return `手札から${h.v}枚選んでください`;
   endMove(c);
+  g.used = true;
   for (const x of ids) {
     if (h.t === "c") { const card = p.hand.splice(p.hand.findIndex((y) => y.id === x), 1)[0]; removeCard(g, id, card); } // ベースキャンプ: ゲームから除外
     else playFromHand(g, id, x, false);
   }
-  if (h.t === "c") log(g, `${nm(c, id)} がベースキャンプでカードを${ids.length}枚除外`);
+  if (h.t === "c") log(g, `${nm(c, id)} が${g.cfg.gt ? "キャンプ" : "ベースキャンプ"}でカードを${ids.length}枚除外`);
   enter(c, id, piece, m.to);
   stopAt(c, id, piece);
   pump(c);
@@ -456,6 +620,14 @@ function breakBlockade(c, id, m) {
   if (bl.t === "d") {
     endMove(c);
     g.q.push({ t: "curse", pid: id, piece });
+  } else if (bl.t[0] === "x") {
+    // 黄金の神殿のバリケード 11〜14: カードは使わない
+    if (bl.t === "xpay" && p.eldo < 1) return "エルドが1つ必要です";
+    endMove(c);
+    if (bl.t === "xpay" && p.eldo < 1) { pump(c); return "エルドがなくなりました"; }
+    if (bl.t === "xpay") p.eldo--;
+    else if (bl.t === "xeldo") { for (const o of g.order) if (o !== id) gainEldo(g, o, 1); }
+    else othersOpt(g, id, bl.t === "xdraw" ? "draw" : "trash");
   } else if (bl.t === "r") {
     const e = canPlayCards(p); if (e) return e;
     const ids = Array.isArray(m.cards) ? [...new Set(m.cards)] : [];
@@ -493,26 +665,30 @@ const STEP = {
   native: { n: 1, bl: true }, shaman: { n: 2, bl: true }, geologist: { n: 1, demonOnly: true },
   isabella: { n: 1, occ: true, mt: true, bl: true }, nathan: { n: 3, single: true, bl1: true }, gertrude: { n: 6, occ: true, mt: true, bl: true },
   voodoo: { n: 2, foreign: true, must: true }, paralysis: { n: 1, foreign: true }, lara: { n: 1, foreign: true, must: true },
+  // 黄金の神殿(blF: たいまつのバリケードだけ / torch: 遺跡のマスだけ)
+  g_scroll: { n: 2, bl: true }, g_arch: { n: 2, torch: true, blF: true }, g_tracker: { n: 2, single: true, bl1: true }, g_map: { n: 1, bl: true }, g_outfit: { n: 1, bl: true },
 };
 function stepTargets(g, st) {
   const R = STEP[st.kind], p = g.P[st.owner], from = p.pieces[st.piece], hex = g.course.hex, out = [];
   for (const to of neighbors(g, from, !R.foreign)) {
     const h = hex[to];
-    if (!h || h.t === "s") continue;
+    if (!h || h.t === "s" || h.t === "q" || h.gate) continue;
     if (R.foreign && (h.t === "g" || nb(from).indexOf(to) < 0)) continue;
     if (isMountain(h) && !((R.mt || R.demonOnly) && emptyMountain(g, to))) continue;
     if (R.demonOnly && !isMountain(h) && h.t !== "d" && h.t !== "t") continue;
     if (R.single && h.v !== 1) continue;
-    if (occupied(g, to) && !(R.occ || (g.passAll && !R.foreign))) continue;
+    if (R.torch && h.t !== "f") continue;
+    if (palBlocked(g, from, to)) continue;
+    if (R.foreign ? occupied(g, to) && !R.occ : blockedByPiece(g, st.owner, to) && !R.occ) continue;
     const bl = blockadeBetween(g, from, to);
-    if (bl && !(R.bl || (R.bl1 && bl.v === 1 && bl.t !== "d"))) continue;
+    if (bl && !(R.bl || (R.blF && bl.t === "f") || (R.bl1 && bl.v === 1 && (g.cfg.gt ? bl.t === "f" : bl.t !== "d")))) continue;
     out.push(to);
   }
   return out;
 }
 function startSteps(c, st) {
   const g = c.g;
-  st.left = STEP[st.kind].n;
+  st.left = st.n || STEP[st.kind].n;
   g.steps = st;
   if (!stepTargets(g, st).length) finishSteps(c);
 }
@@ -544,6 +720,11 @@ function pump(c) {
     const t = g.q.shift();
     if (t.t === "curse") drawCurse(c, t.pid, t.piece);
     else if (t.t === "steps") { if (g.P[t.owner] && !g.P[t.owner].done[t.piece]) startSteps(c, t); }
+    else if (t.t === "opt" && g.P[t.pid]) {
+      // 守護者・バリケードの「ほかの全員が〜してよい」
+      if (t.kind === "draw") g.pending = { type: "optdraw", pid: t.pid, title: "山札からカードを1枚引きますか？(引かなくてもよい)" };
+      else if (g.P[t.pid].hand.length) g.pending = { type: "trash", pid: t.pid, max: 1, title: "手札から1枚ゲームから除外してよい(しなくてもよい)" };
+    }
   }
   arm(c);
 }
@@ -608,9 +789,10 @@ function buy(c, id, m, free) {
   const slot = g.market.findIndex((s) => s && s.k === k);
   const hole = g.market.findIndex((s) => !s);
   const access = !free && m.access != null ? p.tokens.find((x) => x.id === m.access && x.k === "market") : null;
+  const any = !free && g.anyBuy && slot < 0 && hole < 0; // 新しい装備: 市場の外から買う(山は動かさない)
   if (slot < 0) {
     if (!g.reserve[k]) return "売り切れです";
-    if (hole < 0 && !free && !access) return "市場に空きがないので、市場の外のカードは買えません";
+    if (hole < 0 && !free && !access && !any) return "市場に空きがないので、市場の外のカードは買えません";
   }
   if (!free) {
     if (g.bought) return "カードを買えるのは1ターンに1枚です";
@@ -622,7 +804,9 @@ function buy(c, id, m, free) {
     if (!toks.every((x) => p.tokens.some((y) => y.id === x && TOKENS[y.k].s === "v"))) return "コインの洞窟トークンだけ使えます";
     if (toks.length && symBlocked(p, "v")) return "不調の呪い: コインが使えません";
     const boost = m.boost != null ? ids.find((x) => x === m.boost && cardDef(p.hand.find((y) => y.id === x)).boost) : null;
-    const total = ids.reduce((n, x) => n + coinOf(g, p, p.hand.find((y) => y.id === x), x === boost), 0) + toks.reduce((n, x) => n + TOKENS[p.tokens.find((y) => y.id === x).k].p, 0);
+    if (g.cfg.gt && m.eldo) endMove(c); // 先に移動を終える(止まったマスの守護者でエルドが減ることがある)
+    const el = g.cfg.gt && Number.isInteger(m.eldo) ? Math.max(0, Math.min(p.eldo, m.eldo)) : 0; // エルドは1つ1コイン
+    const total = ids.reduce((n, x) => n + coinOf(g, p, p.hand.find((y) => y.id === x), x === boost), 0) + toks.reduce((n, x) => n + TOKENS[p.tokens.find((y) => y.id === x).k].p, 0) + el;
     if (total < d.cost) return `コインが足りません(${total} / ${d.cost})`;
     endMove(c);
     // コインとして効果を使ったアイテム(宝箱・プロペラ機)は除外。0.5 として使ったものは場へ
@@ -634,13 +818,14 @@ function buy(c, id, m, free) {
     }
     for (const x of toks) useToken(g, id, x);
     if (access) useToken(g, id, access.id);
+    p.eldo -= el;
     g.bought = true;
   }
   // 市場から1枚減らす。市場の外から買ったら、その山を空きに置く(市場への道を使ったときは置かない)
   if (slot >= 0) { g.market[slot].n--; if (!g.market[slot].n) g.market[slot] = null; }
   else {
     g.reserve[k]--; const left = g.reserve[k]; delete g.reserve[k];
-    if (hole >= 0 && !access) { if (left) g.market[hole] = { k, n: left }; } else if (left) g.reserve[k] = left;
+    if (hole >= 0 && !access && !any) { if (left) g.market[hole] = { k, n: left }; } else if (left) g.reserve[k] = left;
   }
   p.discard.push({ id: ++g.uid, k });
   log(g, `${nm(c, id)} が ${d.name} を${free ? "電信機でもらった" : "買った"}`);
@@ -657,16 +842,25 @@ function action(c, id, m) {
   if (!card || !cardDef(card).a) return "アクションカードを選んでください";
   const e0 = canPlayAction(p); if (e0) return e0;
   const k = card.k;
-  const MOVE = { native: 1, shaman: 1, geologist: 1, isabella: 1, nathan: 1, gertrude: 1 };
+  const MOVE = { native: 1, shaman: 1, geologist: 1, isabella: 1, nathan: 1, gertrude: 1, g_scroll: 1, g_arch: 1, g_tracker: 1, g_map: 1, g_outfit: 1 };
   if (MOVE[k]) {
     const e = movable(g); if (e) return e;
     const piece = pieceAt(g, id, m.piece); if (piece < 0) return "動かせるコマがありません";
+    // 装備屋: 払ったエルドの数だけ進む
+    let n = null;
+    if (k === "g_outfit") {
+      n = Number.isInteger(m.n) ? m.n : 0;
+      if (n < 1 || n > 3) return "払うエルドの数(1〜3)を選んでください";
+      if (p.eldo < n) return `エルドが足りません(${p.eldo}つ)`;
+      p.eldo -= n;
+    }
+    if (k === "g_map") gainEldo(g, id, 1);
     // 行き先を指定して使うとき(1マスだけのカード)は、先に行けるか確かめる
     if (m.to != null && !stepTargets(g, { kind: k, mover: id, owner: id, piece }).includes(m.to)) return "そのマスには進めません";
     endMove(c);
     playFromHand(g, id, card.id, true); // ガートルードは1回限りなのでここで除外される
     log(g, `${nm(c, id)} が ${CARDS[k].name} を使った`);
-    startSteps(c, { kind: k, mover: id, owner: id, piece, then: k === "shaman" ? [{ t: "curse", pid: id, piece }] : null });
+    startSteps(c, { kind: k, mover: id, owner: id, piece, n, then: k === "shaman" ? [{ t: "curse", pid: id, piece }] : null });
     if (m.to != null && g.steps) doStep(c, id, m.to);
     pump(c);
     return;
@@ -692,7 +886,39 @@ function action(c, id, m) {
   if (k === "travellog") { draw(g, id, 2); g.pending = { type: "trash", pid: id, max: 2, title: "探検記録: 手札から2枚までゲームから除外してよい" }; }
   if (k === "caveexp") takeSupplyToken(c, id);
   if (k === "magellan") { takeSupplyToken(c, id); g.keepToken = true; }
+  if (k === "g_gatherer") { gainEldo(g, id, 1); draw(g, id, 1); }
+  if (k === "g_hunter") { gainEldo(g, id, 1); if (p.hand.length) g.pending = { type: "trash", pid: id, max: 1, title: "狩人: 手札から1枚ゲームから除外してよい" }; }
+  if (k === "g_hat") { gainEldo(g, id, 3); g.anyBuy = true; }
   log(g, `${nm(c, id)} が ${CARDS[k].name} を使った`);
+  pump(c);
+}
+// 黄金の神殿: エルド1つで、コイン1つの村か「エルドを払う」神殿のマスへ1マス(カードとは合わせられない)
+function eldoStep(c, id, m) {
+  const g = c.g, p = g.P[id], hex = g.course.hex, piece = pieceAt(g, id, m.piece);
+  if (!g.cfg.gt) return;
+  const e0 = movable(g); if (e0) return e0;
+  if (piece < 0) return "動かせるコマがありません";
+  const from = p.pieces[piece], h = hex[m.to];
+  if (!h || !nb(from).includes(m.to)) return "となりのマスを選んでください";
+  if (!(h.t === "e" || (h.t === "v" && h.v === 1))) return "エルドで入れるのは、コイン1つの村か、エルドを払う神殿のマスだけです";
+  if (p.eldo < 1) return "エルドがありません";
+  if (blockedByPiece(g, id, m.to)) return "ほかのコマがいるマスには入れません";
+  if (blockadeBetween(g, from, m.to)) return "先にバリケードを取り除いてください";
+  if (palBlocked(g, from, m.to)) return "柵のとがった側からは入れません";
+  // 続けて進んでいたカードの移動はここで止まる(止まったマスの守護者でエルドを失うことがある)
+  endMove(c);
+  if (p.eldo < 1) { pump(c); return "エルドがなくなりました"; }
+  p.eldo--;
+  enter(c, id, piece, m.to);
+  stopAt(c, id, piece);
+  pump(c);
+}
+// 2人: 宝石3つで門のとなりにいるコマを門へ(もう1つのコマを待ってから出てもよい)
+function gate(c, id, m) {
+  const g = c.g, piece = pieceAt(g, id, m.piece);
+  if (piece < 0 || !canExit(g, id, piece)) return "宝石3つを持って門のとなりにいるコマだけが門を通れます";
+  endMove(c);
+  enter(c, id, piece, g.course.gate);
   pump(c);
 }
 // 洞窟トークン(記号のトークンは移動・購入で使う)
@@ -748,6 +974,13 @@ function trash(c, id, ids) {
   g.pending = null;
   pump(c);
 }
+function optDraw(c, id, yes) {
+  const g = c.g, pd = g.pending;
+  if (!pd || pd.type !== "optdraw" || pd.pid !== id) return;
+  g.pending = null;
+  if (yes) { draw(g, id, 1); log(g, `${nm(c, id)} がカードを1枚引いた`); }
+  pump(c);
+}
 function chooseHero(c, id, k) {
   const g = c.g, pd = g.pending;
   if (!pd || pd.type !== "hero" || pd.pid !== id) return;
@@ -785,7 +1018,9 @@ function endTurn(c, id, keepIds, force) {
   p.discard.push(...p.hand.filter((x) => !keep.has(x.id)));
   p.hand = p.hand.filter((x) => keep.has(x.id));
   draw(g, id, HAND - p.hand.length);
-  Object.assign(g, { bought: false, change: false, changeCard: null, passAll: false, lastItem: null, keepToken: false });
+  // 黄金の神殿: カードを1枚も出さず、買いもしなかったらエルドを1つ
+  if (g.cfg.gt && !g.used && !g.bought && p.eldo < ELDO_MAX) { gainEldo(g, id, 1); log(g, `${nm(c, id)} はカードを使わなかったのでエルドを1つもらった`); }
+  Object.assign(g, { bought: false, change: false, changeCard: null, passAll: false, lastItem: null, keepToken: false, used: false, anyBuy: false });
   if (g.finalRound && g.cur >= g.endIdx) return finish(c);
   g.cur = (g.cur + 1) % g.order.length;
   if (g.cur === 0) g.turnNo++;
@@ -800,6 +1035,7 @@ function autoResolve(c) {
       if (pd.type === "trash") trash(c, pd.pid, []);
       else if (pd.type === "hero") chooseHero(c, pd.pid, pd.opts[0]);
       else if (pd.type === "protect") protect(c, pd.pid, true);
+      else if (pd.type === "optdraw") optDraw(c, pd.pid, false);
       else g.pending = null;
     } else if (g.steps) {
       const st = g.steps, R = STEP[st.kind];
@@ -818,7 +1054,7 @@ function distance(g, from) {
   while (q.length) {
     const [k, d] = q.shift();
     if (hex[k].t === "g") return d;
-    for (const n of neighbors(g, k)) if (hex[n] && !seen.has(n) && hex[n].t !== "m" && hex[n].t !== "s") { seen.add(n); q.push([n, d + 1]); }
+    for (const n of neighbors(g, k)) if (hex[n] && !seen.has(n) && !isWall(hex[n]) && hex[n].t !== "s") { seen.add(n); q.push([n, d + 1]); }
   }
   return 999;
 }
@@ -828,9 +1064,10 @@ function finish(c) {
   const score = (id) => {
     const p = g.P[id], arrived = p.done.every(Boolean);
     const dist = p.pieces.reduce((n, k, i) => n + (p.done[i] ? 0 : distance(g, k)), 0);
-    return { id, arrived, nb: p.blockades.length, top: Math.max(0, ...p.blockades), dist };
+    return { id, arrived, nb: p.blockades.length, top: Math.max(0, ...p.blockades), dist, gems: p.gems.length };
   };
-  const rows = g.order.map(score).sort((a, b) => (b.arrived - a.arrived) || (b.nb - a.nb) || (b.top - a.top) || (a.dist - b.dist));
+  // 着いた人どうしはバリケードの数→最大の番号。着かなかった人(順位づけはこのサイトの独自)は、黄金の神殿なら宝石の数→門までの近さ
+  const rows = g.order.map(score).sort((a, b) => (b.arrived - a.arrived) || (a.arrived || !g.cfg.gt ? (b.nb - a.nb) || (b.top - a.top) || (a.dist - b.dist) : (b.gems - a.gems) || (a.dist - b.dist)));
   g.result = rows;
   const raw = {};
   rows.forEach((r, i) => { raw[r.id] = 100 - i; });
@@ -874,6 +1111,7 @@ function handle(c, pid, m) {
     if (m.a === "trash") return trash(c, pid, m.ids);
     if (m.a === "hero") return chooseHero(c, pid, m.k);
     if (m.a === "protect") return protect(c, pid, !!m.yes);
+    if (m.a === "opt") return optDraw(c, pid, !!m.yes);
     return "先に表示中の選択をしてください";
   }
   if (g.steps) {
@@ -895,6 +1133,8 @@ function handle(c, pid, m) {
     case "action": return action(c, pid, m);
     case "token": return token(c, pid, m);
     case "lift": return lift(c, pid, m);
+    case "eldo": return eldoStep(c, pid, m);
+    case "gate": return gate(c, pid, m);
     case "stop": endMove(c); pump(c); return;
     case "end": return endTurn(c, pid, m.keep, false);
     default: return;
@@ -919,8 +1159,19 @@ function onLeave(c, pid) {
 
 function view(c, me) {
   const g = c.g, mine = g.P[me];
-  const hexes = Object.entries(g.course.hex).map(([k, h]) => [k, h.t, h.v, h.sym || null, h.tile, h.cave ? (g.caveTok[k] || []).length : null, h.tavern ? 1 : 0]);
-  const pub = (id) => { const p = g.P[id]; return { pieces: p.pieces, done: p.done, deck: p.deck.length, discard: p.discard.length, hand: p.hand.length, played: p.played.map((x) => x.k), removed: p.gone.length, blockades: p.blockades, deckSize: p.deck.length + p.discard.length + p.hand.length + p.played.length, tokens: p.tokens.map((t) => t.k), curses: p.curses.map((x) => ({ id: x.id, k: x.k })), hero: p.hero }; };
+  // 8番目: 黄金の神殿の印(神殿の色・2人用・エルドのタイル・柵・守護者トークン(表になったものだけ種類))
+  const gx = (k, h) => {
+    if (!g.cfg.gt) return null;
+    const gd = g.course.guards[k], o = {};
+    if (h.temple) { o.tp = h.temple; if (h.two) o.two = 1; }
+    if (h.eldo) o.eldo = 1;
+    if (h.pal) o.pal = h.pal;
+    if (h.gate) o.gate = 1;
+    if (gd) o.gd = gd.open ? gd.k : "?";
+    return Object.keys(o).length ? o : null;
+  };
+  const hexes = Object.entries(g.course.hex).map(([k, h]) => [k, h.t, h.v, h.sym || null, h.tile, h.cave ? (g.caveTok[k] || []).length : null, h.tavern ? 1 : 0, gx(k, h)]);
+  const pub = (id) => { const p = g.P[id]; return { pieces: p.pieces, done: p.done, deck: p.deck.length, discard: p.discard.length, hand: p.hand.length, played: p.played.map((x) => x.k), removed: p.gone.length, blockades: p.blockades, deckSize: p.deck.length + p.discard.length + p.hand.length + p.played.length, tokens: p.tokens.map((t) => t.k), curses: p.curses.map((x) => ({ id: x.id, k: x.k })), hero: p.hero, eldo: p.eldo, gems: p.gems }; };
   const pd = g.pending;
   return {
     step: g.step, cfg: g.cfg, course: { id: g.course.id, name: g.course.name, endSym: g.course.endSym }, hexes,
@@ -928,7 +1179,7 @@ function view(c, me) {
     order: g.order, cur: curId(g), turnNo: g.turnNo, finalRound: g.finalRound,
     P: Object.fromEntries(g.order.map((id) => [id, pub(id)])),
     hand: mine ? mine.hand : null, tokens: mine ? mine.tokens : null, myDeck: mine ? [...mine.deck, ...mine.discard, ...mine.hand, ...mine.played].map((x) => x.k) : null,
-    market: g.market, reserve: g.reserve, bought: g.bought, change: g.change, passAll: g.passAll, keepToken: g.keepToken, lastItem: !!g.lastItem && curId(g) === me,
+    market: g.market, reserve: g.reserve, bought: g.bought, anyBuy: g.anyBuy && curId(g) === me, canExit: mine && g.cfg.gt ? mine.pieces.map((_, i) => canExit(g, me, i)) : null, change: g.change, passAll: g.passAll, keepToken: g.keepToken, lastItem: !!g.lastItem && curId(g) === me,
     move: g.move && curId(g) === me ? g.move : g.move ? { k: g.move.k, left: g.move.left, fixed: g.move.fixed } : null,
     steps: g.steps ? { kind: g.steps.kind, mover: g.steps.mover, owner: g.steps.owner, piece: g.steps.piece, left: g.steps.left, targets: g.steps.mover === me ? stepTargets(g, g.steps) : [] } : null,
     pending: pd ? (pd.pid === me ? { type: pd.type, max: pd.max, only: pd.only, title: pd.title, opts: pd.opts, curse: pd.curse && pd.curse.k } : { type: pd.type, pid: pd.pid }) : null,
@@ -937,4 +1188,4 @@ function view(c, me) {
   };
 }
 
-module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, CARDS, COURSES, BOARDS, TOKENS, CURSES, MARKET0, RESERVE0, RESERVE_HH, _t: { buildCourse, distance, coinOf, blockadeBetween, stepTargets, neighbors, autoResolve } };
+module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, CARDS, COURSES, BOARDS, TOKENS, CURSES, MARKET0, RESERVE0, RESERVE_HH, GT_BOARDS, GT_COURSES, GT_MARKET0, GT_RESERVE0, GUARDS, BLOCKADES_GT, _t: { buildCourse, distance, coinOf, blockadeBetween, stepTargets, neighbors, autoResolve, canExit, palBlocked, localHexes } };

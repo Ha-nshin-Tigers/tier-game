@@ -260,7 +260,7 @@ $("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQ
 }
 
 // ---- 共通 ----
-let DB = { cards: {}, courses: {}, tokens: {}, curses: {} };
+let DB = { cards: {}, courses: {}, tokens: {}, curses: {}, guards: {} };
 const player = (id) => S?.players.find((p) => p.id === id);
 const nameOf = (id) => player(id)?.name || "退出した人";
 const PCOL = ["#e5484d", "#f2f0e6", "#9d7df7", "#ff9636"];
@@ -268,16 +268,21 @@ const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -
 const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
 const isGM = () => S.gameHostId === me;
 const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
-const SYM = { j: { n: "ナタ", ic: "🌿", c: "#3f9a5c" }, w: { n: "パドル", ic: "🛶", c: "#3a8ad0" }, v: { n: "コイン", ic: "🪙", c: "#e3b041" }, a: { n: "アクション", ic: "✨", c: "#9d6fd1" }, x: { n: "魔物", ic: "👹", c: "#4b3a6b" } };
-const TER = { j: "#5aa86b", w: "#5d9fe0", v: "#f0cc5a", r: "#a8adb2", c: "#d46a5a", m: "#4a4f57", s: "#e8e2cf", g: "#f2c14e", d: "#5b3f8f", t: "#5b3f8f" };
+const SYM = { j: { n: "ナタ", ic: "🌿", c: "#3f9a5c" }, w: { n: "パドル", ic: "🛶", c: "#3a8ad0" }, v: { n: "コイン", ic: "🪙", c: "#e3b041" }, f: { n: "たいまつ", ic: "🔥", c: "#e07a26" }, a: { n: "アクション", ic: "✨", c: "#9d6fd1" }, x: { n: "魔物", ic: "👹", c: "#4b3a6b" } };
+const TER = { j: "#5aa86b", w: "#5d9fe0", v: "#f0cc5a", r: "#a8adb2", c: "#d46a5a", m: "#4a4f57", s: "#e8e2cf", g: "#f2c14e", d: "#5b3f8f", t: "#5b3f8f", f: "#ec9a4a", q: "#8a6d2f", e: "#eab7cc" };
+// 黄金の神殿: 宝石の色・バリケード 11〜14 の表示
+const GEM = { red: { n: "赤", c: "#e5484d" }, green: { n: "緑", c: "#2f9e57" }, blue: { n: "青", c: "#3a7bd5" } };
+const XBL = { xdraw: "ほかの全員が1枚引いてよい", xtrash: "ほかの全員が手札1枚を除外してよい", xeldo: "ほかの全員がエルド1つ", xpay: "エルドを1つ払う" };
+const blText = (b) => b.t === "r" ? `手札${b.v}枚を捨てる` : b.t === "d" ? "呪いを1枚引く" : XBL[b.t] || `${SYM[b.t].n}${b.v}`;
+const blShort = (b) => b.t === "r" ? `捨${b.v}` : b.t === "d" ? "👹1" : XBL[b.t] ? { xdraw: "引", xtrash: "除", xeldo: "E+", xpay: "E-" }[b.t] : SYM[b.t].ic + b.v;
 // sel: 選んだ手札 / tsel: 選んだ洞窟トークン / mode: マスを押す待ち(原住民など)・市場を押す待ち(電信機・ヘンリー)
-let local = { sel: new Set(), tsel: new Set(), mode: null, modeCard: null, piece: 0, keep: new Set(), boost: false, access: false, sx: null, sy: null, lastFrom: null };
+let local = { sel: new Set(), tsel: new Set(), mode: null, modeCard: null, piece: 0, keep: new Set(), boost: false, access: false, sx: null, sy: null, lastFrom: null, eldo: 0 };
 const cardDef = (k) => DB.cards[k] || {};
 const symsOf = (k) => { const d = cardDef(k); return d.a ? ["a"] : d.demon ? ["x"] : d.s || []; };
 
 function cardEl(card, opt = {}) {
   const d = cardDef(card.k), syms = symsOf(card.k), s = SYM[syms[0]] || SYM.a;
-  const sub = d.a || d.demon ? "" : syms.length === 3 ? "ナタ・パドル・コインのどれか" : syms.map((x) => SYM[x].n).join("か");
+  const sub = d.a || d.demon ? "" : syms.length >= 3 ? syms.map((x) => SYM[x].n).join("・") + "のどれか" : syms.map((x) => SYM[x].n).join("か");
   return h(opt.onclick ? "button" : "div", { type: opt.onclick ? "button" : null, class: "ecard" + (opt.sel ? " sel" : "") + (opt.small ? " small" : "") + (d.hero ? " hero" : "") + (d.demon ? " demon" : ""), style: `--cc:${s.c}`, onclick: opt.onclick || null, title: d.text || "", "aria-pressed": opt.onclick ? (opt.sel ? "true" : "false") : null },
     h("span", { class: "top" }, h("span", { class: "ic" }, syms.map((x) => SYM[x]?.ic || "").join("")), d.p ? h("b", { class: "p" }, d.p) : null),
     h("span", { class: "nm" }, d.name || card.k),
@@ -302,7 +307,7 @@ function onTransition(prev, cur) {
   if ((g.steps?.mover === me && pg.steps?.mover !== me) || (g.pending?.type && !g.pending.pid && !pg.pending)) Sound.play("turn");
   if (g.step === "end" && pg.step !== "end") Sound.play("reveal");
 }
-const resetSel = () => { local.sel.clear(); local.tsel.clear(); local.mode = null; local.modeCard = null; local.boost = false; local.access = false; };
+const resetSel = () => { local.sel.clear(); local.tsel.clear(); local.mode = null; local.modeCard = null; local.boost = false; local.access = false; local.eldo = 0; };
 
 function render() {
   if (!S) return;
@@ -314,7 +319,7 @@ function renderMeta() {
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
     h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
   const g = S.game;
-  if (g) m.append(h("span", { class: "pill" }, `${g.course.name}・${g.turnNo}ラウンド目` + (g.finalRound ? "(最後)" : "")));
+  if (g) m.append(h("span", { class: "pill" }, (g.cfg.gt ? "黄金の神殿・" : "") + `${g.course.name}・${g.turnNo}ラウンド目` + (g.finalRound ? "(最後)" : "")));
 }
 function renderSide() {
   const side = $("side"); side.replaceChildren();
@@ -327,7 +332,8 @@ function renderSide() {
       const extra = [p.tokens.length ? `洞窟${p.tokens.length}` : "", p.curses.length ? "呪い:" + p.curses.map((x) => DB.curses[x.k]?.name).join("・") : "", p.hero ? "英雄あり" : ""].filter(Boolean).join("・");
       ul.append(h("li", { class: id === g.cur ? "cur" : "" }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
         h("span", { class: "pname" }, (id === g.cur ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : "")),
-        h("span", { class: "pinfo" }, `デッキ${p.deckSize}枚・🚧${p.blockades.length}` + (p.done.some(Boolean) ? "・🏁" + p.done.filter(Boolean).length : "")),
+        h("span", { class: "pinfo" }, `デッキ${p.deckSize}枚・🚧${p.blockades.length}` + (g.cfg.gt ? `・エルド${p.eldo}` : "") + (p.done.some(Boolean) ? "・🏁" + p.done.filter(Boolean).length : "")),
+        g.cfg.gt ? h("span", { class: "pextra" }, "宝石: ", ...(p.gems.length ? p.gems.map((x) => h("b", { style: `color:${GEM[x].c}` }, "◆" + GEM[x].n + " ")) : ["まだなし"])) : null,
         extra ? h("span", { class: "pextra" }, extra) : null));
     }
     side.append(ul);
@@ -387,13 +393,16 @@ function renderPending(main, g) {
       h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => { act("trash", { ids: [...local.sel] }); local.sel.clear(); } }, local.sel.size ? `${local.sel.size}枚除外する` : "除外しない"))));
   } else if (pd.type === "hero") {
     main.append(h("div", { class: "prompt" }, h("b", {}, "酒場: 仲間にする英雄を1人選んでください(手札に入ります)"), h("div", { class: "cards" }, ...pd.opts.map((k) => cardEl({ k }, { onclick: () => act("hero", { k }) })))));
+  } else if (pd.type === "optdraw") {
+    main.append(h("div", { class: "prompt" }, h("b", {}, pd.title),
+      h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("opt", { yes: true }) }, "1枚引く"), h("button", { type: "button", class: "ghost", onclick: () => act("opt", { yes: false }) }, "引かない"))));
   } else if (pd.type === "protect") {
     const d = DB.curses[pd.curse] || {};
     main.append(h("div", { class: "prompt" }, h("b", {}, `呪い「${d.name}」を引きました。呪いよけを使って防ぎますか？`), h("p", { class: "small" }, d.text),
       h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("protect", { yes: true }) }, "呪いよけを使う"), h("button", { type: "button", class: "ghost", onclick: () => act("protect", { yes: false }) }, "使わない"))));
   }
 }
-const STEPN = { native: "原住民", shaman: "シャーマン", geologist: "地質学者", isabella: "イザベラ", nathan: "ネイサン", gertrude: "ガートルード", voodoo: "呪術", paralysis: "昏睡", lara: "ララ" };
+const STEPN = { native: "原住民", shaman: "シャーマン", geologist: "地質学者", isabella: "イザベラ", nathan: "ネイサン", gertrude: "ガートルード", voodoo: "呪術", paralysis: "昏睡", lara: "ララ", g_scroll: "巻物", g_arch: "考古学者", g_tracker: "追跡者", g_map: "宝の地図", g_outfit: "装備屋" };
 function renderSteps(main, g) {
   const st = g.steps, foreign = st.owner !== me;
   main.append(h("div", { class: "prompt" }, h("b", {}, `${STEPN[st.kind]}: ${foreign ? nameOf(st.owner) + " さんの" : "自分の"}コマを動かす(あと${st.left}回)`),
@@ -405,7 +414,7 @@ function renderSteps(main, g) {
 const HS = 22, SQ3 = Math.sqrt(3);
 const px = (q, r) => [HS * SQ3 * (q + r / 2), HS * 1.5 * r];
 const nbKeys = (k) => { const [q, r] = k.split(",").map(Number); return [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]].map(([a, b]) => `${q + a},${r + b}`); };
-const hexMap = (g) => new Map(g.hexes.map(([k, t, v, sym, tile, cave, tav]) => [k, { k, t, v, sym, tile, cave, tav }]));
+const hexMap = (g) => new Map(g.hexes.map(([k, t, v, sym, tile, cave, tav, x]) => [k, { k, t, v, sym, tile, cave, tav, x: x || {} }]));
 // となり(トンネルは同じタイルのトンネル同士もとなり)
 function nbsOf(g, hm, k) {
   const out = nbKeys(k).filter((x) => hm.has(x)), hx = hm.get(k);
@@ -431,16 +440,25 @@ function boardEl(g, myTurn) {
   // 押せるマス: コマを動かす効果の途中ならその行き先、自分の番ならとなり
   let near;
   if (g.steps && g.steps.mover === me) near = new Set(g.steps.targets);
-  else if (myTurn && from) near = new Set(nbsOf(g, hm, from).filter((k) => { const hx = hm.get(k); return hx.t !== "s" && ((hx.t !== "m" && (!occ.has(k) || g.passAll)) || (local.mode && ["isabella", "geologist", "geostep"].includes(local.mode))); }));
+  else if (myTurn && from) near = new Set(nbsOf(g, hm, from).filter((k) => { const hx = hm.get(k); return hx.t !== "s" && hx.t !== "q" && !hx.x.gate && ((hx.t !== "m" && (!occ.has(k) || g.passAll || (hx.x.two && g.order.length === 2 && occ.get(k) === me))) || (local.mode && ["isabella", "geologist", "geostep"].includes(local.mode))); }));
   else near = new Set();
   const pts = (cx, cy) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 180 * (60 * i - 30); return `${cx + HS * 0.97 * Math.cos(a)},${cy + HS * 0.97 * Math.sin(a)}`; }).join(" ");
   for (const hx of hm.values()) {
     const [q, r] = hx.k.split(",").map(Number), [x, y] = px(q, r);
     const canTry = near.has(hx.k);
-    const poly = el("polygon", { points: pts(x, y), fill: TER[hx.t], stroke: canTry ? "#fff" : hx.tav ? "#c9822e" : "rgba(0,0,0,.35)", "stroke-width": canTry ? 2.5 : hx.tav ? 2.5 : 0.8, class: canTry ? "can" : "" });
+    const tp = hx.x.tp ? GEM[hx.x.tp].c : null;
+    const poly = el("polygon", { points: pts(x, y), fill: TER[hx.t], stroke: canTry ? "#fff" : tp || (hx.tav ? "#c9822e" : "rgba(0,0,0,.35)"), "stroke-width": canTry ? 2.5 : tp ? 3 : hx.tav ? 2.5 : 0.8, class: canTry ? "can" : "" });
     const gEl = el("g", { "data-k": hx.k }, [poly]);
+    if (tp) gEl.append(el("polygon", { points: `${x},${y - HS * 0.78} ${x + 4},${y - HS * 0.6} ${x},${y - HS * 0.42} ${x - 4},${y - HS * 0.6}`, fill: tp, stroke: "#181b23", "stroke-width": 0.6 }));
+    if (hx.x.two) gEl.append(txt(x + HS * 0.5, y - 5, "👥", { "font-size": 7 }));
+    if (hx.x.eldo) gEl.append(el("circle", { cx: x + HS * 0.5, cy: y + HS * 0.35, r: 4.5, fill: "#f2c14e", stroke: "#7a5a00", "stroke-width": 1 }));
+    // 柵: とがった側の辺に太い茶色の線
+    for (const d of hx.x.pal || []) { const a1 = Math.PI / 180 * (-60 * d + 30), a2 = Math.PI / 180 * (-60 * d - 30); gEl.append(el("line", { x1: x + HS * 0.92 * Math.cos(a1), y1: y + HS * 0.92 * Math.sin(a1), x2: x + HS * 0.92 * Math.cos(a2), y2: y + HS * 0.92 * Math.sin(a2), stroke: "#6b3d12", "stroke-width": 4, "stroke-linecap": "round" })); }
     if (hx.t === "d" || hx.t === "t") { gEl.append(txt(x, y + 4, "👹".repeat(hx.v), { "font-size": hx.v > 1 ? 8 : 10 })); if (hx.t === "t") gEl.append(el("circle", { cx: x - HS * 0.45, cy: y + HS * 0.42, r: 3.5, fill: "#7fd3ff", stroke: "#181b23", "stroke-width": 0.8 })); }
     else if (hx.t === "m") { if (hx.cave != null) gEl.append(txt(x, y + 4, hx.cave ? `⛏${hx.cave}` : "⛏", { "font-size": 9, fill: hx.cave ? "#ffd166" : "#888" })); }
+    else if (hx.t === "q") { const gd = hx.x.gd; gEl.append(txt(x, y + 4, gd === "?" || !gd ? "守?" : (DB.guards[gd]?.name || "守").slice(0, 2), { "font-size": 9, fill: "#fff" })); }
+    else if (hx.x.gate) gEl.append(txt(x, y + 4, "門", { "font-size": 11, fill: "#181b23" }));
+    else if (hx.t === "e") gEl.append(txt(x, y + 4, "E1", { "font-size": 10, fill: "#7a2a4a" }));
     else if (hx.t === "s") gEl.append(txt(x, y + 4, "S", { "font-size": 9, fill: "#555" }));
     else {
       const label = hx.t === "r" || hx.t === "c" ? `${hx.t === "r" ? "捨" : "除"}${hx.v}` : hx.t === "g" ? "金" : "•".repeat(hx.v);
@@ -456,7 +474,7 @@ function boardEl(g, myTurn) {
     for (const hx of hm.values()) if (hx.tile === b.a) for (const n of nbKeys(hx.k)) { const o = hm.get(n); if (!o || o.tile !== b.b) continue;
       const [q1, r1] = hx.k.split(",").map(Number), [q2, r2] = n.split(",").map(Number), [x1, y1] = px(q1, r1), [x2, y2] = px(q2, r2);
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = (y2 - y1), dy = -(x2 - x1), L = Math.hypot(dx, dy) || 1, s = HS * 0.55;
-      svg.append(el("line", { x1: mx + dx / L * s, y1: my + dy / L * s, x2: mx - dx / L * s, y2: my - dy / L * s, stroke: b.t === "r" ? "#6b7076" : b.t === "d" ? "#3b2463" : SYM[b.t].c, "stroke-width": 5, "stroke-linecap": "round" })); }
+      svg.append(el("line", { x1: mx + dx / L * s, y1: my + dy / L * s, x2: mx - dx / L * s, y2: my - dy / L * s, stroke: b.t === "r" ? "#6b7076" : b.t === "d" ? "#3b2463" : XBL[b.t] ? "#b8860b" : SYM[b.t].c, "stroke-width": 5, "stroke-linecap": "round" })); }
   }
   // コマ(同じマスに2つあるときは少しずらす)
   const seen = new Map();
@@ -474,16 +492,20 @@ function boardEl(g, myTurn) {
     if (from && local.lastFrom !== from) { const [q, r] = from.split(",").map(Number), [x, y] = px(q, r); wrap.scrollLeft = x - (minx - pad) - wrap.clientWidth / 2; wrap.scrollTop = y - (miny - pad) - wrap.clientHeight / 2; local.lastFrom = from; }
     else if (local.sx != null) { wrap.scrollLeft = local.sx; wrap.scrollTop = local.sy; }
   }, 0);
-  const lg = [["j", "ジャングル(ナタ)"], ["w", "川(パドル)"], ["v", "村(コイン)"], ["r", "荒地: 手札を捨てる"], ["c", "ベースキャンプ: 手札を除外"], ["m", "山(入れない)"], ["g", "エルドラド"]];
+  const lg = g.cfg.gt ? [["j", "ジャングル(ナタ)"], ["w", "川(パドル)"], ["v", "村(コイン)"], ["f", "遺跡(たいまつ)"], ["c", "キャンプ: 手札を除外"], ["m", "山(入れない)"], ["q", "守護者(入れない)"], ["e", "エルドを払う神殿のマス"], ["g", "エルドラドの門"]]
+    : [["j", "ジャングル(ナタ)"], ["w", "川(パドル)"], ["v", "村(コイン)"], ["r", "荒地: 手札を捨てる"], ["c", "ベースキャンプ: 手札を除外"], ["m", "山(入れない)"], ["g", "エルドラド"]];
   if (g.cfg.hh) lg.push(["d", "魔物マス: 👹の数だけ呪い(水色の丸=トンネル)"]);
-  const legend = h("div", { class: "legend small" }, ...lg.map(([t, n]) => h("span", {}, h("i", { style: `background:${TER[t]}` }), n)), h("span", {}, "• の数がパワー"), g.cfg.caves ? h("span", {}, "⛏ 洞窟(数字は残りトークン)") : null, g.cfg.hh ? h("span", {}, "🍺 酒場(英雄)") : null);
-  const bls = h("div", { class: "small" }, "バリケード: ", ...g.blockades.map((b) => h("span", { class: "blk" + (b.by ? " gone" : "") }, `${b.n}:${b.t === "r" ? "捨" : b.t === "d" ? "👹" : SYM[b.t].ic}${b.v}` + (b.by ? `(${nameOf(b.by)})` : ""))));
-  return h("div", { class: "boardbox" }, wrap, legend, bls);
+  const legend = h("div", { class: "legend small" }, ...lg.map(([t, n]) => h("span", {}, h("i", { style: `background:${TER[t]}` }), n)), h("span", {}, "• の数がパワー"), g.cfg.caves ? h("span", {}, "⛏ 洞窟(数字は残りトークン)") : null, g.cfg.hh ? h("span", {}, "🍺 酒場(英雄)") : null,
+    g.cfg.gt ? h("span", {}, "◆色のふち=神殿(止まると宝石)・👥=2人用") : null, g.cfg.eldoMod ? h("span", {}, "金の丸=エルドのタイル") : null, g.cfg.palMod ? h("span", {}, "茶色の線=柵(その辺からは入れない)") : null);
+  const bls = h("div", { class: "small" }, "バリケード: ", ...g.blockades.map((b) => h("span", { class: "blk" + (b.by ? " gone" : ""), title: blText(b) }, `${b.n}:${blShort(b)}` + (b.by ? `(${nameOf(b.by)})` : ""))));
+  const gds = g.cfg.gt ? h("details", { class: "small" }, h("summary", {}, "守護者(となりに止まると表になって効果。表になったものは盤に名前)"), h("ul", { class: "rules" }, ...Object.values(DB.guards).map((x) => h("li", {}, `${x.name}: ${x.text}`)))) : null;
+  return h("div", { class: "boardbox" }, wrap, legend, bls, gds);
 }
 function tapHex(g, hx, piece) {
   if (g.steps && g.steps.mover === me) return act("step", { to: hx.k });
   if (local.mode === "action") { act("action", { card: local.modeCard, to: hx.k, piece }); resetSel(); return; }
   if (local.mode === "tokmove") { act("token", { id: local.modeCard, to: hx.k, piece }); resetSel(); return; }
+  if (local.mode === "eldo" || hx.t === "e") { act("eldo", { to: hx.k, piece }); resetSel(); return; }
   if (hx.t === "d" || hx.t === "t") { act("demon", { to: hx.k, piece }); resetSel(); return; }
   if (hx.t === "r" || hx.t === "c") {
     if (local.sel.size !== hx.v) return toast(`手札から${hx.v}枚選んでから、このマスを押してください(${hx.t === "r" ? "捨て札へ" : "ゲームから除外"})`);
@@ -508,12 +530,22 @@ function renderHand(main, g, myTurn) {
   const p = g.P[me], hand = g.hand || [], tokens = g.tokens || [];
   const box = h("div", { class: "handbox" });
   if (p.pieces.length > 1 && myTurn) box.append(h("div", { class: "btns" }, "動かすコマ: ", ...p.pieces.map((k, i) => h("button", { type: "button", class: "tiny" + (myPiece(g) === i ? " primary" : ""), disabled: p.done[i], onclick: () => { local.piece = i; render(); } }, `コマ${i + 1}` + (p.done[i] ? "(到着)" : "")))));
-  const coins = [...local.sel].reduce((n, id) => { const c = hand.find((x) => x.id === id); return n + (c ? coinOf(c) : 0); }, 0) + [...local.tsel].reduce((n, id) => { const t = tokens.find((x) => x.id === id); return n + (t && DB.tokens[t.k]?.s === "v" ? DB.tokens[t.k].p : 0); }, 0);
+  const coins = [...local.sel].reduce((n, id) => { const c = hand.find((x) => x.id === id); return n + (c ? coinOf(c) : 0); }, 0) + [...local.tsel].reduce((n, id) => { const t = tokens.find((x) => x.id === id); return n + (t && DB.tokens[t.k]?.s === "v" ? DB.tokens[t.k].p : 0); }, 0) + (g.cfg.gt ? Math.min(local.eldo, p.eldo) : 0);
   box.append(h("div", { class: "head" }, h("h3", {}, `手札(${hand.length})`), h("span", { class: "small muted" }, `山札${p.deck}・捨て札${p.discard}・除外${p.removed}`)));
   if (g.move && myTurn) box.append(h("p", { class: "small" }, `${cardDef(g.move.k).name || DB.tokens[g.move.k]?.name} の残りパワー ${g.move.left}${g.move.fixed ? "(" + SYM[g.move.fixed].n + ")" : ""}: となりのマスを押すと続けて進めます。`, h("button", { type: "button", class: "tiny ghost", onclick: () => act("stop") }, "ここで止まる")));
   const flags = [g.bought ? "購入済み(もう進めません)" : "", g.change ? "記号変更中: 次のカード1枚はナタ・パドル・コインのどれにも使える" : "", g.passAll ? "すり抜け中: ほかのコマのマスにも入れる" : "", g.keepToken ? "マゼラン博士: 次に使う洞窟トークン1つはなくならない" : ""].filter(Boolean);
   if (flags.length && myTurn) box.append(h("p", { class: "small" }, flags.join(" / ")));
-  if (local.mode && myTurn) box.append(h("p", { class: "small modehint" }, local.mode === "market" ? "市場のカードを押してください" : "進むマス(白くふちどられたマス)を押してください", h("button", { type: "button", class: "tiny ghost", onclick: () => { resetSel(); render(); } }, "やめる")));
+  if (local.mode === "outfit" && myTurn) box.append(h("p", { class: "small modehint" }, "装備屋: 払うエルドの数(=進むマスの数) ", ...[1, 2, 3].map((n) => h("button", { type: "button", class: "tiny", disabled: n > p.eldo, onclick: () => { act("action", { card: local.modeCard, n, piece: myPiece(g) }); resetSel(); } }, `${n}つ`)), h("button", { type: "button", class: "tiny ghost", onclick: () => { resetSel(); render(); } }, "やめる")));
+  else if (local.mode && myTurn) box.append(h("p", { class: "small modehint" }, local.mode === "market" ? "市場のカードを押してください" : local.mode === "eldo" ? "エルド1つで進むマス(コイン1つの村・エルドの神殿マス)を押してください" : "進むマス(白くふちどられたマス)を押してください", h("button", { type: "button", class: "tiny ghost", onclick: () => { resetSel(); render(); } }, "やめる")));
+  // 黄金の神殿: エルド(移動・支払い)と門
+  if (g.cfg.gt && myTurn) {
+    const row = h("div", { class: "btns small" }, `エルド ${p.eldo}/3`);
+    if (p.eldo) row.append(h("button", { type: "button", class: "tiny" + (local.mode === "eldo" ? " primary" : ""), onclick: () => { resetSel(); local.mode = "eldo"; render(); } }, "エルドで進む"),
+      " 支払いに使う: ", h("button", { type: "button", class: "tiny ghost", disabled: local.eldo <= 0, onclick: () => { local.eldo--; render(); } }, "−"), String(Math.min(local.eldo, p.eldo)), h("button", { type: "button", class: "tiny ghost", disabled: local.eldo >= p.eldo, onclick: () => { local.eldo++; render(); } }, "＋"));
+    box.append(row);
+    (g.canExit || []).forEach((ok, i) => { if (ok) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => act("gate", { piece: i }) }, `コマ${i + 1}を門から出す(脱出)`), h("span", { class: "small muted" }, "2人のときは、もう1つのコマを待ってから出してもかまいません"))); });
+    if (g.anyBuy) box.append(h("p", { class: "small" }, "新しい装備: このターンは市場の外のカードも買えます"));
+  }
   box.append(h("div", { class: "cards" }, ...hand.map((c) => {
     const d = cardDef(c.k);
     const el = cardEl(c, { sel: local.sel.has(c.id), onclick: myTurn ? () => { if (local.sel.has(c.id)) local.sel.delete(c.id); else local.sel.add(c.id); local.mode = null; render(); } : null });
@@ -535,13 +567,14 @@ function renderHand(main, g, myTurn) {
   if (p.curses.length) box.append(h("h3", {}, "呪い"), ...p.curses.map((cu) => { const d = DB.curses[cu.k] || {}; return h("div", { class: "curse small" }, h("b", {}, d.name), " ", d.text, myTurn ? h("button", { type: "button", class: "tiny", onclick: () => { act("lift", { curse: cu.id, cards: [...local.sel], tokens: [...local.tsel] }); resetSel(); } }, "選んだもので解く") : null); }));
   if (myTurn) {
     const n = local.sel.size + local.tsel.size;
-    box.append(h("p", { class: "small muted" }, n === 0 ? "カード(または記号の洞窟トークン)を選んで、白くふちどられたマスを押すと進みます。荒地・ベースキャンプは必要な枚数を選んでから押します。魔物マスはそのまま押します(呪いを引く)。買うときは払うものを選んで市場のカードを押します。"
+    box.append(h("p", { class: "small muted" }, n === 0 ? (g.cfg.gt ? "カードを選んで、白くふちどられたマスを押すと進みます。キャンプは除外する枚数を選んでから押します。神殿のマスに止まると宝石。買うときは払うカード(とエルド)を選んで市場のカードを押します。カードを1枚も使わずにターンを終えるとエルドが1つもらえます。"
+      : "カード(または記号の洞窟トークン)を選んで、白くふちどられたマスを押すと進みます。荒地・ベースキャンプは必要な枚数を選んでから押します。魔物マスはそのまま押します(呪いを引く)。買うときは払うものを選んで市場のカードを押します。")
       : `${n}つ選択中(コイン ${coins})。`));
     // となりのバリケード
     const piece = myPiece(g), from = p.pieces[piece], hm = hexMap(g);
-    const near = g.blockades.filter((b) => !b.by && from && nbKeys(from).some((n2) => { const a = hm.get(from), o = hm.get(n2); return a && o && Math.min(a.tile, o.tile) === b.a && Math.max(a.tile, o.tile) === b.b && Math.abs(a.tile - o.tile) === 1; }));
-    for (const b of near) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => { const src = sourceForMove(g) || {}; act("blockade", { n: b.n, ...(b.t === "r" ? {} : src), cards: [...local.sel], piece, boost: local.boost || undefined }); resetSel(); } },
-      `バリケード${b.n}(${b.t === "r" ? `手札${b.v}枚を捨てる` : b.t === "d" ? "呪いを1枚引く" : `${SYM[b.t].n}${b.v}`})を取り除く`)));
+    const near = g.blockades.filter((b) => !b.by && from && nbKeys(from).some((n2) => { const a = hm.get(from), o = hm.get(n2); return a && o && Math.min(a.tile, o.tile) === b.a && Math.max(a.tile, o.tile) === b.b; }));
+    for (const b of near) box.append(h("div", { class: "btns" }, h("button", { type: "button", class: "primary", onclick: () => { const src = sourceForMove(g) || {}; act("blockade", { n: b.n, ...(b.t === "r" || XBL[b.t] ? {} : src), cards: [...local.sel], piece, boost: local.boost || undefined }); resetSel(); } },
+      `バリケード${b.n}(${blText(b)})を取り除く`)));
     // ターン終了: 残す手札
     box.append(h("div", { class: "endrow" }, hand.length ? h("span", { class: "small" }, "残す手札: ", ...hand.map((c) => h("label", { class: "keep" }, h("input", { type: "checkbox", checked: local.keep.has(c.id), onchange: (e) => { if (e.target.checked) local.keep.add(c.id); else local.keep.delete(c.id); } }), cardDef(c.k).name))) : null,
       h("button", { type: "button", class: "primary big", onclick: () => { act("end", { keep: [...local.keep].filter((id) => hand.some((x) => x.id === id)) }); resetSel(); local.keep.clear(); } }, "ターン終了")));
@@ -549,6 +582,7 @@ function renderHand(main, g, myTurn) {
   main.append(box);
 }
 function useAction(g, c) {
+  if (c.k === "g_outfit") { resetSel(); local.mode = "outfit"; local.modeCard = c.id; render(); return; }
   if (ACT_TO.has(c.k)) { resetSel(); local.mode = "action"; local.modeCard = c.id; toast(`${cardDef(c.k).name}: 進むマスを押してください`); render(); return; }
   if (c.k === "transmitter" || c.k === "henry") { resetSel(); local.mode = "market"; local.modeCard = c.id; toast(`${cardDef(c.k).name}: 市場のカードを押してください`); render(); return; }
   act("action", { card: c.id, piece: myPiece(g) }); resetSel();
@@ -578,21 +612,21 @@ function renderMarket(main, g, myTurn) {
   const buy = (k, outside) => {
     if (!myTurn) return;
     if (local.mode === "market") { act("action", { card: local.modeCard, k }); resetSel(); return; }
-    if (!local.sel.size && !local.tsel.size) return toast("払うカード(またはコインの洞窟トークン)を選んでから押してください");
+    if (!local.sel.size && !local.tsel.size && !local.eldo) return toast(g.cfg.gt ? "払うカード(またはエルド)を選んでから押してください" : "払うカード(またはコインの洞窟トークン)を選んでから押してください");
     const hole = g.market.some((s) => !s);
-    act("buy", { k, cards: [...local.sel], tokens: [...local.tsel], boost: local.boost ? [...local.sel].find((id) => cardDef(g.hand.find((x) => x.id === id)?.k).boost) : undefined, access: outside && !hole && access ? access.id : undefined });
+    act("buy", { k, cards: [...local.sel], tokens: [...local.tsel], eldo: g.cfg.gt ? local.eldo : undefined, boost: local.boost ? [...local.sel].find((id) => cardDef(g.hand.find((x) => x.id === id)?.k).boost) : undefined, access: outside && !hole && access ? access.id : undefined });
     resetSel();
   };
   box.append(h("div", { class: "cards" }, ...g.market.map((s) => s ? cardEl({ k: s.k }, { small: true, badge: `残り${s.n}`, onclick: myTurn ? () => buy(s.k, false) : null }) : h("div", { class: "ecard empty small" }, "空き"))));
-  const hole = g.market.some((s) => !s), canOut = hole || (local.mode === "market" && cardDef((g.hand || []).find((x) => x.id === local.modeCard)?.k).name === "電信機") || !!access;
-  box.append(h("details", { open: hole || local.mode === "market" }, h("summary", { class: "small" }, hole ? "市場の外のカード(市場に空きがあるので買えます)" : access ? "市場の外のカード(「市場への道」で買えます)" : "市場の外のカード(市場に空きができたら買えます)"),
+  const hole = g.market.some((s) => !s), canOut = hole || (local.mode === "market" && cardDef((g.hand || []).find((x) => x.id === local.modeCard)?.k).name === "電信機") || !!access || !!g.anyBuy;
+  box.append(h("details", { open: hole || local.mode === "market" || !!g.anyBuy }, h("summary", { class: "small" }, hole ? "市場の外のカード(市場に空きがあるので買えます)" : g.anyBuy ? "市場の外のカード(新しい装備で買えます)" : access ? "市場の外のカード(「市場への道」で買えます)" : "市場の外のカード(市場に空きができたら買えます)"),
     h("div", { class: "cards" }, ...Object.entries(g.reserve).map(([k, n]) => cardEl({ k }, { small: true, badge: `残り${n}`, onclick: myTurn && canOut ? () => buy(k, true) : null })))));
   main.append(box);
 }
 function renderResult(main, g) {
   const rows = g.result || [];
-  main.append(h("div", { class: "say good" }, rows[0]?.arrived ? `🏆 ${nameOf(rows[0].id)} さんがエルドラドに一番乗り！` : "ゲーム終了"),
-    h("table", { class: "rank" }, h("tbody", {}, ...rows.map((r, i) => h("tr", { class: r.id === me ? "me" : "" }, h("td", {}, `${i + 1}位`), h("td", {}, chip(r.id)), h("td", {}, r.arrived ? "到着" : `あと${r.dist}マス`), h("td", { class: "small" }, `バリケード${r.nb}`))))),
+  main.append(h("div", { class: "say good" }, rows[0]?.arrived ? (g.cfg.gt ? `🏆 ${nameOf(rows[0].id)} さんが宝石を持ってエルドラドを脱出！` : `🏆 ${nameOf(rows[0].id)} さんがエルドラドに一番乗り！`) : "ゲーム終了"),
+    h("table", { class: "rank" }, h("tbody", {}, ...rows.map((r, i) => h("tr", { class: r.id === me ? "me" : "" }, h("td", {}, `${i + 1}位`), h("td", {}, chip(r.id)), h("td", {}, r.arrived ? (g.cfg.gt ? "脱出" : "到着") : g.cfg.gt ? `宝石${r.gems}・門まであと${r.dist}マス` : `あと${r.dist}マス`), h("td", { class: "small" }, `バリケード${r.nb}`))))),
     h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
 }
 function renderLobby(main) {
@@ -602,16 +636,32 @@ function renderLobby(main) {
   } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
   const tog = (label, key, note, locked) => h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: !!st[key], disabled: !gm || locked, onchange: (e) => send({ t: "settings", s: { [key]: e.target.checked } }) }), h("span", {}, h("b", {}, label), h("span", { class: "small muted" }, " " + note)));
   const live = S.players.filter((p) => p.connected).length;
-  const hhCourse = DB.courses[st.course]?.exp === "hh";
+  const hhCourse = DB.courses[st.course]?.exp === "hh", gt = DB.courses[st.course]?.exp === "gt";
+  const courseSel = sel("コース(本家のルールブック)", "course", Object.entries(DB.courses).map(([k, c]) => [k, `${c.exp === "hh" ? "【英雄と呪い】" : c.exp === "gt" ? "【黄金の神殿】" : ""}${c.name}(${c.diff})`]));
+  const timeSel = sel("1手の持ち時間", "turnSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]);
+  if (gt) {
+    main.append(h("h2", {}, "遊び方(黄金の神殿)"),
+      h("ol", { class: "rules" },
+        h("li", {}, "目的: 3つの神殿(赤・緑・青)で宝石を1つずつ集め、スタートのタイルにある「エルドラドの門」から脱出すること。神殿の3マスのどれかに止まると、その色の宝石がもらえます。"),
+        h("li", {}, "手札4枚。カードのパワーで同じ種類のとなりのマスへ進みます(🌿ナタ=ジャングル・🛶パドル=川・🪙コイン=村・🔥たいまつ=遺跡)。•の数が必要なパワー。キャンプは手札を指定の枚数ゲームから除外して入ります。山と守護者のマスには入れません。"),
+        h("li", {}, "エルド(金貨トークン、最大3つ): 1つでコイン1つの村へ1マス進める・買い物で1コイン。カードを1枚も使わず買いもしなかったターンは1つもらえます。神殿の1つ(緑)はエルドを払って入る面です。"),
+        h("li", {}, "守護者のとなりに止まると、守護者が表になって効果が起きます。スタートのタイルの境目にはバリケード(9〜14)。1ターンに1枚、市場で買えます(進み終わってから)。"),
+        h("li", {}, "宝石3つで門のとなりに来たら、そのまま脱出(カード不要)。だれかが脱出したら、そのラウンドの最後の人まで遊んで終わり。脱出した人どうしはバリケードの多い人の勝ち(同じなら番号の大きい方、どちらも無ければ引き分け)。"),
+        h("li", {}, "2人: 1人2コマ。緑の宝石は、自分の2コマを同じ「👥2人用」のマスにそろえて止まると取れます。両方のコマが脱出したら到着。")),
+      h("div", { class: "settings" }, courseSel, timeSel),
+      h("div", { class: "toggles" },
+        tog("エルドのモジュール", "eldoMod", "エルドのタイル4枚(たいまつ・ナタ・コイン・パドル各1)を地形タイルの上にランダムに置く。止まるとエルドが1つ(もう一度もらうには一度ほかのマスに止まってから戻る)。"),
+        tog("柵のモジュール(小さい柵2枚)", "palMod", "3マスの柵(川・ジャングル)を地形タイルの上にランダムに置く。とがった側(茶色の線)からは入れない。")),
+      h("p", { class: "small muted" }, "※コース・神殿の位置はルールブック(2024年版)の図から、タイルの地形は2019年版のタイル写真から写したものです。ルールブックでスタートのタイルに接していない地形タイルにはバリケードを置いていません。柵の大きいタイル(地形タイルの間に置く13マス)は、置き方がルールブックで決まっていないため入れていません。小さい柵・エルドのタイルの置き場所はランダム(本来は自由に置く)。守護者・バリケードの効果名はこのサイトでつけたものです。"),
+      h("p", { class: "muted small" }, "2〜4人。約30〜60分。"));
+  } else
   main.append(h("h2", {}, "遊び方"),
     h("ol", { class: "rules" },
       h("li", {}, "手札4枚。カードのパワーで、同じ種類のとなりのマスへ進みます(🌿ナタ=ジャングル・🛶パドル=川・🪙コイン=村)。マスの•の数が必要なパワー。残ったパワーで続けて進めます。カードは1枚ずつ(合わせられない)。"),
       h("li", {}, "荒地は手札を指定の枚数捨て、ベースキャンプは手札を指定の枚数ゲームから除外して入ります(弱いカードを減らすチャンス)。ほかのコマのいるマスと山には入れません。"),
       h("li", {}, "1ターンに1枚、市場でカードを買えます(買うのは進み終わってから)。コインのカードはその数、ほかのカードは0.5コイン。買ったカードは捨て札へ。ボードの境目のバリケードは、最初に通る人が取り除きます。"),
       h("li", {}, "使わなかった手札は残してもOK。だれかがエルドラドに着いたら、そのラウンドの最後の人まで遊んで終わり。着いた人の中でバリケードの多い人の勝ち！")),
-    h("div", { class: "settings" },
-      sel("コース(本家のルールブック)", "course", Object.entries(DB.courses).map(([k, c]) => [k, `${c.exp === "hh" ? "【英雄と呪い】" : ""}${c.name}(${c.diff})`])),
-      sel("1手の持ち時間", "turnSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]])),
+    h("div", { class: "settings" }, courseSel, timeSel),
     h("div", { class: "toggles" },
       tog("洞窟ルール(基本セットの上級ルール)", "caves", "洞窟のある山のとなりに止まると、洞窟トークン(1回使える特典)がもらえる。", st.hh),
       tog("拡張「英雄と呪い」", "hh", "魔物マス・トンネル・呪い・魔物カード・酒場の英雄・動物カード・新しい市場カード4種・新しい洞窟トークン。洞窟ルールも入ります。", hhCourse)),
