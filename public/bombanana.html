@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ボムバナナ（BOMBANANA!風）</title>
+<meta name="description" content="3人協力の爆弾解除。目隠しの「見ざる」だけが爆弾に触れ、「聞かざる」だけが色や画面を見て、「言わざる」だけがマニュアルを読める。声が届く向きも限られた中で、伝言リレーで時間内に解除しよう。3Dのミニバンの車内で遊べます。">
+<meta name="theme-color" content="#3446c4">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="みんなのあそびば">
+<meta property="og:title" content="ボムバナナ（BOMBANANA!風）">
+<meta property="og:description" content="3人協力の爆弾解除。目隠しの「見ざる」だけが爆弾に触れ、「聞かざる」だけが色や画面を見て、「言わざる」だけがマニュアルを読める。声が届く向きも限られた中で、伝言リレーで時間内に解除しよう。3Dのミニバンの車内で遊べます。">
+<meta property="og:image" content="%%ORIGIN%%/icons/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=3Dの車内と役割ごとの道具、下=プレイヤーと招待 */
+:root {
+  --bg: #e9ecf2; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+.say.good { color: var(--good); } .say.red { color: var(--bad); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+.chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #181b23; border: 1.5px solid #181b23; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.word { font-family: var(--display); font-size: 18px; }
+.need { display: inline-block; font-family: var(--display); font-size: 18px; padding: 0 8px; border-radius: 6px; background: var(--gold); color: var(--ink); }
+
+/* 盤面(マス目)と矢印 */
+.seq { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 64px; align-items: center; }
+.arw { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 10px; border: 2px solid var(--line); font-family: var(--display); font-size: 26px; background: var(--surface); color: var(--fg); }
+.arw.now { width: 64px; height: 64px; font-size: 40px; border-color: var(--fg); background: var(--gold); color: #181b23; }
+.arw.hid { color: var(--muted); } .arw.done { opacity: .55; }
+.grid { --n: 5; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 5px; width: min(100%, 440px, max(210px, calc(100dvh - 380px))); margin: 0 auto; padding: 8px; border-radius: 12px; background: #3d4a2f; }
+.cell { position: relative; aspect-ratio: 1; border-radius: 8px; background: #c9b78a; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 2px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.cell.ghost { outline: 3px dashed #fff; outline-offset: -4px; }
+.cell.boom { animation: boom .9s ease-out; }
+@keyframes boom { 0% { background: #fff3a0; } 25% { background: #ff7a1a; transform: scale(.92); } 60% { background: #6b3a1f; } 100% { background: #c9b78a; } }
+.pc { display: grid; place-items: center; width: 44%; aspect-ratio: 1; border-radius: 50%; border: 2px solid #181b23; font-size: 12px; font-weight: 700; color: #181b23; }
+.pc.me { box-shadow: 0 0 0 3px #fff; } .pc.dead { filter: grayscale(1); opacity: .6; } .pc.hit { animation: shake .5s; }
+@keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.pad { display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(2, 60px); gap: 6px; justify-content: center; }
+.pad button { font-size: 28px; padding: 0; } .pad button.on { background: var(--fg); color: var(--surface); }
+.pad .u { grid-column: 2; } .pad .l { grid-column: 1; grid-row: 2; } .pad .d { grid-column: 2; grid-row: 2; } .pad .r { grid-column: 3; grid-row: 2; }
+.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--bad); width: 100%; }
+.hearts { letter-spacing: 1px; }
+.players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 180px; overflow: auto; }
+.rank { width: 100%; border-collapse: collapse; font-size: 14px; } .rank td { padding: 4px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; animation: pop .25s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (max-width: 520px) {
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .slot .n { font-size: 15px; }
+  .answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* ボムバナナ: 3Dの車内(左)と、役割ごとの道具(右) */
+.wrap { max-width: 1280px; }
+.playgrid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
+@media (max-width: 900px) { .playgrid { grid-template-columns: minmax(0, 1fr); } }
+.stagebox { position: relative; height: min(70vh, 640px); min-height: 320px; border-radius: 10px; overflow: hidden; background: #000; }
+@media (max-width: 900px) { .stagebox { height: 56vh; } }
+#stage { width: 100%; height: 100%; display: block; touch-action: none; }
+.hud { position: absolute; left: 8px; top: 8px; right: 8px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; font-weight: 700; }
+.hud > * { background: rgba(0,0,0,.6); color: #fff; padding: 3px 10px; border-radius: 8px; font-size: 14px; }
+.hud .tm { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .hud .tm.low { color: #ff6b6b; }
+.caps { position: absolute; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 4px; justify-items: center; pointer-events: none; }
+.caps div { background: rgba(0,0,0,.72); color: #fff; padding: 3px 12px; border-radius: 8px; font-size: 15px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; animation: pop .2s ease-out; }
+.readout { position: absolute; left: 8px; top: 48px; max-width: calc(100% - 16px); background: rgba(255,255,255,.92); color: #181b23; border-radius: 8px; padding: 6px 12px; font-size: 15px; font-weight: 700; pointer-events: none; }
+.readout:empty { display: none; }
+.readout .hot { color: #c4323a; }
+.dark { position: fixed; inset: 0; z-index: 28; background: rgba(0,0,0,.94); display: grid; place-items: center; color: #aaa; text-align: center; padding: 20px; }
+.ov { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10,12,18,.72); color: #fff; text-align: center; padding: 16px; }
+.ov .box { display: grid; gap: 10px; justify-items: center; max-width: 520px; }
+.ov h3 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 6vw, 40px); margin: 0; line-height: 1.2; }
+.ov .modlist { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.ov .modlist span { background: rgba(255,255,255,.15); border-radius: 999px; padding: 1px 10px; font-size: 13px; }
+.ov button { background: #fff; color: #181b23; border-color: #fff; }
+.flashred { animation: fr .6s; } @keyframes fr { 0% { box-shadow: inset 0 0 0 0 rgba(255,0,0,0); } 30% { box-shadow: inset 0 0 0 12px rgba(255,40,40,.85); } 100% { box-shadow: inset 0 0 0 0 rgba(255,0,0,0); } }
+.flashgreen { animation: fg .6s; } @keyframes fg { 30% { box-shadow: inset 0 0 0 12px rgba(60,220,120,.85); } }
+.boomfx { animation: bm 1.2s; } @keyframes bm { 0% { filter: brightness(4) saturate(0); } 100% { filter: none; } }
+.modbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.modbar button { padding: 3px 10px; font-size: 13px; }
+.modbar button.on, .seg button.on { background: var(--fg); color: var(--surface); }
+.seg { display: inline-flex; } .seg button { border-radius: 0; } .seg button:first-child { border-radius: 6px 0 0 6px; } .seg button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.tool { display: grid; gap: 10px; }
+.box2 { border: 1.5px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.box2 h3 { margin: 0; font-size: 14px; }
+.speak { display: flex; gap: 6px; } .speak input { flex: 1; }
+.emos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.emos button { padding: 6px 2px; font-size: 14px; }
+.rolebadge { display: inline-flex; gap: 6px; align-items: center; font-weight: 700; }
+.roles3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .roles3 { grid-template-columns: minmax(0, 1fr); } }
+.rolecard { border: 2px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 4px; text-align: left; font-weight: 400; align-content: start; }
+.rolecard.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.rolecard b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+.rolecard .who { font-size: 12px; font-weight: 700; color: var(--accent); }
+.checks { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.checks label { display: inline-flex; gap: 4px; align-items: center; }
+/* マニュアル(言わざる) */
+.man { display: grid; gap: 8px; }
+.mtabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.mtabs button { padding: 2px 8px; font-size: 12px; border-radius: 999px; border-color: var(--line); }
+.mtabs button.on { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.mpage { font-size: 13px; display: grid; gap: 6px; max-height: 62vh; overflow: auto; }
+.mpage table { border-collapse: collapse; width: 100%; }
+.mpage td, .mpage th { border: 1px solid var(--line); padding: 3px 5px; text-align: center; }
+.mpage th { background: var(--bg); font-size: 12px; }
+.cc { display: inline-block; min-width: 2.2em; padding: 0 5px; border-radius: 4px; color: #181b23; font-weight: 700; border: 1px solid #181b23; }
+.cc.red { background: #e5484d; color: #fff; } .cc.blue { background: #3a7bd5; color: #fff; } .cc.green { background: #2fa35a; color: #fff; } .cc.yellow { background: #f2c94c; }
+.mazes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mazes figure { margin: 0; display: grid; gap: 2px; justify-items: center; font-weight: 700; }
+.mazes canvas { width: 100%; max-width: 170px; aspect-ratio: 1; background: #fff; border-radius: 4px; cursor: crosshair; }
+.symcell canvas { width: 28px; height: 28px; vertical-align: middle; background: #fff; border-radius: 3px; }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }</script>
+</head>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">見ざる・聞かざる・言わざるの爆弾解除</div><h1>ボムバナナ <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（BOMBANANA!）</small></h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">見ざる・聞かざる・言わざるの爆弾解除</div><h1>ボムバナナ <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（BOMBANANA!）</small></h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+};
+const COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0", "#ee7fc0", "#5fd0c8"];
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); }
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+// ---- 効果音 ----
+const Sound = {
+  ctx: null, on: store.get("tier:sound") !== false,
+  setOn(v) { this.on = v; store.set("tier:sound", v); if (v) { this.unlock(); this.play("tap"); } },
+  unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch {} },
+  seq: { tap: [[880, 0, .06]], join: [[660, 0, .08], [880, .08, .12]], turn: [[784, 0, .1], [988, .1, .1], [1318, .2, .18]], done: [[1046, 0, .07]],
+    reveal: [[392, 0, .14], [523, .14, .14], [659, .28, .14], [1046, .42, .4]], tick: [[1000, 0, .05]] },
+  play(name) {
+    if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+    const t0 = this.ctx.currentTime, soft = name === "tick" || name === "done";
+    for (const [f, s, d] of this.seq[name] || []) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = soft ? "square" : "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + s); g.gain.exponentialRampToValueAtTime(soft ? 0.05 : 0.14, t0 + s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.02);
+    }
+  },
+};
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/bombanana/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("bombanana:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/bombanana?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+    else onExtra(m);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (!el) return toast(msg); el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null; 
+  store.set("bombanana:last", { room: "", name: myName });
+  history.replaceState(null, "", "/bombanana");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("bombanana:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+
+// ---- 共通 ----
+const player = (id) => S?.players.find((p) => p.id === id);
+const nameOf = (id) => player(id)?.name || "退出した人";
+const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const chip = (id) => h("span", { class: "chip", style: `background:${colorOf(id)}` }, nameOf(id) + (id === me ? "(あなた)" : ""));
+const isGM = () => S.gameHostId === me;
+const remaining = () => S?.deadline ? Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000)) : null;
+const act = (a, x = {}) => send({ t: "game", a, ...x });
+
+// ---- ボムバナナ: ここから下はこのゲームだけ ----
+window.PB_NO_CHAT = true; // 「しゃべれない・聞こえない」役があるので、全員の文字チャットは置かない
+const ROLE_JA = { blind: "見ざる", deaf: "聞かざる", mute: "言わざる", watch: "観戦" };
+const ROLE_ICON = { blind: "🙈", deaf: "🙉", mute: "🙊", watch: "👀" };
+const ROLE_DO = {
+  blind: "目隠しをしています。爆弾に触れて操作できるのはあなただけ。色・画面・ランプは見えませんが、点字・熱さ・音は分かります。声は言わざるに届きます(聞かざるには届きません)。聞かざるの声は聞こえます。",
+  deaf: "耳あてをしています。爆弾の色・画面・ランプと、仲間のジェスチャーが見えます。声は見ざる・言わざるの両方に届きますが、あなたにはだれの声もゲームの音も聞こえません。",
+  mute: "口をテープでふさがれています。マニュアルを読めるのはあなただけ。しゃべれないので、エモート・指差し・色の小物で伝えます。見ざると聞かざるの声は聞こえます。爆弾は見えません。",
+  watch: "観戦中です。聞かざると同じ見え方です。",
+};
+const HEARS = { blind: ["deaf"], mute: ["blind", "deaf"], deaf: [] };
+const COLOR_JA = { red: "赤", blue: "青", green: "緑", yellow: "黄" };
+const DIR_JA = { up: "上", right: "右", down: "下", left: "左" };
+const POS_JA = ["左上", "上の真ん中", "右上", "左の真ん中", "真ん中", "右の真ん中", "左下", "下の真ん中", "右下"];
+const EMO = { yes: "👍 はい", no: "👎 いいえ", n1: "1", n2: "2", n3: "3", n4: "4", n5: "5", up: "⬆ 上", down: "⬇ 下", left: "⬅ 左", right: "➡ 右", ok: "👌 OK", what: "❓ ？", angry: "💢 怒", wave: "👋 やあ", laugh: "😂 笑" };
+const EMO_T = { yes: "はい", no: "いいえ", n1: "1", n2: "2", n3: "3", n4: "4", n5: "5", up: "↑", down: "↓", left: "←", right: "→", ok: "OK", what: "？", angry: "怒", wave: "やあ", laugh: "笑" };
+const MOD_JA = { cable: "ケーブル", slider: "カラースライダー", direction: "方向", calc: "電卓", symbol: "シンボル", piano: "ピアノ", soundboard: "サウンドボード", monkey: "サルまね", morse: "モールス", maze: "迷路", switch: "スイッチ", pressure: "圧力(カオス)", rslider: "せり上がりスライダー(カオス)", alarm: "アラーム(カオス)" };
+const EASY = ["cable", "slider", "direction", "calc"], MEDIUM = ["symbol", "piano", "soundboard"], HARD = ["monkey", "morse", "maze", "switch"], CHAOS = ["pressure", "rslider", "alarm"];
+let DB = null, MANUAL = null, B3D = null, scene3d = null, sceneLoading = false, roleKey = "", lastFx = -1, stageBox = null;
+let local = { tab: "cable", focus: null, blindMode: "press", readout: "", touchKey: "", touchAt: 0, caps: [], mazeMarks: {}, sideSig: "", toolSig: "", lobbySig: "", skel: "" };
+const myRole = () => S?.game?.role?.[me] || "watch";
+const canHear = () => myRole() !== "deaf";
+const canSpeak = () => ["blind", "deaf"].includes(myRole());
+const isHover = matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+// ---- 効果音(WebAudio) ----
+Sound.tone = function (f, s, d, type = "sine", vol = 0.12) {
+  if (!this.on || !this.ctx || this.ctx.state !== "running") return;
+  const t0 = this.ctx.currentTime + s, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  o.connect(g).connect(this.ctx.destination); o.start(t0); o.stop(t0 + d + 0.03);
+};
+Sound.noise = function (d, vol = 0.2, lp = 1200) {
+  if (!this.on || !this.ctx || this.ctx.state !== "running") return null;
+  const n = Math.floor(this.ctx.sampleRate * d), buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate), a = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) a[i] = Math.random() * 2 - 1;
+  const src = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+  src.buffer = buf; f.type = "lowpass"; f.frequency.value = lp; g.gain.value = vol;
+  src.connect(f).connect(g).connect(this.ctx.destination); src.start(); return src;
+};
+const NOTE = [0, 262, 294, 330, 349, 392, 440, 494];
+function playFx(f) {
+  const T = (a, b, c, d, e) => Sound.tone(a, b, c, d, e);
+  switch (f.kind) {
+    case "chime": T(1318, 0, 0.3); T(1760, 0.14, 0.45); break;
+    case "morse": { let t = 0; for (const ch of f.code || "") { const d = ch === "-" ? 0.33 : 0.11; T(700, t, d, "sine", 0.14); t += d + 0.12; } break; }
+    case "note": T(NOTE[f.key] || 440, 0, 0.5, "triangle", 0.16); break;
+    case "beep": T(f.tone || 880, 0, 0.15, "square", 0.06); break;
+    case "click": T(2200, 0, 0.03, "square", 0.04); break;
+    case "snip": T(3000, 0, 0.04, "sawtooth", 0.05); T(1800, 0.04, 0.05, "sawtooth", 0.05); break;
+    case "hiss": Sound.noise(0.35, 0.12, 4000); break;
+    case "strike": T(150, 0, 0.45, "sawtooth", 0.16); T(110, 0.05, 0.5, "sawtooth", 0.12); break;
+    case "solved": T(988, 0, 0.12); T(1318, 0.1, 0.25); break;
+    case "clear": [523, 659, 784, 1046].forEach((x, i) => T(x, i * 0.12, 0.35, "triangle", 0.14)); break;
+    case "boom": Sound.noise(1.8, 0.5, 400); T(60, 0, 1.2, "sine", 0.4); break;
+    case "slap": Sound.noise(0.08, 0.35, 5000); break;
+    case "banana": T(500, 0, 0.12, "triangle"); T(320, 0.4, 0.15, "triangle"); break;
+    case "alarm": for (let i = 0; i < 4; i++) { T(880, i * 0.5, 0.25, "square", 0.07); T(660, i * 0.5 + 0.25, 0.25, "square", 0.07); } break;
+    case "light": T(1500, 0, 0.05, "square", 0.04); break;
+  }
+}
+// 続く音: 騒音(ラジオ)とアラーム、時計のカチカチ
+let noiseSrc = null, lastTick = 0;
+function loopSounds() {
+  const g = S?.game, play = g && g.step === "play" && S.phase === "play";
+  const wantNoise = play && g.hazard?.noise && canHear() && Sound.on;
+  if (wantNoise && !noiseSrc) { noiseSrc = Sound.noise(60, 0.18, 2500); }
+  if (!wantNoise && noiseSrc) { try { noiseSrc.stop(); } catch {} noiseSrc = null; }
+  if (play && canHear() && g.bomb) {
+    const left = g.bomb.end - (Date.now() + offset), gap = left < 30000 ? 500 : 1000;
+    if (Date.now() - lastTick >= gap) { lastTick = Date.now(); Sound.tone(left < 30000 ? 1500 : 1200, 0, 0.03, "square", 0.03); }
+    if (g.bomb.mods.some((m) => m.kind === "alarm" && m.active) && Date.now() % 1000 < 260) Sound.tone(900, 0, 0.2, "square", 0.05);
+  }
+}
+setInterval(loopSounds, 250);
+
+// ---- 声(文字の吹き出し+読み上げ)。届くのは「聞こえる相手」だけ(サーバが配り分ける) ----
+function onSay(m) {
+  const who = m.self ? "あなた" : `${nameOf(m.from)}(${ROLE_JA[S?.game?.role?.[m.from]] || ""})`;
+  addCap(`${who}: ${m.text}`);
+  if (scene3d) scene3d.talk(m.from, true);
+  if (!m.self && Sound.on && window.speechSynthesis && store.get("bb:tts") !== false) {
+    try { const u = new SpeechSynthesisUtterance(m.text); u.lang = "ja-JP"; u.rate = 1.15; speechSynthesis.speak(u); } catch {}
+  }
+}
+function addCap(t) {
+  local.caps.push({ t, at: Date.now() }); if (local.caps.length > 3) local.caps.shift(); drawCaps();
+  setTimeout(drawCaps, 6100);
+}
+function drawCaps() {
+  const el = $("caps"); if (!el) return;
+  local.caps = local.caps.filter((c) => Date.now() - c.at < 6000);
+  el.replaceChildren(...local.caps.map((c) => h("div", {}, c.t)));
+}
+
+// ---- ボイスチャット(WebRTC)。声が届く向きだけつなぐ: 見ざる→言わざる、聞かざる→見ざる・言わざる ----
+const Voice = {
+  on: false, stream: null, pcs: {}, audio: {},
+  async enable() {
+    this.on = true; Sound.unlock();
+    if (canSpeak() && !this.stream) {
+      try { this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+      catch { flash("マイクが使えませんでした(声は文字で送れます)", true); }
+    }
+    // 自分に話しかける人へ「つないで」と知らせる
+    const g = S?.game; if (g) for (const id of g.order) if (id !== me && (HEARS[myRole()] || []).includes(g.role[id])) send({ t: "rtc", to: id, data: { hello: 1 } });
+    this.sync(); renderTool(true);
+  },
+  disable() {
+    this.on = false; for (const pc of Object.values(this.pcs)) try { pc.close(); } catch {}
+    this.pcs = {}; for (const a of Object.values(this.audio)) { a.srcObject = null; } this.audio = {};
+    if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
+    renderTool(true);
+  },
+  sync() {
+    if (!this.on) return;
+    if (S?.phase !== "play" || !S.game) { if (Object.keys(this.pcs).length) { for (const pc of Object.values(this.pcs)) try { pc.close(); } catch {} this.pcs = {}; } return; }
+    const g = S.game, my = myRole();
+    if (!this.stream) return;
+    for (const id of g.order) if (id !== me && (HEARS[g.role[id]] || []).includes(my) && !this.pcs[id]) this.call(id);
+  },
+  mk(id) {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    pc.onicecandidate = (e) => { if (e.candidate) send({ t: "rtc", to: id, data: { ice: e.candidate.toJSON() } }); };
+    pc.ontrack = (e) => {
+      const g = S?.game; if (!g || !(HEARS[myRole()] || []).includes(g.role[id])) return;
+      const a = this.audio[id] || (this.audio[id] = new Audio()); a.srcObject = e.streams[0];
+      a.play().catch(() => flash("ボイスを聞くには、画面のどこかをタップしてください"));
+    };
+    pc.onconnectionstatechange = () => { if (["failed", "closed"].includes(pc.connectionState) && this.pcs[id] === pc) delete this.pcs[id]; };
+    this.pcs[id] = pc; return pc;
+  },
+  async call(id) {
+    if (this.pcs[id]) try { this.pcs[id].close(); } catch {}
+    const pc = this.mk(id);
+    this.stream.getTracks().forEach((t) => pc.addTrack(t, this.stream));
+    await pc.setLocalDescription(await pc.createOffer());
+    send({ t: "rtc", to: id, data: { sdp: pc.localDescription.toJSON() } });
+  },
+  async onSignal(m) {
+    const d = m.data || {};
+    try {
+      if (d.hello) { if (this.on && this.stream) await this.call(m.from); return; }
+      if (d.sdp && d.sdp.type === "offer") {
+        if (!this.on) return;
+        if (this.pcs[m.from]) try { this.pcs[m.from].close(); } catch {}
+        const pc = this.mk(m.from);
+        await pc.setRemoteDescription(d.sdp);
+        await pc.setLocalDescription(await pc.createAnswer());
+        send({ t: "rtc", to: m.from, data: { sdp: pc.localDescription.toJSON() } });
+      } else if (d.sdp && d.sdp.type === "answer") { const pc = this.pcs[m.from]; if (pc) await pc.setRemoteDescription(d.sdp); }
+      else if (d.ice) { const pc = this.pcs[m.from]; if (pc) await pc.addIceCandidate(d.ice); }
+    } catch (e) { console.warn("voice", e); }
+  },
+};
+document.addEventListener("pointerdown", () => { for (const a of Object.values(Voice.audio)) if (a.paused && a.srcObject) a.play().catch(() => {}); });
+
+// ---- 受信(共通の connect から呼ばれる) ----
+function onExtra(m) {
+  if (m.t === "db") DB = m;
+  else if (m.t === "manual") { MANUAL = m.data; renderTool(true); }
+  else if (m.t === "say") onSay(m);
+  else if (m.t === "rtc") Voice.onSignal(m);
+}
+
+function onTransition(prev, cur) {
+  if (prev && prev.code === cur.code && cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game;
+  if (!g) { lastFx = -1; return; }
+  const fxs = g.fx || [];
+  if (lastFx < 0 || !prev || !prev.game) { lastFx = fxs.length ? fxs[fxs.length - 1].id : 0; return; }
+  if (fxs.length && fxs[fxs.length - 1].id < lastFx) lastFx = 0; // 新しいゲーム
+  for (const f of fxs) {
+    if (f.id <= lastFx) continue;
+    lastFx = f.id;
+    if (canHear()) playFx(f);
+    visualFx(f);
+  }
+}
+function visualFx(f) {
+  const box = $("stagebox"), ro = myRole();
+  const flashIt = (cls) => { if (!box) return; box.classList.remove(cls); void box.offsetWidth; box.classList.add(cls); };
+  if (f.kind === "strike" && ro !== "blind") flashIt("flashred");
+  if ((f.kind === "solved" || f.kind === "clear") && ro !== "blind") flashIt("flashgreen");
+  if (f.kind === "boom") flashIt("boomfx");
+  if (f.kind === "emote" && scene3d) scene3d.showBubble(f.from, EMO_T[f.e] || "?");
+  if ((f.kind === "slap" || f.kind === "banana") && scene3d) scene3d.anim(f.kind, f.from, f.to);
+  if (f.kind === "slap" && f.to === me) toast(`${nameOf(f.from)} にビンタされた！`);
+  if (f.kind === "banana" && f.to === me) toast(`${nameOf(f.from)} にバナナを投げられた！`);
+  if (f.kind === "strike" && ro === "blind") toast("ブッ！(ミスの音)");
+}
+
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  renderMeta(); renderSide(); renderMain();
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g) m.append(h("span", { class: "pill" }, g.mode === "campaign" ? `レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目・${g.score}点` : "カスタム"),
+    h("span", { class: "pill rolebadge" }, ROLE_ICON[myRole()], ROLE_JA[myRole()]));
+}
+function renderSide() {
+  const g = S.game;
+  const sig = JSON.stringify([S.players, S.gameHostId, S.phase, g ? [g.order, g.role, g.log] : null, me]);
+  if (sig === local.sideSig) return; local.sideSig = sig;
+  const side = $("side"); side.replaceChildren();
+  side.append(h("h2", {}, "プレイヤー"));
+  const ul = h("ul", { class: "players" });
+  const roles = g ? g.role : S.settings.roles || {};
+  for (const p of S.players) {
+    const nm = h("span", { class: "pname" }, (roles[p.id] ? ROLE_ICON[roles[p.id]] + " " : "") + p.name + (p.id === me ? "(あなた)" : ""));
+    if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+    const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm,
+      h("span", { class: "pinfo" }, !p.connected ? "切断中" : roles[p.id] ? ROLE_JA[roles[p.id]] : g ? "観戦" : "役割まだ"));
+    if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+    ul.append(li);
+  }
+  side.append(ul);
+  const link = location.origin + "/bombanana?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る・ちょうど3人で遊びます)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  if (g?.log?.length) side.append(h("details", {}, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { Voice.disable(); send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+function twoStep(label, action, cls = "ghost danger") {
+  let armed = false, t;
+  const b = h("button", { class: cls, type: "button" }, label);
+  b.onclick = () => { if (!armed) { armed = true; b.textContent = "もう一度押すと実行"; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; } clearTimeout(t); action(); };
+  return b;
+}
+
+function renderMain() {
+  const main = $("main");
+  if (S.phase === "lobby" || !S.game) {
+    local.skel = "";
+    const sig = JSON.stringify([S.settings, S.players, S.gameHostId, me, !!DB]);
+    if (sig === local.lobbySig && main.dataset.v === "lobby") return;
+    local.lobbySig = sig; main.dataset.v = "lobby"; main.replaceChildren();
+    return renderLobby(main);
+  }
+  main.dataset.v = "play"; local.lobbySig = "";
+  const g = S.game, skel = `${S.code}:${me}:${g.order.join()}:${JSON.stringify(g.role)}`;
+  if (local.skel !== skel || !$("stagebox")) { local.skel = skel; local.toolSig = ""; buildPlay(main); }
+  updatePlay();
+}
+
+// ---- 遊ぶ画面の骨組み(3Dの舞台は作り直さずに使い回す) ----
+function buildPlay(main) {
+  main.replaceChildren();
+  if (!stageBox) {
+    stageBox = h("div", { class: "stagebox", id: "stagebox" }, h("canvas", { id: "stage", "aria-label": "ミニバンの車内と爆弾(3D)" }),
+      h("div", { class: "hud", id: "hud" }), h("div", { class: "readout", id: "readout", "aria-live": "polite" }), h("div", { class: "caps", id: "caps", "aria-live": "polite" }), h("div", { class: "ov", id: "ov", hidden: true }));
+  }
+  const col = h("div", {}, stageBox, h("div", { class: "modbar", id: "modbar" }), h("p", { class: "small muted", id: "stagehint", style: "margin:6px 0 0" }));
+  main.append(h("div", { class: "playgrid" }, col, h("div", { class: "tool", id: "tool" })));
+  loadScene();
+}
+async function loadScene() {
+  if (scene3d || sceneLoading) return applyRole();
+  sceneLoading = true;
+  try {
+    B3D = await import("/js/bb3d.js");
+    scene3d = B3D.createScene($("stage"), { onClick, onHover, offset: () => offset });
+  } catch (e) { console.error(e); flash("3Dの表示を読み込めませんでした。ページを再読み込みしてください", true); }
+  sceneLoading = false; applyRole(); updatePlay();
+}
+function applyRole() {
+  const g = S?.game; if (!scene3d || !g) return;
+  const k = `${me}:${myRole()}:${JSON.stringify(g.role)}`;
+  if (k === roleKey) return; roleKey = k;
+  scene3d.setRole(myRole(), { me, roles: g.role, names: Object.fromEntries(g.order.map((id) => [id, nameOf(id) + (id === me ? "(あなた)" : "")])) });
+  local.focus = null; renderTool(true);
+}
+
+function updatePlay() {
+  const g = S?.game; if (!g || !$("stagebox")) return;
+  applyRole();
+  if (scene3d) scene3d.update(g);
+  Voice.sync();
+  drawHud(); drawOverlay(); drawModbar(); drawDark(); drawCaps(); renderTool();
+}
+const clock = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+function drawHud() {
+  const g = S.game, b = g.bomb, el = $("hud"); if (!el || !b) return;
+  const ro = myRole(), left = g.step === "play" ? b.end - (Date.now() + offset) : g.step === "brief" ? (b.end || 0) : 0;
+  const tm = ro === "blind" ? "⏱ 見えない(音で)" : g.step === "brief" ? "まもなく開始" : clock(left);
+  const kids = [h("span", { class: "tm" + (ro !== "blind" && g.step === "play" && left < 30000 ? " low" : "") }, tm),
+    h("span", {}, ro === "blind" ? `ミス ${"✕".repeat(b.strikes)}(${b.mistakes + 1}回で爆発)` : `ミス ${"✕".repeat(b.strikes) || "なし"} / ${b.mistakes + 1}回で爆発`)];
+  const sig = kids.map((x) => x.textContent + x.className).join();
+  if (el.dataset.sig !== sig) { el.dataset.sig = sig; el.replaceChildren(...kids); }
+  const ro2 = $("readout"); if (ro2 && ro !== "blind" && ro2.textContent) ro2.textContent = "";
+}
+function drawOverlay() {
+  const g = S.game, el = $("ov"); if (!el) return;
+  let sig = "", kids = [];
+  if (g.step === "brief") {
+    const b = g.bomb, mods = b.mods.map((m) => m.kind === "hidden" ? null : MOD_JA[m.kind]).filter(Boolean);
+    const sec = Math.max(0, Math.ceil((b.briefUntil - (Date.now() + offset)) / 1000));
+    sig = "brief" + sec + g.level + g.wave;
+    kids = [h("div", { class: "eyebrow", style: "color:#ddd" }, g.mode === "campaign" ? `キャンペーン レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目` : "カスタム"),
+      h("h3", {}, "爆弾が届いた！"),
+      myRole() === "mute" ? h("p", {}, `モジュール ${b.mods.length}個(あなたには爆弾は見えません。マニュアルを開いて待とう)`) : h("div", { class: "modlist" }, ...mods.map((x) => h("span", {}, x))),
+      h("p", {}, `${b.mistakes + 1}回ミスしたら爆発。${sec}秒後にスタート`)];
+  } else if (g.result && (g.step === "clear" || g.step === "boom")) {
+    const r = g.result, inGame = g.order.includes(me);
+    sig = "res" + g.step + JSON.stringify(r) + inGame;
+    const nextLabel = g.mode === "campaign" ? (r.ok ? (g.level < 30 ? `レベル${g.level + 1}へ` : "レベル30をもう一度") : "同じレベルにもう一度") : g.mode === "endless" ? "最初からもう一度" : "もう一度";
+    kids = [h("h3", {}, r.ok ? "🎉 解除成功！" : "💥 ドカーン！"),
+      h("p", {}, r.ok ? `のこり ${r.left}秒で解除しました` : `${r.why}`),
+      g.mode === "endless" ? h("p", {}, `記録: ${r.wave || 0}ウェーブ・${r.score || 0}点`) : null,
+      g.mode === "campaign" && r.ok && g.level === 30 ? h("p", {}, "全30レベルクリア！おめでとう！") : null,
+      inGame ? h("div", { class: "btns", style: "justify-content:center" }, h("button", { class: "big", type: "button", onclick: () => act("next") }, nextLabel), h("button", { type: "button", class: "ghost", style: "color:#fff;background:transparent", onclick: () => send({ t: "again" }) }, "待機画面に戻る")) : h("p", {}, "観戦中")];
+  }
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig; el.hidden = !sig;
+  el.replaceChildren(h("div", { class: "box" }, ...kids.filter(Boolean)));
+}
+function drawModbar() {
+  const g = S.game, el = $("modbar"); if (!el || !g.bomb) return;
+  const ro = myRole(), n = g.bomb.mods.length;
+  const sig = [ro, n, local.focus, local.blindMode, g.bomb.mods.map((m) => m.solved ? 1 : 0).join("")].join(":");
+  if (el.dataset.sig === sig) return; el.dataset.sig = sig;
+  const kids = [];
+  if (ro !== "mute") {
+    kids.push(h("span", { class: "small muted" }, "寄る:"), h("button", { type: "button", class: local.focus == null ? "on" : "", onclick: () => setFocus(null) }, "全体"));
+    g.bomb.mods.forEach((m, i) => kids.push(h("button", { type: "button", class: local.focus === i ? "on" : "", onclick: () => setFocus(i) }, `${i + 1}${m.solved ? "✓" : ""}`)));
+  }
+  if (ro === "blind" && !isHover) kids.push(h("span", { class: "seg", role: "group", "aria-label": "タップの動作" },
+    h("button", { type: "button", class: local.blindMode === "touch" ? "on" : "", onclick: () => { local.blindMode = "touch"; drawModbar(); } }, "✋ さわる"),
+    h("button", { type: "button", class: local.blindMode === "press" ? "on" : "", onclick: () => { local.blindMode = "press"; drawModbar(); } }, "👆 押す")));
+  el.replaceChildren(...kids);
+  const hint = $("stagehint");
+  if (hint) hint.textContent = ro === "blind" ? (isHover ? "マウスを乗せると「さわる」(点字・熱さ・音が分かる)、クリックで「押す・切る・回す」。ドラッグで見回せます。" : "「さわる」でタップすると点字・熱さ・音が分かり、「押す」でタップすると操作します。ドラッグで見回せます。")
+    : ro === "deaf" ? "爆弾や小物をタップ/クリックすると、そこを指差します(仲間に見えます)。ドラッグで見回せます。"
+    : ro === "mute" ? "車内の小物をタップ/クリックで指差し(赤い消火器・青いクーラーボックス・緑の植木・黄色いバナナ箱で色を伝えられます)。" : "ドラッグで見回せます。";
+}
+function setFocus(i) { local.focus = i; if (scene3d) scene3d.focus(i); drawModbar(); }
+function drawDark() {
+  const g = S.game, dark = g.step === "play" && g.hazard?.dark && myRole() !== "blind";
+  let el = $("darkov");
+  if (dark && !el) {
+    el = h("div", { class: "dark", id: "darkov" }, h("div", {}, h("p", { style: "font-size:20px;font-weight:700" }, "💡 停電！真っ暗で何も見えない"),
+      h("p", {}, "手探りでランプのひもを引こう(見ざるには関係ありません)"), h("button", { type: "button", onclick: () => act("env", { what: "lamp" }) }, "ランプをつける")));
+    document.body.append(el);
+  } else if (!dark && el) el.remove();
+}
+
+// ---- 3Dの舞台を触ったとき ----
+function onHover(pick) { if (myRole() === "blind" && pick && S.phase === "play") doTouch(pick); }
+function onClick(hit) {
+  const g = S?.game; if (!g || S.phase !== "play" || g.step !== "play" || !g.order.includes(me)) return;
+  const ro = myRole(), pick = hit?.pick;
+  if (pick && pick.act === "env") return act("env", { what: pick.part });
+  if (ro === "blind") {
+    if (!pick) return;
+    doTouch(pick, true);
+    if (isHover || local.blindMode === "press") doAct(pick);
+    return;
+  }
+  act("point", { at: hit ? [hit.point.x, hit.point.y, hit.point.z] : null });
+}
+function doTouch(pick, force) {
+  if (pick.mod < 0) { setReadout(pick.part === "lamp" ? "天井のランプのひも" : "ラジオ"); return; }
+  const key = pick.mod + ":" + pick.part;
+  setReadout(describe(pick));
+  if (!force && key === local.touchKey && Date.now() - local.touchAt < 1500) return;
+  local.touchKey = key; local.touchAt = Date.now();
+  act("touch", { mod: pick.mod, part: pick.part });
+}
+function setReadout(t) { const el = $("readout"); if (el) el.innerHTML = t; }
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function describe(p) {
+  const mv = S.game.bomb.mods[p.mod]; if (!mv) return "";
+  const x = p.part, head = `<small>モジュール${p.mod + 1}・${esc(MOD_JA[mv.kind] || "")}${mv.solved ? "(解除ずみ)" : ""}</small><br>`;
+  if (x === "panel") return head + "パネルの平らなところ(部品はほかの場所)";
+  const hot = (b) => b ? ` <span class="hot">🔥熱い！</span>` : "(ふつうの温度)";
+  let t = "";
+  switch (mv.kind) {
+    case "cable": t = `ケーブル 奥から${x + 1}本目(全${mv.n}本)${mv.cut[x] ? "・切れている" : ""}`; break;
+    case "slider": t = p.act === "knob" ? `スライダー 左から${x + 1}本目: いま${["下", "真ん中", "上"][mv.pos[x] + 1]}` : `スライダー 左から${x + 1}本目を${p.act === "up" ? "上" : "下"}へ動かすボタン`; break;
+    case "direction": t = x === "braille" ? `点字: <b>${mv.num}</b>(段階 ${mv.stage + 1}/${mv.stages})` : `${DIR_JA[x]}の矢印ボタン`; break;
+    case "calc": t = x === 10 ? "「＝」キー" : `キー: 点字 <b>${mv.keys[x]}</b>`; if (mv.stage === 1) t += "(2段目)"; break;
+    case "symbol": t = x === "wheel" ? "記号のホイール(触っても記号は分からない。チャイムが鳴るか聞こう)" : p.act === "turn" ? `ホイールを${x < 0 ? "左" : "右"}に回すボタン` : `ボタン 奥から${x + 1}つ目(段階 ${mv.stage + 1}/${mv.stages})`; break;
+    case "piano": t = x === "octave" ? `点字: <b>${mv.octave}</b>(オクターブ)` : `鍵盤 左から${x}つ目(点字 ${x})・弾いた数 ${mv.played}/4`; break;
+    case "soundboard": t = `ボタン ${POS_JA[x]}: 点字 <b>${mv.nums[x]}</b>(押した数 ${mv.pressed}/3)`; break;
+    case "monkey": t = `ボタン ${["左上", "右上", "左下", "右下"][x]}${hot(mv.hot === x)}(段階 ${mv.stage + 1}/${mv.stages}・入力 ${mv.input})`; break;
+    case "morse": t = p.act === "read" ? `${x + 1}つ目の信号ボタン(触ると信号の音が鳴る)` : p.act === "enter" ? "決定ボタン" : `${x + 1}つ目のダイヤル(いま点字 <b>${mv.dials[x]}</b>)を${p.act === "dialUp" ? "1増やす" : "1減らす"}`; break;
+    case "maze": t = x === "num" ? `点字: <b>${mv.num}</b>(迷路の番号)` : `${DIR_JA[x]}へ進むボタン`; break;
+    case "switch": t = p.act === "toggle" ? `スイッチ 左から${x + 1}つ目: いま<b>${mv.up[x] ? "上" : "下"}</b>` : p.act === "enter" ? "決定ボタン" : `スイッチ ${x + 1}の下の点字: <b>${mv.nums[x]}</b>`; break;
+    case "pressure": t = `圧力ボタン${mv.urgent ? ' <span class="hot">(ブルブル震えている！押して！)</span>' : "(静か)"}`; break;
+    case "rslider": t = `せり上がるスライダー${mv.urgent ? ' <span class="hot">(かなり上がっている！引き下げて！)</span>' : "(まだ低い)"}`; break;
+    case "alarm": t = mv.active ? `ボタン ${x + 1}${hot((mv.hot || []).includes(x))}` : `ボタン ${x + 1}(静か)`; break;
+    default: t = "";
+  }
+  return head + t;
+}
+function doAct(P) {
+  const A = (x) => act("act", { mod: P.mod, ...x });
+  switch (P.act) {
+    case "cut": case "key": case "press": return A({ part: P.part });
+    case "up": case "down": return A({ part: P.part, dir: P.act });
+    case "dir": return A({ dir: P.part });
+    case "turn": return A({ what: "turn", dir: P.part });
+    case "dialUp": return A({ what: "dial", part: P.part, dir: 1 });
+    case "dialDown": return A({ what: "dial", part: P.part, dir: -1 });
+    case "enter": return A({ what: "enter" });
+    case "toggle": return A({ what: "toggle", part: P.part });
+    case "pressure": return A({ what: "press" });
+    case "pull": return A({ what: "pull" });
+  }
+}
+
+// ---- 右側: 役割ごとの道具(話す・エモート・ビンタ・マニュアル・ボイス) ----
+function renderTool(force) {
+  const el = $("tool"), g = S?.game; if (!el || !g) return;
+  const ro = myRole(), inGame = g.order.includes(me);
+  const sig = JSON.stringify([ro, inGame, !!MANUAL, local.tab, Voice.on, !!Voice.stream, g.step, g.hazard?.noise, g.hazard?.dark, g.order]);
+  if (!force && sig === local.toolSig) return; local.toolSig = sig;
+  // 入力中の文字は作り直しても残す
+  const draft = $("sayIn")?.value || "", hadFocus = document.activeElement?.id === "sayIn";
+  const kids = [h("div", { class: "box2" }, h("h3", {}, `${ROLE_ICON[ro]} あなたは「${ROLE_JA[ro]}」`), h("p", { class: "small", style: "margin:0" }, ROLE_DO[ro]))];
+  if (inGame && canSpeak()) {
+    const inp = h("input", { type: "text", id: "sayIn", maxlength: 60, placeholder: ro === "blind" ? "言わざるに話す(例: 点字は7)" : "見ざる・言わざるに話す(例: 赤いケーブル)", autocomplete: "off", value: draft });
+    const form = h("form", { class: "speak", onsubmit: (e) => { e.preventDefault(); const t = inp.value.trim(); if (t) { act("say", { text: t }); inp.value = ""; } } }, inp, h("button", { type: "submit", class: "primary" }, "話す"));
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) form.append(h("button", { type: "button", title: "声で入力", "aria-label": "声で入力", onclick: (e) => {
+      const b = e.currentTarget; try { const r = new SR(); r.lang = "ja-JP"; r.interimResults = false; b.textContent = "…"; r.onresult = (ev) => { const t = ev.results[0][0].transcript; if (t) act("say", { text: t }); }; r.onend = () => { b.textContent = "🎤"; }; r.start(); } catch { flash("声の入力が使えません", true); }
+    } }, "🎤"));
+    kids.push(h("div", { class: "box2" }, h("h3", {}, "話す"), form,
+      h("p", { class: "small muted", style: "margin:0" }, ro === "blind" ? "あなたの声は言わざるにだけ届きます(聞かざるは耳あて中)。" : "あなたの声は見ざると言わざるに届きます。あなた自身には、だれの声も聞こえません。",
+        g.hazard?.noise ? " 📻 いまラジオがうるさくて、声がところどころ聞き取れません！" : "")));
+  } else if (inGame && ro === "mute") kids.push(h("div", { class: "box2" }, h("h3", {}, "🙊 しゃべれません"), h("p", { class: "small", style: "margin:0" }, "エモート・指差し・色の小物で伝えよう。")));
+  if (inGame) {
+    kids.push(h("div", { class: "box2" }, h("h3", {}, "エモート(見ざるには見えません)"),
+      h("div", { class: "emos" }, ...(DB?.emotes || Object.keys(EMO)).map((e) => h("button", { type: "button", onclick: () => act("emote", { e }) }, EMO[e] || e))),
+      ro !== "blind" ? h("div", { class: "btns" }, h("button", { type: "button", class: "ghost tiny", onclick: () => act("point", { at: null }) }, "指差しをやめる")) : null));
+    const others = g.order.filter((x) => x !== me);
+    kids.push(h("div", { class: "box2" }, h("h3", {}, "ちょっかい"), h("div", { class: "btns" }, ...others.flatMap((id) => [
+      h("button", { type: "button", class: "tiny", onclick: () => act("env", { what: "slap", to: id }) }, `👋 ${ROLE_JA[g.role[id]]}をビンタ`),
+      h("button", { type: "button", class: "tiny", onclick: () => act("env", { what: "banana", to: id }) }, `🍌 ${ROLE_JA[g.role[id]]}に投げる`)])),
+      g.hazard?.noise ? h("button", { type: "button", class: "primary", onclick: () => act("env", { what: "radio" }) }, "📻 ラジオを止める") : null,
+      g.hazard?.dark ? h("button", { type: "button", class: "primary", onclick: () => act("env", { what: "lamp" }) }, "💡 ランプをつける") : null));
+    // ボイスチャット
+    kids.push(h("div", { class: "box2" }, h("h3", {}, "ボイス(任意)"),
+      h("p", { class: "small muted", style: "margin:0" }, "声が届く向きだけつながります: 見ざる→言わざる、聞かざる→見ざる・言わざる。" + (ro === "mute" ? "あなたはマイクを使いません(聞くだけ)。" : ro === "deaf" ? "あなたには声は届きません(話すだけ)。" : "")),
+      h("div", { class: "btns" }, Voice.on ? h("button", { type: "button", onclick: () => Voice.disable() }, "ボイスを切る") : h("button", { type: "button", onclick: () => Voice.enable() }, ro === "mute" ? "🔊 ボイスを聞く" : "🎙 ボイスをつなぐ"),
+        h("label", { class: "small" }, h("input", { type: "checkbox", checked: store.get("bb:tts") !== false, onchange: (e) => store.set("bb:tts", e.target.checked) }), " 文字の声を読み上げる"))));
+  }
+  if (ro === "mute") {
+    if (!MANUAL && inGame) { act("manual"); kids.push(h("p", { class: "muted" }, "マニュアルを開いています…")); }
+    else if (MANUAL) kids.splice(1, 0, manualEl()); // マニュアルは言わざるの一番の道具なので上に
+  }
+  el.replaceChildren(...kids);
+  if (hadFocus) { const i = $("sayIn"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+}
+
+// ---- マニュアル(言わざるだけが見る) ----
+const cc = (c) => h("span", { class: "cc " + c }, COLOR_JA[c]);
+function symCanvas(name) { const cv = h("canvas", { width: 56, height: 56, title: MANUAL.symbolNames[name] }); if (B3D) { const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, 56, 56); B3D.drawSymbol(x, name, 28, 28, 50); } return h("span", { class: "symcell" }, cv); }
+function manualEl() {
+  const M = MANUAL, C = ["red", "blue", "green", "yellow"];
+  const tabs = [["cable", "ケーブル"], ["direction", "方向"], ["calc", "電卓"], ["slider", "スライダー"], ["symbol", "シンボル"], ["piano", "ピアノ"], ["soundboard", "サウンドボード"], ["monkey", "サルまね"], ["morse", "モールス"], ["maze", "迷路"], ["switch", "スイッチ"], ["chaos", "カオス"]];
+  const tbl = (head, rows) => h("table", {}, h("thead", {}, h("tr", {}, ...head.map((x) => h("th", {}, x)))), h("tbody", {}, ...rows.map((r) => h("tr", {}, ...r.map((x) => h("td", {}, x))))));
+  const P = (t) => h("p", { style: "margin:0" }, t);
+  let page = [];
+  switch (local.tab) {
+    case "cable": page = [P("ケーブルの本数と、ランプの色を聞かざるに教えてもらう。表の色のケーブルを1本だけ切る。"),
+      tbl(["本数＼ランプ", ...C.map(cc)], [3, 4, 5].map((n) => [`${n}本`, ...C.map((c) => cc(M.cable[n][c]))]))]; break;
+    case "direction": page = [P("見ざるが点字の数字を、聞かざるがランプの色を伝える。表の向きの矢印を押す。2〜3回くり返す(毎回数字と色が変わる)。"),
+      tbl(["点字＼ランプ", ...C.map(cc)], M.direction.map(([ns, ds]) => [ns.join("・"), ...ds.map((d) => DIR_JA[d])]))]; break;
+    case "calc": page = [P("1段目: 画面の式を聞かざるが読み、答えを計算して見ざるがキー(点字)で入力し「＝」。2段目: ランプがつくので、その色と答えの奇数・偶数で押す数字が決まる。"),
+      tbl(["ランプ", "答えが奇数", "答えが偶数"], C.map((c) => [cc(c), M.calc2[c][0], M.calc2[c][1]]))]; break;
+    case "slider": page = [P("4本のスライダーそれぞれ、つまみの色と左からの位置(見ざるから見て)で、上か下かが決まる。"),
+      tbl(["色＼位置", "1", "2", "3", "4"], C.map((c) => [cc(c), ...M.slider[c].map((d) => DIR_JA[d])]))]; break;
+    case "symbol": page = [P("見ざるがホイールを回し、チャイムが鳴ったところで止める。そのとき矢印が指している記号を聞かざるが伝える。記号と段階で押すボタンの色が決まる(3段階)。"),
+      tbl(["記号", "段階1", "段階2", "段階3"], Object.keys(M.symbol).map((s) => [h("span", {}, symCanvas(s), " ", M.symbolNames[s]), ...M.symbol[s].map(cc)]))]; break;
+    case "piano": page = [P("見ざるがオクターブの点字(1〜3)を、聞かざるがランプの色を伝える。表の順に鍵盤(左から1〜7、点字つき)を4回弾く。"),
+      tbl(["オクターブ＼ランプ", ...C.map(cc)], [1, 2, 3].map((o) => [o, ...C.map((c) => M.piano[o][c].join("→"))]))]; break;
+    case "soundboard": page = [P("9つのボタンのうち1つだけ、触ると音が鳴る。見ざるがそのボタンの点字を、聞かざるがそのボタンの色を伝える。表の3か所を順に押す。"),
+      tbl(["点字＼色", ...C.map(cc)], [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [n, ...C.map((c) => M.sound[n][c].map((p) => M.posNames[p]).join("→"))]))]; break;
+    case "monkey": page = [P("4つのボタンのうち1つが熱くなる(見ざるが分かる)。そのボタンの色を聞かざるが伝える。熱いボタンの色と段階から、押す色が決まる。段階が進むたびに、それまでの答えを最初から順に全部押す(3〜4段階)。"),
+      tbl(["熱いボタン＼段階", "1", "2", "3", "4"], C.map((c) => [cc(c), ...M.monkey[c].map(cc)]))]; break;
+    case "morse": page = [P("信号ボタンが3つ。見ざるが触ると、それぞれ数字1つ分のモールス信号(短・長)が鳴る(見ざると言わざるに聞こえる)。聞き取った数字を3つのダイヤルに合わせて決定。・=短い音 −=長い音"),
+      tbl(["数字", "信号"], Object.entries(M.morse).map(([d, c]) => [d, c.replace(/\./g, "・").replace(/-/g, "−")]))]; break;
+    case "maze": {
+      const box = h("div", { class: "mazes" });
+      for (const n of [1, 2, 3, 4, 5, 6]) {
+        const cv = h("canvas", { width: 240, height: 240 });
+        drawMaze(cv, n);
+        cv.addEventListener("click", (e) => { const r = cv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * 6), y = Math.floor((e.clientY - r.top) / r.height * 6), k = n + ":" + (y * 6 + x); local.mazeMarks[k] = ((local.mazeMarks[k] || 0) + 1) % 3; drawMaze(cv, n); });
+        box.append(h("figure", {}, cv, h("figcaption", {}, `迷路 ${n}`)));
+      }
+      page = [P("見ざるが迷路の番号(点字)を、聞かざるが赤い点(いまの位置)と緑の点(ゴール)の場所を伝える。壁はマニュアルにしか描いていない。壁にぶつかるとミス。マスをタップで印(赤→緑→消す)。"), box]; break;
+    }
+    case "switch": page = [P("4つのスイッチ。上のランプの色(聞かざる)と、下の点字の数字(見ざる)で、上か下かが決まる。全部合わせて決定ボタン。"),
+      tbl(["ランプ", "決まり"], C.map((c) => [cc(c), M.switch[c]]))]; break;
+    case "chaos": page = [P("カオスモジュールは解くものではなく、爆弾を解除するまで見張り続ける。黄色い三角のマークがついている。"),
+      tbl(["モジュール", "やること"], [["圧力", "メーターが上がりきるとミス。真ん中の赤いボタンを押すと下がる(見ざるは震えで分かる)"], ["せり上がりスライダー", "少しずつ上がってくる。上がりきるとミス。引き下げる"], ["アラーム", "ときどき鳴る。6つのうち熱くなった3つのボタンを10秒以内に全部押す(熱さは見ざるだけが分かる)"]]),
+      P("停電: 真っ暗になる。だれかがランプをつける。騒音: ラジオが大音量で声が聞き取りにくい。だれかがラジオを止める。")]; break;
+  }
+  return h("div", { class: "box2 man" }, h("h3", {}, "📖 爆弾解除マニュアル"),
+    h("div", { class: "mtabs", role: "tablist" }, ...tabs.map(([k, t]) => h("button", { type: "button", role: "tab", class: local.tab === k ? "on" : "", "aria-selected": local.tab === k ? "true" : "false", onclick: () => { local.tab = k; renderTool(true); } }, t))),
+    h("div", { class: "mpage" }, ...page));
+}
+function drawMaze(cv, n) {
+  const x = cv.getContext("2d"), W = MANUAL.mazes[n], s = cv.width / 6;
+  x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height);
+  for (let c = 0; c < 36; c++) { const mk = local.mazeMarks[n + ":" + c]; if (mk) { x.fillStyle = mk === 1 ? "#e5484d" : "#2fa35a"; x.beginPath(); x.arc((c % 6 + 0.5) * s, (Math.floor(c / 6) + 0.5) * s, s * 0.3, 0, Math.PI * 2); x.fill(); } }
+  x.strokeStyle = "#e3e6ec"; x.lineWidth = 1;
+  for (let i = 1; i < 6; i++) { x.beginPath(); x.moveTo(i * s, 0); x.lineTo(i * s, cv.height); x.moveTo(0, i * s); x.lineTo(cv.width, i * s); x.stroke(); }
+  x.strokeStyle = "#181b23"; x.lineWidth = 4; x.lineCap = "round";
+  W.forEach(([u, r, d, l], c) => {
+    const X = (c % 6) * s, Y = Math.floor(c / 6) * s; x.beginPath();
+    if (u) { x.moveTo(X, Y); x.lineTo(X + s, Y); } if (r) { x.moveTo(X + s, Y); x.lineTo(X + s, Y + s); }
+    if (d) { x.moveTo(X, Y + s); x.lineTo(X + s, Y + s); } if (l) { x.moveTo(X, Y); x.lineTo(X, Y + s); } x.stroke();
+  });
+}
+
+// ---- 待機画面: 役割・モード・レベル ----
+function renderLobby(main) {
+  const st = S.settings, gm = isGM(), roles = st.roles || {};
+  const live = S.players.filter((p) => p.connected).length;
+  main.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "3人で協力して、ミニバンに届いた爆弾を時間内に解除します。3人はそれぞれ「見ざる・聞かざる・言わざる」のサルになります。"),
+      h("li", {}, "🙈 見ざる: 爆弾に触れて操作できる唯一の役。目隠しで色・画面・ランプは見えないが、点字・熱さ・音は分かる。"),
+      h("li", {}, "🙉 聞かざる: 爆弾の見た目が全部見える。話せるが、仲間の声もゲームの音も聞こえない。"),
+      h("li", {}, "🙊 言わざる: マニュアルを読める唯一の役。しゃべれないので、エモート・指差し・色の小物で伝える。"),
+      h("li", {}, "声が届くのは 見ざる→言わざる、聞かざる→見ざる・言わざる だけ。うまく伝言して、全部の解除モジュールを解けば成功。時間切れか、ミスが上限を超えると爆発！")),
+    h("h2", {}, "役割をえらぶ"),
+    h("div", { class: "roles3" }, ...["blind", "deaf", "mute"].map((ro) => {
+      const who = Object.entries(roles).find(([, r]) => r === ro)?.[0];
+      return h("button", { type: "button", class: "rolecard" + (who === me ? " mine" : ""), onclick: () => send({ t: "role", role: who === me ? null : ro }) },
+        h("b", {}, `${ROLE_ICON[ro]} ${ROLE_JA[ro]}`), h("span", { class: "small" }, ROLE_DO[ro].split("。")[0] + "。"),
+        h("span", { class: "who" }, who ? `${nameOf(who)}${who === me ? "(あなた・もう一度押すと外す)" : ""}` : "空き(押して選ぶ)"));
+    })),
+    gm ? h("div", { class: "btns" }, h("button", { type: "button", onclick: () => send({ t: "randomRoles" }) }, "🎲 ランダムロール"), h("span", { class: "small muted" }, "決まっていない役割は、スタート時にランダムで決まります")) : h("p", { class: "small muted" }, "決まっていない役割は、スタート時にランダムで決まります"));
+  // モード
+  const sel = (label, val, opts, on) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => on(opts.find((x) => String(x[0]) === e.target.value)[0]) }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: val === v }, t))));
+  const camp = DB?.campaign || [];
+  const lvLabel = (i) => { const L = camp[i - 1]; if (!L) return `レベル${i}`; const mods = L.mods.map((k) => ({ E: "かんたん", M: "ふつう", H: "むずかしい" })[k] || MOD_JA[k]).join("・"); return `レベル${i}(${clock(L.secs * 1000)}・ミス${L.mistakes}回まで・${mods}${L.chaos.length ? "+カオス" + L.chaos.length : ""})`; };
+  const settings = h("div", { class: "settings" },
+    sel("モード", st.mode, [["campaign", "キャンペーン(30レベル)"], ["endless", "エンドレス"], ["custom", "カスタム"]], (v) => send({ t: "settings", s: { mode: v } })));
+  if (st.mode === "campaign") settings.append(sel("レベル", st.level, Array.from({ length: 30 }, (_, i) => [i + 1, lvLabel(i + 1)]), (v) => send({ t: "settings", s: { level: v } })));
+  main.append(h("h2", {}, "モード"), settings);
+  if (st.mode === "campaign") main.append(h("p", { class: "small muted" }, "レベルが上がるとモジュールが増え、カオスモジュールや停電・騒音(レベル11から)も出ます。成功すると次のレベルへ進めます。"));
+  if (st.mode === "endless") main.append(h("p", { class: "small muted" }, "爆弾が次々に届きます。モジュールを1つ解くごとに1点・30秒延長。何ウェーブ耐えられるか挑戦。"));
+  if (st.mode === "custom") {
+    const cu = st.custom, setC = (patch) => send({ t: "settings", s: { custom: { ...cu, ...patch } } });
+    const cnt = (k) => cu.mods.filter((x) => x === k).length;
+    main.append(h("div", { class: "settings" },
+      sel("制限時間", cu.secs, [120, 180, 240, 300, 420, 600].map((s) => [s, clock(s * 1000)]), (v) => setC({ secs: v })),
+      sel("許されるミス", cu.mistakes, [1, 2, 3, 4, 5].map((n) => [n, `${n}回`]), (v) => setC({ mistakes: v }))),
+      h("div", { class: "field" }, "解除モジュール(＋で追加・−で減らす。最大8個)", h("div", { class: "checks" }, ...[...EASY, ...MEDIUM, ...HARD].map((k) => h("span", {}, `${MOD_JA[k]} ×${cnt(k)} `,
+        h("button", { type: "button", class: "tiny", disabled: !gm || cu.mods.length >= 8, onclick: () => setC({ mods: [...cu.mods, k] }) }, "＋"),
+        h("button", { type: "button", class: "tiny", disabled: !gm || !cnt(k) || cu.mods.length <= 1, onclick: () => { const m = [...cu.mods]; m.splice(m.lastIndexOf(k), 1); setC({ mods: m }); } }, "−"))))),
+      h("div", { class: "field" }, "カオスモジュール", h("div", { class: "checks" }, ...CHAOS.map((k) => h("label", {}, h("input", { type: "checkbox", disabled: !gm, checked: cu.chaos.includes(k), onchange: (e) => setC({ chaos: e.target.checked ? [...cu.chaos, k] : cu.chaos.filter((x) => x !== k) }) }), MOD_JA[k])),
+        h("label", {}, h("input", { type: "checkbox", disabled: !gm, checked: cu.hazards, onchange: (e) => setC({ hazards: e.target.checked }) }), "停電・騒音あり"))));
+  }
+  main.append(h("p", { class: "muted small" }, "ちょうど3人で遊びます(4人目からは観戦)。声は文字で送れます(🎤で音声入力・読み上げあり)。ボイスチャットもつなげます。PCならヘッドホン推奨。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live < 3, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live < 3 ? `あと${3 - live}人必要です。招待リンクを送ってください` : live > 3 ? "先に入った3人で始めます(ほかの人は観戦)" : "3人そろいました！")));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+setInterval(() => { if (S?.game && S.phase !== "lobby") { drawHud(); drawOverlay(); drawCaps(); } }, 250);
+
+connect();
+</script>
+<script src="/js/partybar.js" defer></script>
+</body>
+</html>

@@ -261,6 +261,8 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
   function chatKey() {
     if (HUB) return info && st ? "lobby:" + info.code : null;
     if (!/^[a-z]{2,12}$/.test(page) || !inRoom()) return null;
+    // 文字チャットを置かないページ(ボムバナナは「しゃべれない・聞こえない」役があるので、全員が読み書きできるチャットはルールを壊す)
+    if (window.PB_NO_CHAT) return null;
     // eslint-disable-next-line no-undef
     return page + ":" + S.code;
   }

@@ -23,6 +23,7 @@ const citychase = require("./games/citychase"); // シティチェイス(/citych
 const matchy = require("./games/matchy"); // マッチィマッチ(/matchy)
 const lobby = require("./games/lobby"); // パーティー: みんなでゲームを移動する(/lobby)
 const chat = require("./games/chat"); // 全ゲーム共通の文字チャット
+const bombanana = require("./games/bombanana"); // ボムバナナ(/bombanana)
 const heat = require("./games/heat"); // ヒート(/heat)
 const party = require("./games/party");   // ミニゲーム集(/party 大会、/bridge /bomb /memory 単独)
 
@@ -556,7 +557,7 @@ const PAGES = {
   "/coyote": "coyote.html", "/coyote/": "coyote.html",
   "/challengers": "challengers.html", "/challengers/": "challengers.html",
   "/eldorado": "eldorado.html", "/eldorado/": "eldorado.html",
-  "/guessclub": "guessclub.html", "/guessclub/": "guessclub.html", "/mortar": "mortar.html", "/mortar/": "mortar.html", "/citychase": "citychase.html", "/citychase/": "citychase.html", "/matchy": "matchy.html", "/matchy/": "matchy.html", "/lobby": "lobby.html", "/lobby/": "lobby.html",
+  "/guessclub": "guessclub.html", "/guessclub/": "guessclub.html", "/mortar": "mortar.html", "/mortar/": "mortar.html", "/citychase": "citychase.html", "/citychase/": "citychase.html", "/matchy": "matchy.html", "/matchy/": "matchy.html", "/lobby": "lobby.html", "/lobby/": "lobby.html", "/bombanana": "bombanana.html", "/bombanana/": "bombanana.html",
   "/heat": "heat.html", "/heat/": "heat.html",
   "/party": "party.html", "/party/": "party.html",
   // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
@@ -626,7 +627,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : p === chat.WS_PATH ? chat.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : p === chat.WS_PATH ? chat.wss : p === bombanana.WS_PATH ? bombanana.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {
