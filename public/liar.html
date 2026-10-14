@@ -146,9 +146,12 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 8px 10px;
 .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .players li:last-child { border-bottom: none; }
-.players li.dead .pname { text-decoration: line-through; color: var(--muted); }
+.players li.dead .pname, .players li.dead .pname .nmtxt { text-decoration: line-through; color: var(--muted); }
 .sw { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
-.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 長い名前は「…」で切り、うしろの「ホスト」などの札は切らずに出す */
+.pname { min-width: 0; display: flex; align-items: center; }
+.pname .nmtxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { flex: none; white-space: nowrap; }
 .pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; }
 .pname .tag.gm { color: var(--accent); }
 .pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; text-align: right; }
@@ -169,8 +172,9 @@ body.compact #game > .top { flex: none; }
 body.compact #game > .top > div:first-child { display: none; }
 body.compact .meta { gap: 4px; flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
 body.compact .pill { font-size: 12px; padding: 2px 9px; white-space: nowrap; flex: none; }
+body.compact .meta .pill.wide { display: none; } /* スマホの1画面表示: 部屋・ラウンド・状態はメニューの中で見る */
 body.compact .menuBtn { display: inline-flex; margin-left: auto; background: var(--fg); color: var(--surface); }
-body.compact .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; }
+body.compact .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; align-items: stretch; }
 body.compact .col { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 6px; }
 body.compact .stage { aspect-ratio: auto; flex: 1; min-height: 150px; }
 body.compact #main { flex: none; padding: 8px 10px; gap: 6px; }
@@ -495,25 +499,26 @@ function renderMeta() {
   const m = $("meta"); m.replaceChildren();
   const label = { lobby: "待機中", play: "勝負中", reveal: "公開", shot: "ロシアンルーレット", finished: "ゲーム終了" }[S.phase] || "";
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"));
-  m.append(h("button", { type: "button", class: "pill", onclick: toggleMode, title: "表示方法を切り替える" }, mode === "3d" && !view3dFailed ? "3D表示" : "2D表示"));
-  m.append(h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
-  if (S.phase !== "lobby") {
-    m.append(h("span", { class: "pill" }, `ラウンド ${S.round}`));
-    if (S.tableRank) m.append(h("span", { class: "pill table" }, `テーブル: ${RANK_NAME[S.tableRank]}`));
-  }
-  m.append(h("span", { class: "pill" }, label));
+  m.append(h("button", { type: "button", class: "pill", onclick: toggleMode, title: "押すと表示を切り替えます" }, mode === "3d" && !view3dFailed ? "表示: 3D ⇄" : "表示: 2D ⇄"));
+  if (S.phase !== "lobby" && S.tableRank) m.append(h("span", { class: "pill table" }, `テーブル: ${RANK_NAME[S.tableRank]}`));
+  m.append(h("span", { class: "pill wide" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  if (S.phase !== "lobby") m.append(h("span", { class: "pill wide" }, `ラウンド ${S.round}`));
+  m.append(h("span", { class: "pill wide" }, label));
   m.append(h("button", { type: "button", class: "pill menuBtn", onclick: () => setDrawer(true) }, "メニュー"));
 }
 
 function renderSide() {
   const side = $("side"); side.replaceChildren();
   side.append(h("button", { type: "button", class: "ghost closeDrawer", onclick: () => setDrawer(false) }, "閉じる ✕"));
+  // スマホの1画面表示では上の行から外した「部屋・ラウンド・状態」を、メニューの最初に出す
+  const phaseJa = { lobby: "待機中", play: "勝負中", reveal: "公開", shot: "ロシアンルーレット", finished: "ゲーム終了" }[S.phase] || "";
+  side.append(h("p", { class: "small muted", style: "margin:0" }, `部屋 ${S.code}` + (S.phase !== "lobby" ? `・ラウンド ${S.round}` : "") + (phaseJa ? `・${phaseJa}` : "")));
   side.append(h("h2", {}, "プレイヤー"));
   const isGM = S.gameHostId === me, inGame = S.phase !== "lobby";
   const ul = h("ul", { class: "players" });
   for (const p of S.players) {
     const seated = S.seats.includes(p.id);
-    const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+    const nm = h("span", { class: "pname" }, h("span", { class: "nmtxt" }, p.name + (p.id === me ? "(あなた)" : "")));
     if (p.id === S.gameHostId) nm.append(h("span", { class: "tag gm" }, "ホスト"));
     let info = "";
     if (inGame && !seated) info = "観戦";

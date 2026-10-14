@@ -81,6 +81,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 /* 役職と質問 */
 .rolecard { border: 2px solid var(--fg); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; background: color-mix(in srgb, var(--gold) 18%, var(--surface)); }
 .rolecard.insider { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
+.rolecard.hidden { background: var(--surface); border-style: dashed; }
 .rolecard.common { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .rolecard .rl b { font-family: var(--display); font-weight: 400; font-size: 20px; }
 .word { font-family: var(--display); font-size: 22px; }
@@ -88,6 +89,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 50dvh; overflow: auto; }
 .qs li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 5px 6px; border: 1.5px solid var(--line); border-radius: 8px; }
 .qs .qt { font-weight: 700; overflow-wrap: anywhere; flex: 1 1 140px; }
+.qs .btns button.tiny { min-height: 36px; min-width: 56px; font-size: 14px; }
 .qs .ans { padding: 0 8px; border-radius: 999px; border: 1.5px solid currentColor; font-size: 13px; }
 .qs li.a-yes .ans { color: var(--good); } .qs li.a-no .ans { color: var(--bad); } .qs li.a-idk .ans { color: var(--muted); }
 .qs li.a-correct { border-color: var(--good); } .qs li.a-correct .ans { color: var(--good); }
@@ -291,7 +293,10 @@ function renderMain() {
 }
 function roleCard(g) {
   const [name, desc] = ROLE[g.role];
-  return h("div", { class: "rolecard " + g.role }, h("div", { class: "rl" }, "あなたは ", h("b", {}, name)),
+  // 画面をのぞかれないように隠せる(押すと出し入れ)
+  const tog = h("button", { type: "button", class: "ghost tiny", style: "justify-self:end", onclick: () => { local.hideRole = !local.hideRole; render(); } }, local.hideRole ? "役職を見る" : "隠す");
+  if (local.hideRole) return h("div", { class: "rolecard hidden" }, h("div", { class: "rl" }, "役職とお題は隠しています ", tog));
+  return h("div", { class: "rolecard " + g.role }, h("div", { class: "rl" }, "あなたは ", h("b", {}, name), " ", tog),
     g.word ? h("div", { class: "wd" }, "お題: ", h("span", { class: "word" }, g.word)) : h("div", { class: "wd muted" }, "お題: ？？？"),
     h("div", { class: "small" }, desc));
 }
@@ -325,6 +330,15 @@ function renderReady(main, g) {
   else main.append(h("p", { class: "muted" }, "マスターがお題を確認しています… ", cd()));
 }
 
+// 「正解した人」の2度押し: 画面が描き直されても1回目を覚えておく(3秒以内にもう一度押すと確定)
+function correctBtn(id) {
+  const armed = local.armCorrect?.id === id && local.armCorrect.until > Date.now();
+  return h("button", { type: "button", class: armed ? "primary" : "ghost", onclick: () => {
+    if (local.armCorrect?.id === id && local.armCorrect.until > Date.now()) { local.armCorrect = null; send({ t: "game", a: "correct", who: id }); return; }
+    local.armCorrect = { id, until: Date.now() + 3000 }; render();
+    setTimeout(() => { if (local.armCorrect?.id === id && local.armCorrect.until <= Date.now()) { local.armCorrect = null; render(); } }, 3100);
+  } }, armed ? `${nameOf(id)}: もう一度押すと確定` : nameOf(id));
+}
 const ANS = { yes: ["はい", "yes"], no: ["いいえ", "no"], idk: ["わからない", "idk"], correct: ["正解！", "correct"] };
 function qList(g, master) {
   const ul = h("ul", { class: "qs" });
@@ -342,7 +356,7 @@ function renderQuestion(main, g) {
   main.append(h("div", { class: "head" }, h("div", { class: "say" }, "質問タイム"), h("span", {}, "残り ", cd("mmss"))));
   if (g.role === "master") {
     main.append(h("p", { class: "small" }, "通話での質問には口で答えてください。だれかがお題を言い当てたら、その人を選んで「正解！」。"),
-      h("div", { class: "btns" }, h("span", { class: "small" }, "正解した人:"), ...g.players.filter((id) => id !== g.master).map((id) => twoStep(nameOf(id), () => send({ t: "game", a: "correct", who: id }), "ghost"))));
+      h("div", { class: "btns" }, h("span", { class: "small" }, "正解した人:"), ...g.players.filter((id) => id !== g.master).map((id) => correctBtn(id))));
   } else if (g.role) {
     const inp = h("input", { type: "text", id: "qInput", maxlength: 60, placeholder: "例: 食べ物ですか？", autocomplete: "off", value: local.qDraft, "aria-label": "質問",
       oninput: (e) => { local.qDraft = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); ask(); } } });
@@ -373,7 +387,7 @@ function renderVote2(main, g) {
   main.append(h("div", { class: "say" }, "投票2: インサイダーはだれ？"), h("div", {}, "残り ", cd()));
   if (g.vote1) main.append(h("p", { class: "small muted" }, `投票1は「インサイダーだと思う」${g.vote1.yes}/${g.vote1.total}票で過半数にならず。`));
   if (!g.role) return;
-  main.append(h("div", { class: "btns" }, ...g.players.filter((id) => id !== me).map((id) => h("button", { type: "button", class: g.myVote2 === id ? "primary" : "", "aria-pressed": g.myVote2 === id ? "true" : "false", onclick: () => send({ t: "game", a: "vote2", who: id }) }, nameOf(id)))),
+  main.append(h("div", { class: "btns" }, ...g.players.filter((id) => id !== me && id !== g.master).map((id) => h("button", { type: "button", class: g.myVote2 === id ? "primary" : "", "aria-pressed": g.myVote2 === id ? "true" : "false", onclick: () => send({ t: "game", a: "vote2", who: id }) }, nameOf(id)))),
     h("p", { class: "small muted" }, "いちばん票が集まった1人がインサイダーなら庶民の勝ち。同票ならインサイダーの勝ちです。"));
 }
 function renderResult(main, g) {

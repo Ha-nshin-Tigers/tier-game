@@ -164,7 +164,7 @@ function handle(c, pid, m) {
       if (voters1(g, c.live()).every((id) => id in g.votes1)) closeVote1(c);
       return;
     case "vote2":
-      if (g.step !== "vote2" || typeof m.who !== "string" || m.who === pid || !g.players.includes(m.who)) return;
+      if (g.step !== "vote2" || typeof m.who !== "string" || m.who === pid || m.who === g.master || !g.players.includes(m.who)) return;
       g.votes2[pid] = m.who;
       if (g.players.filter((id) => c.live().includes(id)).every((id) => id in g.votes2)) closeVote2(c);
       return;

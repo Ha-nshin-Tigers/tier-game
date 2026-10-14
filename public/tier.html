@@ -668,7 +668,9 @@ function renderMain() {
     const ranked = [...S.players].sort((a, b) => b.score - a.score);
     const winners = S.result?.winners || [];
     main.append(h("div", { class: "eyebrow" }, `${S.round}ラウンドで決着`),
-      h("div", { class: "winner" }, "優勝 " + winners.map((w) => w.name).join("・") + " さん"));
+      // だれも点を取っていない(全員0点)・結果がないときは「優勝者なし」
+      winners.length && (ranked[0]?.score || 0) > 0 ? h("div", { class: "winner" }, "優勝 " + winners.map((w) => w.name).join("・") + " さん")
+        : h("div", { class: "winner" }, "優勝者なし(だれも点を取れませんでした)"));
     const ol = h("ol", { class: "final" });
     let place = 0, prev = null;
     ranked.forEach((p, i) => {

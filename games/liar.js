@@ -250,7 +250,7 @@ function detach(ws) {
   const room = ws.room;
   if (!room) return;
   const p = room.players.get(ws.pid);
-  if (p) p.sockets.delete(ws);
+  if (p) { p.sockets.delete(ws); if (!p.sockets.size) p.goneAt = Date.now(); }
   ws.room = null;
   if (![...room.players.values()].some(connected)) room.emptySince = Date.now();
   broadcast(room);
@@ -397,6 +397,15 @@ setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms)
     if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { clearTimer(room); rooms.delete(code); }
-}, 60000);
+    else dropStalled(room, now);
+}, 20000);
+// 手番(または撃つ番)の人が切断したまま戻らないとゲームが止まるので、2分たったら席から外して進める
+// (制限時間「なし」の設定のとき用。制限時間があれば自動で進む)
+const STALL_MS = 120000;
+function dropStalled(room, now) {
+  const id = (room.phase === "play" ? room.turnId : room.phase === "reveal" && room.reveal ? room.reveal.target : null);
+  const p = id && room.players.get(id);
+  if (p && !connected(p) && p.goneAt && now - p.goneAt > STALL_MS) removePlayer(room, id);
+}
 
 module.exports = { WS_PATH, wss, rooms };

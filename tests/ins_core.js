@@ -56,7 +56,7 @@ for (const [label, target, how] of [["インサイダーに集まる", "insider"
   check(g.step === "vote2", `投票1が過半数でない → 投票2(${label})`);
   g.players.forEach((id, k) => {
     let t = target === "insider" ? g.insider : target === "other" ? commons[1] : (k % 2 ? g.insider : commons[1]);
-    if (t === id) t = target === "insider" ? commons[1] : g.master;
+    if (t === id) t = target === "insider" ? commons[1] : commons[2] || g.insider; // マスターには投票できない
     core.handle(c, id, { a: "vote2", who: t });
   });
   check(g.step === "result" && g.result.how === how, `投票2: ${label} → ${how} ${JSON.stringify(g.vote2.count)}`);

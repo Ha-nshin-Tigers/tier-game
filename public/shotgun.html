@@ -146,9 +146,12 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 8px 10px;
 .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .players li:last-child { border-bottom: none; }
-.players li.dead .pname { text-decoration: line-through; color: var(--muted); }
+.players li.dead .pname, .players li.dead .pname .nmtxt { text-decoration: line-through; color: var(--muted); }
 .sw { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
-.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 長い名前は「…」で切り、うしろの「ホスト」などの札は切らずに出す */
+.pname { min-width: 0; display: flex; align-items: center; }
+.pname .nmtxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { flex: none; white-space: nowrap; }
 .pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; }
 .pname .tag.gm { color: var(--accent); }
 .pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; text-align: right; }
@@ -170,7 +173,7 @@ body.compact #game > .top > div:first-child { display: none; }
 body.compact .meta { gap: 4px; flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
 body.compact .pill { font-size: 12px; padding: 2px 9px; white-space: nowrap; flex: none; }
 body.compact .menuBtn { display: inline-flex; margin-left: auto; background: var(--fg); color: var(--surface); }
-body.compact .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; }
+body.compact .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; align-items: stretch; }
 body.compact .col { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 6px; }
 body.compact .stage { aspect-ratio: auto; flex: 1; min-height: 150px; }
 body.compact #main { flex: none; padding: 8px 10px; gap: 6px; }
@@ -222,7 +225,7 @@ body.compact.drawer .scrim { display: block; position: fixed; inset: 0; backgrou
 .shootbtn { border-width: 3px; font-weight: 700; }
 .selfshot { background: var(--fg); color: var(--surface); }
 .itemtoggles { display: flex; flex-wrap: wrap; gap: 6px; }
-.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
 .settings .field { min-width: 0; }
 .settings select { width: 100%; min-width: 0; }
 .itoggle small { display: block; font-size: 10px; font-weight: 500; }
@@ -538,7 +541,7 @@ function renderMeta() {
   const m = $("meta"); m.replaceChildren();
   const g = S.game;
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"));
-  m.append(h("button", { type: "button", class: "pill", onclick: toggleMode, title: "表示方法を切り替える" }, mode === "3d" && !view3dFailed ? "3D表示" : "2D表示"));
+  m.append(h("button", { type: "button", class: "pill", onclick: toggleMode, title: "押すと表示を切り替えます" }, mode === "3d" && !view3dFailed ? "表示: 3D ⇄" : "表示: 2D ⇄"));
   m.append(h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
   if (S.phase === "play" && g) {
     m.append(h("span", { class: "pill table" }, `残り ${g.remaining}発`));
@@ -556,7 +559,7 @@ function renderSide() {
   const ul = h("ul", { class: "players" });
   for (const p of S.players) {
     const s = g && gseat(p.id);
-    const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+    const nm = h("span", { class: "pname" }, h("span", { class: "nmtxt" }, p.name + (p.id === me ? "(あなた)" : "")));
     if (p.id === S.gameHostId) nm.append(h("span", { class: "tag gm" }, "ホスト"));
     let info = "";
     if (S.phase === "play" && !s) info = "観戦";
@@ -664,7 +667,7 @@ function renderMain() {
     ...known.map(([k, t]) => h("span", { class: "kn" }, (+k === 0 ? "今の弾" : `${+k + 1}発目`) + "=", shellChip(t), t === "live" ? "実弾" : "空砲"))));
 
   if (g.step === "load") main.append(h("div", { class: "say" }, "装填中…"));
-  else if (g.step === "shot") main.append(h("div", { class: "say" }, "…"));
+  else if (g.step === "shot") main.append(h("div", { class: "say" }, g.log?.length ? g.log[g.log.length - 1] : "…"));
   else if (myTurn) main.append(h("div", { class: "say" }, "あなたの番", secEl(remaining())));
   else if (mine && !mine.alive) main.append(h("p", { class: "muted" }, "脱落しました。観戦中です。"));
   else main.append(h("p", {}, `${nameOf(g.turnId)} さんの番`, secEl(remaining())));
@@ -981,7 +984,9 @@ function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
   const seatedNow = () => myIndex >= 0;
   function placeCamera() {
     const aspect = camera.aspect;
-    camera.fov = seatedNow() ? (aspect < 1 ? 78 : 62) : (aspect < 1 ? 60 : 50);
+    // 縦長の画面では横の見える範囲が狭くなり、端の席の人(名札)が切れるので、横の画角が保てるよう縦の画角を広げる(上限あり)
+    const vOf = (hDeg) => 2 * Math.atan(Math.tan(hDeg * Math.PI / 360) / aspect) * 180 / Math.PI;
+    camera.fov = seatedNow() ? Math.min(100, Math.max(aspect < 1 ? 78 : 62, vOf(96))) : Math.min(90, Math.max(aspect < 1 ? 60 : 50, vOf(80)));
     camera.updateProjectionMatrix();
     aimCamera();
   }

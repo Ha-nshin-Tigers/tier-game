@@ -471,18 +471,31 @@ body.has-pbchat .wrap::after { content: ""; display: block; height: 44px; }
     store.set("tier:recent", list.slice(0, 5));
   }
   // 3Dのゲームの画質ボタン(標準⇄軽量)。押すと設定を覚えて読み込み直す
+  // 遊んでいる途中は出さない(スマホで操作ボタンに重なり、押し間違えると読み込み直してしまうため)。待機画面・結果画面だけ
   function gfxButton() {
-    if (!window.PB_3D || !window.TG || document.getElementById("pb-gfx")) return;
-    const b = document.createElement("button");
-    b.id = "pb-gfx"; b.type = "button";
-    const lite = TG.lite();
-    b.textContent = lite ? "画質: 軽量" : "画質: 標準";
-    b.title = lite ? "押すと標準の画質にします(読み込み直します)" : "動きが重いときは押して軽量にします(読み込み直します)";
-    b.style.cssText = "position:fixed;right:12px;bottom:calc(108px + env(safe-area-inset-bottom,0px));z-index:36;padding:4px 10px;border-radius:999px;border:2px solid var(--fg,#181b23);background:var(--surface,#fff);color:var(--fg,#181b23);font:700 12px var(--body,system-ui,sans-serif);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)";
-    b.addEventListener("click", () => { store.set("tier:lite", !TG.lite()); location.reload(); });
-    document.body.append(b);
+    if (!window.PB_3D || !window.TG) return;
+    let b = document.getElementById("pb-gfx");
+    if (!b) {
+      b = document.createElement("button");
+      b.id = "pb-gfx"; b.type = "button";
+      const lite = TG.lite();
+      b.textContent = lite ? "画質: 軽量" : "画質: 標準";
+      b.title = lite ? "押すと標準の画質にします(読み込み直します)" : "動きが重いときは押して軽量にします(読み込み直します)";
+      b.style.cssText = "position:fixed;right:12px;bottom:calc(108px + env(safe-area-inset-bottom,0px));z-index:36;padding:4px 10px;border-radius:999px;border:2px solid var(--fg,#181b23);background:var(--surface,#fff);color:var(--fg,#181b23);font:700 12px var(--body,system-ui,sans-serif);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)";
+      b.addEventListener("click", () => {
+        const to = TG.lite() ? "標準" : "軽量";
+        if (!confirm(`画質を「${to}」にして、ページを読み込み直します。よろしいですか？`)) return;
+        store.set("tier:lite", !TG.lite()); location.reload();
+      });
+      document.body.append(b);
+    }
+    b.hidden = busy();
   }
   setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); }, 1500);
+  // 招待欄が画面に出たらすぐ「共有」ボタンを付ける(1.5秒ごとの確認を待たない)
+  let shareQ = false;
+  if (document.body) new MutationObserver(() => { if (shareQ) return; shareQ = true; requestAnimationFrame(() => { shareQ = false; addShare(); }); })
+    .observe(document.body, { childList: true, subtree: true });
   // ホーム画面に追加(PWA)のためのサービスワーカー(キャッシュはしない)
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("/sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => wake());
