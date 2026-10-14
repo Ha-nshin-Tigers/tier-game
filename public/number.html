@@ -311,6 +311,8 @@ function connect() {
       // ホストに退出させられた
       Sound.play("bye");
       backToLogin("ホストによって部屋から退出しました", true);
+    } else if (m.t === "info") {
+      flash(m.msg);
     } else if (m.t === "error") {
       if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); }
       else flash(m.msg, true);

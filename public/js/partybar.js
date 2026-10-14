@@ -33,6 +33,13 @@
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === "joined") { if (info.create) { info.create = false; store.set(KEY, info); } lastErr = ""; }
       else if (m.t === "state") { st = m.room; me = m.me; follow(); notify(); }
+      else if (m.t === "kicked") {
+        // ホストにパーティーから外された
+        const w = ws; ws = null; info = null; st = null; pending = null; store.del(KEY); lastErr = "ホストによってパーティーから外されました";
+        try { w.close(); } catch {}
+        notify(); banner(lastErr, 6000);
+      }
+      else if (m.t === "info" && m.msg) banner(m.msg, m.maint ? 20000 : 6000);
       else if (m.t === "error") {
         lastErr = m.msg;
         // 入れなかった(コード違い・満員など)ときは、パーティーの情報を消す
@@ -41,6 +48,17 @@
       }
     };
     ws.onclose = () => { const was = ws; ws = null; if (!info || !was) return; setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+  }
+  // 画面の上のお知らせ(サーバの更新・パーティーから外された など)
+  function banner(text, ms) {
+    let el = document.getElementById("pb-banner");
+    if (!el) {
+      el = document.createElement("div"); el.id = "pb-banner"; el.setAttribute("role", "status");
+      el.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top,0px));z-index:70;width:min(560px,calc(100vw - 16px));padding:10px 14px;border-radius:10px;background:#181b23;color:#fff;font:700 14px/1.5 var(--body,system-ui,sans-serif);box-shadow:0 4px 16px rgba(0,0,0,.3);text-align:center";
+      document.body.append(el);
+    }
+    el.textContent = text; el.hidden = false;
+    clearTimeout(banner.t); banner.t = setTimeout(() => { el.hidden = true; }, ms);
   }
   // 遊んでいる途中か(ゲームの画面の状態 S を見る。待機中・結果画面なら途中ではない)
   function busy() {
@@ -110,9 +128,10 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       bar = document.createElement("div"); bar.className = "partybar"; document.body.append(bar); document.body.classList.add("has-partybar");
       bar.addEventListener("click", onBarClick);
     }
-    const n = st ? st.members.length : 0, gname = (k) => (st && st.games.find((x) => x.key === k) || {}).name || k;
+    const n = st ? st.members.filter((x) => x.connected).length : 0, gname = (k) => (st && st.games.find((x) => x.key === k) || {}).name || k;
     let html = "";
     if (pending) html += `<div class="pb-note">次は「${esc(pending.name)}」(このゲームが終わったら移動します) <button class="pb-b" data-act="gonow">今すぐ移動</button></div>`;
+    else if (st && ended() && !open && endSeen !== endKey()) html += `<div class="pb-note">🎉 ゲームおわり！ 次は？ ${isHost() ? `<button class="pb-b" data-act="lobbyall">みんなでパーティーへ戻る</button><button class="pb-b" data-act="toggle">次のゲームを選ぶ</button>` : `<a href="/lobby" data-act="hub">パーティーの画面へ</a><button class="pb-b" data-act="toggle">やりたいゲームを伝える</button>`}<button class="pb-b" data-act="endok" aria-label="閉じる">×</button></div>`;
     if (open) {
       html += `<div class="pb-panel"><b>🎉 パーティー ${esc(info.code)}</b>`;
       if (lastErr) html += `<div class="pb-muted" style="color:#c4323a">${esc(lastErr)}</div>`;
@@ -123,23 +142,40 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
         if (sc.length) html += `<div class="pb-muted">通算成績: ${sc.map((r, i) => `${i + 1}位 ${esc(r.name)} ${r.pts}点`).join(" / ")}</div>`;
         const vote = st.mode === "vote", votes = st.votes || {}, cnt = {};
         for (const k of Object.values(votes)) cnt[k] = (cnt[k] || 0) + 1;
-        const btns = () => `<div class="pb-games">${st.games.map((x) => `<button class="pb-b${x.key === page ? " cur" : ""}${vote && votes[me] === x.key ? " voted" : ""}" data-game="${x.key}">${esc(x.name)}<span class="pb-muted"> ${x.min}〜${x.max}人${vote && cnt[x.key] ? ` ・${cnt[x.key]}票` : ""}</span></button>`).join("")}</div>`;
+        const wcnt = {}; for (const k of Object.values(st.wants || {})) wcnt[k] = (wcnt[k] || 0) + 1;
+        const btns = () => `<div class="pb-games">${st.games.map((x) => `<button class="pb-b${x.key === page ? " cur" : ""}${vote && votes[me] === x.key ? " voted" : ""}" data-game="${x.key}">${esc(x.name)}<span class="pb-muted"> ${x.min === x.max ? x.min : x.min + "〜" + x.max}人${vote && cnt[x.key] ? ` ・${cnt[x.key]}票` : ""}${!vote && wcnt[x.key] ? ` ・👍${wcnt[x.key]}` : ""}</span></button>`).join("")}</div>`;
         if (vote) {
           html += `<div class="pb-muted">次のゲームは投票で決めます(押すと投票・もう一度押すと取り消し)。全員が投票すると決まります。</div>${btns()}`;
           if (isHost()) html += `<button class="pb-b" data-act="decide">投票を締め切って決める</button><button class="pb-b" data-act="lobbyall">みんなでパーティーの画面へ戻る</button>`;
         } else if (isHost()) html += `<div class="pb-muted">ホストのあなたが次のゲームを選ぶと、みんなの画面がいっしょに移動します:</div>${btns()}<button class="pb-b" data-act="lobbyall">みんなでパーティーの画面へ戻る</button>`;
-        else html += `<div class="pb-muted">次のゲームはホスト(👑)が選びます。選ばれると自動で移動します。</div>`;
+        else {
+          const wants = st.wants || {};
+          html += `<div class="pb-muted">次のゲームはホスト(👑)が選びます。やりたいゲームを押すと「やりたい👍」がホストに伝わります(もう一度押すと取り消し)。</div><div class="pb-games">${st.games.map((x) => { const c = Object.values(wants).filter((k) => k === x.key).length; return `<button class="pb-b${wants[me] === x.key ? " voted" : ""}" data-want="${x.key}">${esc(x.name)}<span class="pb-muted">${c ? ` 👍${c}` : ""}</span></button>`; }).join("")}</div>`;
+        }
       }
       html += `<div style="display:flex;gap:10px;flex-wrap:wrap"><a href="/lobby" data-act="hub">パーティーの画面</a><a href="#" data-act="leave">パーティーを抜ける</a></div></div>`;
     }
     html += `<button class="pb-pill" data-act="toggle" aria-expanded="${open}">🎉 パーティー ${esc(info.code)}・${n}人${st && st.game && st.game.key && st.game.key !== page ? `・次:${esc(st.game.name)}` : ""}</button>`;
     bar.innerHTML = html;
   }
-  let leaveArmed = 0;
+  let leaveArmed = 0, endSeen = -1;
+  // ゲームが終わった画面か(結果・最終結果)
+  function ended() {
+    try {
+      // eslint-disable-next-line no-undef
+      const s = typeof S !== "undefined" ? S : null;
+      if (!s || !s.phase) return false;
+      if (["bridge", "bomb", "memory"].includes(page) && s.phase === "result") return true;
+      return ["finished", "final"].includes(s.phase);
+    } catch { return false; }
+  }
+  let wasEnded = false, endCount = 0; const endKey = () => endCount; // ゲームが終わるたびに1つ増える(閉じたお知らせは、次に終わるまで出さない)
+  setInterval(() => { const e = !!info && ended(); if (e !== wasEnded) { wasEnded = e; if (e) endCount++; drawBar(); } }, 1000);
   function onBarClick(e) {
-    const t = e.target.closest("[data-act],[data-game]");
+    const t = e.target.closest("[data-act],[data-game],[data-want]");
     if (!t) return;
     const a = t.dataset.act;
+    if (t.dataset.want) { e.preventDefault(); api.want(t.dataset.want); return; }
     if (t.dataset.game) {
       e.preventDefault();
       if (st && st.mode === "vote") api.vote(st.votes && st.votes[me] === t.dataset.game ? null : t.dataset.game);
@@ -148,6 +184,7 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     }
     if (a === "toggle") { open = !open; drawBar(); }
     else if (a === "gonow" && pending) go(pending);
+    else if (a === "endok") { endSeen = endKey(); drawBar(); }
     else if (a === "lobbyall") api.backAll();
     else if (a === "decide") api.decide();
     else if (a === "hub") { if (st && st.game) markSeen(st.game.seq); }
@@ -280,7 +317,7 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     if (!key) return drawChat();
     const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/chat/ws");
     cws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: "join", key, pid: ident.pid, name: chatName() }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: "join", key, pid: ident.pid, token: ident.token, name: chatName() }));
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === "log") { clog = m.log; drawChat(); }
@@ -403,7 +440,18 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       document.body.classList.add("has-pbwatch");
     } else if (!watching && wbar) { wbar.remove(); wbar = null; document.body.classList.remove("has-pbwatch"); }
   }
-  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); }, 1500);
+  // 最近遊んだ部屋を覚える(トップページの「続きから」用)
+  function recentTick() {
+    if (!/^[a-z]{2,12}$/.test(page) || HUB) return;
+    let s = null;
+    // eslint-disable-next-line no-undef
+    try { s = typeof S !== "undefined" ? S : null; } catch {}
+    if (!s || !s.code) return;
+    const list = (store.get("tier:recent") || []).filter((x) => x && !(x.page === page && x.code === s.code));
+    list.unshift({ page, code: s.code, title: gameTitle(), at: Date.now() });
+    store.set("tier:recent", list.slice(0, 5));
+  }
+  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); }, 1500);
   // ホーム画面に追加(PWA)のためのサービスワーカー(キャッシュはしない)
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("/sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => wake());
@@ -423,6 +471,13 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     vote(game) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "vote", game })); },
     decide() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "decide" })); },
     backAll() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "lobby" })); },
+    kick(id) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "kick", id })); },
+    want(game) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "want", game })); },
+    rename(name) {
+      name = String(name || "").trim().slice(0, 12); if (!name || !info) return;
+      info.name = name; store.set(KEY, info); const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name });
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "rename", name }));
+    },
     leave() {
       if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "leave" }));
       const w = ws; ws = null; info = null; st = null; pending = null; store.del(KEY);

@@ -69,6 +69,12 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
 .game:hover .go { background: var(--accent); }
 .partylink { display: inline-block; font-weight: 700; padding: 6px 14px; border-radius: 999px; background: var(--fg); color: var(--surface); text-decoration: none; margin-right: 6px; }
 .partylink:hover { background: var(--accent); }
+.partyhero { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 12px; border: 2px solid var(--fg); background: color-mix(in srgb, var(--gold, #f2c14e) 30%, var(--surface)); }
+.partyhero b { font-family: var(--display); font-weight: 400; font-size: 18px; } .partyhero p { margin: 4px 0 0; font-size: 14px; }
+.partyhero .partylink { font-size: 16px; padding: 10px 18px; margin: 0; }
+.resume { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.resume a { display: inline-flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--fg); color: var(--fg); text-decoration: none; font-weight: 700; background: var(--surface); }
+.resume a:hover { background: var(--bg); }
 .installbtn { font-family: var(--body); font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; margin-right: 6px; }
 .note { font-size: 13px; color: var(--muted); border-top: 1.5px solid var(--line); padding-top: 14px; margin: 0; }
 .filters { display: grid; gap: 10px; }
@@ -98,8 +104,13 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     <h1>みんなのあそびば</h1>
     <p class="lead">遊ぶゲームを選んで、部屋を作って友達に招待リンクを送るだけ。</p>
     <p class="lead" id="installRow" hidden><button type="button" class="installbtn" id="installBtn" hidden>📱 ホーム画面に追加</button><span class="small" id="installHint"></span></p>
-    <p class="lead"><a class="partylink" href="/lobby">🎉 パーティーを作る</a> 先にみんなで集まって、ホストが選んだゲームへ全員でいっしょに移動。いくつも続けて遊ぶならこちら。</p>
   </header>
+  <!-- みんなで遊ぶなら、まずパーティー(いちばんおすすめの入り口) -->
+  <section class="partyhero" aria-label="パーティー">
+    <div><b>🎉 みんなで遊ぶなら、まずパーティー</b><p>先に集まって、ホストが選んだゲームへ全員の画面がいっしょに移動。いくつも続けて遊べて、通算成績もつきます。</p></div>
+    <a class="partylink" href="/lobby" id="partyGo">パーティーを作る・入る</a>
+  </section>
+  <section class="resume" id="resume" hidden aria-label="続きから"></section>
 
   <div class="filters" role="group" aria-label="ゲームの絞り込み">
     <div class="chips" id="cats"></div>
@@ -312,7 +323,7 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
     const all = document.getElementById("allGames"), cards = [...all.querySelectorAll("a.game")];
     const st = Object.assign({ cat: "all", people: 0, quick: false }, store.get("home:filter") || {});
     const groups = document.getElementById("groups"), sel = document.getElementById("fPeople"), quick = document.getElementById("fQuick");
-    for (let n = 2; n <= 12; n++) sel.append(new Option(n + "人", n));
+    for (let n = 1; n <= 12; n++) sel.append(new Option(n === 1 ? "1人(練習)" : n + "人", n));
     const chips = document.getElementById("cats");
     const chip = (key, label) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.dataset.key = key; b.onclick = () => { st.cat = key; draw(); }; chips.append(b); };
     chip("all", "すべて"); for (const [k, t] of CATS) chip(k, t);
@@ -347,6 +358,20 @@ h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 6vw, 
   <p class="note">友達から招待リンクが届いたときは、そのリンクを開けばそのまま部屋に入れます。部屋はゲームごとに別々です。</p>
 </div>
 <script src="/js/partybar.js" defer></script>
+<script>
+// 続きから: 最近入った部屋(3時間以内・最大3つ)と、入っているパーティー
+(() => {
+  const get = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+  const el = document.getElementById("resume"), list = (get("tier:recent") || []).filter((x) => x && Date.now() - x.at < 3 * 3600 * 1000).slice(0, 3), party = get("tier:party");
+  const items = [];
+  if (party && party.code) { items.push([`/lobby?code=${encodeURIComponent(party.code)}`, `🎉 パーティー ${party.code} に戻る`]); document.getElementById("partyGo").textContent = `パーティー ${party.code} に戻る`; }
+  for (const x of list) if (/^[a-z]{2,12}$/.test(x.page) && /^[A-Z0-9]{4,6}$/.test(x.code)) items.push([`/${x.page}?room=${x.code}`, `↩ ${x.title}(部屋 ${x.code})`]);
+  if (!items.length) return;
+  el.append(Object.assign(document.createElement("span"), { className: "muted", textContent: "続きから:" }));
+  for (const [href, t] of items) { const a = document.createElement("a"); a.href = href; a.textContent = t; el.append(a); }
+  el.hidden = false;
+})();
+</script>
 <script>
 // ホーム画面に追加: Android などは「追加」ボタン、iPhone は手順のお知らせ。もうアプリとして開いていれば出さない
 (() => {

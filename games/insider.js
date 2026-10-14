@@ -235,4 +235,4 @@ setInterval(() => {
     if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { clearTimer(room); rooms.delete(code); }
 }, 60000);
 
-module.exports = { WS_PATH, wss };
+module.exports = { WS_PATH, wss, rooms };

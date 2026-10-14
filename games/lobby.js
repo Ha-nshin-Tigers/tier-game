@@ -4,10 +4,14 @@
 // 各ゲームの画面は public/js/partybar.js でこのサーバにつながり、ホストが次のゲームを選ぶと自動で移動する。
 
 const { WebSocketServer } = require("ws");
+const fs = require("fs");
+const path = require("path");
+const store = require("./store");
 
 const WS_PATH = "/lobby/ws";
 const MAX_ROOMS = 500, MAX_MEMBERS = 16;
 const ROOM_IDLE_MS = 3 * 60 * 60 * 1000; // だれもつながっていない状態が3時間続いたら片づける
+const OFF_DROP_MS = 30 * 60 * 1000; // 30分つながっていないメンバーは外す(帰った人がずっと人数に数えられないように)
 // 移動先のゲーム。code はゲームの部屋コードの後ろにつける2文字(パーティーのコード4文字+2文字=6文字)
 const GAMES = [
   ["tier", "みんなでティア表", "TI", 2, 12], ["number", "かくれナンバー", "NU", 2, 12], ["liar", "ウソつき酒場", "LI", 2, 6], ["shotgun", "散弾ルーレット", "SG", 2, 6],
@@ -16,6 +20,21 @@ const GAMES = [
   ["monopoly", "不動産王", "MO", 2, 8], ["citychase", "シティチェイス", "CC", 2, 4], ["mortar", "モーターメイヘム", "MT", 1, 8], ["bombanana", "ボムバナナ", "BB", 3, 3],
   ["bridge", "ひとりじめ橋", "BR", 2, 8], ["bomb", "爆弾回し", "BO", 2, 8], ["memory", "おぼえて料理", "ME", 2, 8], ["party", "ドタバタ大会", "PA", 2, 8],
 ].map(([key, name, suffix, min, max]) => ({ key, name, suffix, min, max }));
+// ゲームの説明(1文目)・目安時間・分類は、トップページのカードから読む(説明を2か所に書かない)
+try {
+  const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  for (const g of GAMES) {
+    const i = html.indexOf(`<a class="game" href="/${g.key}"`); if (i < 0) continue;
+    const card = html.slice(i, html.indexOf("</a>", i));
+    const desc = (card.match(/<p class="desc">([^<]*)/) || [])[1] || "";
+    g.desc = desc.split("。")[0].slice(0, 60) + (desc ? "。" : "");
+    g.time = +((card.match(/data-time="(\d+)"/) || [])[1] || 0);
+    g.cat = (card.match(/data-cat="([a-z]+)"/) || [])[1] || "";
+  }
+  // ミニゲーム(ドタバタ大会の中の3つ)はトップにカードが無い
+  const MINI = { bridge: "2本の橋のどちらが安全かを当てて渡る、運と読み合いのミニゲーム。", bomb: "爆弾を回して、爆発したときに持っていた人の負け。", memory: "注文を覚えて、その順に料理を作る記憶のミニゲーム。" };
+  for (const g of GAMES) if (!g.desc && MINI[g.key]) { g.desc = MINI[g.key]; g.time = 5; g.cat = "mini"; }
+} catch (e) { console.error("パーティー: ゲームの説明を読めませんでした", e.message); }
 const GAME = Object.fromEntries(GAMES.map((g) => [g.key, g]));
 const BY_SUFFIX = Object.fromEntries(GAMES.map((g) => [g.suffix, g]));
 // 通算成績の順位点: 1位3点・2位2点・3位1点
@@ -39,7 +58,7 @@ function view(room, me) {
     t: "state", me,
     room: {
       code: room.code, host: hostOf(room), game: room.game, games: GAMES,
-      scores: room.scores, history: room.history.slice(-15), mode: room.mode, votes: room.votes,
+      scores: room.scores, history: room.history.slice(-15), mode: room.mode, votes: room.votes, wants: room.wants || {},
       members: order(room).map((p) => ({ id: p.id, name: p.name, connected: connected(p), where: connected(p) ? p.where : null })),
     },
   };
@@ -53,13 +72,28 @@ function detach(ws) {
   const p = room.members.get(ws.pid);
   if (p) p.sockets.delete(ws);
   ws.room = null;
+  if (p && !connected(p)) p.offSince = Date.now();
   if (![...room.members.values()].some(connected)) room.emptySince = Date.now();
+  checkVote(room);
   broadcast(room);
+}
+// 投票: つながっている全員が投票し終わっていたら決める(投票していない人が抜けたときも確かめる)
+function checkVote(room) {
+  if (room.mode !== "vote" || !Object.keys(room.votes).length) return;
+  const live = order(room).filter(connected);
+  if (live.length && live.every((x) => room.votes[x.id])) decide(room);
+}
+// メンバーを外す(抜ける・ホストが外す・長く切断)
+function removeMember(room, id) {
+  room.members.delete(id); delete room.votes[id]; if (room.wants) delete room.wants[id];
+  if (room.hostId === id) room.hostId = null;
+  if (!room.members.size) { rooms.delete(room.code); persist(); return false; }
+  checkVote(room); return true;
 }
 
 // 次のゲームへ(全員の画面が移動する)
 function go(room, g, by) {
-  room.seq++; room.votes = {};
+  room.seq++; room.votes = {}; room.wants = {};
   room.game = { key: g.key, name: g.name, path: "/" + g.key, roomCode: room.code + g.suffix, seq: room.seq, by };
 }
 // 投票の集計: いちばん多いゲーム(同数ならその中からランダム)
@@ -84,7 +118,7 @@ function handle(ws, m) {
     if (!room) {
       if (m.create === false) return err(ws, "そのパーティーは見つかりませんでした(コードを確かめてください)");
       if (rooms.size >= MAX_ROOMS) return err(ws, "パーティーがいっぱいです。しばらくしてから試してください");
-      room = { code, members: new Map(), game: null, seq: 0, emptySince: null, scores: {}, history: [], hostId: null, mode: "host", votes: {} };
+      room = { code, members: new Map(), game: null, seq: 0, emptySince: null, scores: {}, history: [], hostId: null, mode: "host", votes: {}, wants: {} };
       rooms.set(code, room);
     }
     let p = room.members.get(pid);
@@ -95,7 +129,7 @@ function handle(ws, m) {
       room.members.set(pid, p);
     }
     if (ws.room) detach(ws);
-    p.name = name; p.sockets.add(ws); p.where = typeof m.where === "string" && GAME[m.where] ? m.where : null;
+    p.name = name; p.sockets.add(ws); p.offSince = null; p.where = typeof m.where === "string" && GAME[m.where] ? m.where : null;
     ws.room = room; ws.pid = pid; room.emptySince = null;
     send(ws, { t: "joined", room: code });
     return broadcast(room);
@@ -147,24 +181,48 @@ function handle(ws, m) {
       room.seq++; room.votes = {};
       room.game = { key: null, name: "パーティーの画面", path: "/lobby", roomCode: room.code, seq: room.seq, by: p.id };
       break;
+    case "kick": {
+      // ホスト: メンバーを外す(その人の画面はパーティーから抜ける)
+      if (!isHost) return err(ws, "メンバーを外せるのはホストだけです");
+      const t = room.members.get(m.id);
+      if (!t || t.id === p.id) return;
+      for (const s of t.sockets) { send(s, { t: "kicked" }); s.room = null; }
+      if (!removeMember(room, t.id)) return;
+      break;
+    }
+    case "rename": {
+      // 自分のニックネームを変える(通算成績の名前も変わる)
+      const nm = cleanStr(m.name, 12);
+      if (!nm) return err(ws, "ニックネームを入れてください");
+      p.name = nm; if (room.scores[p.id]) room.scores[p.id].name = nm;
+      break;
+    }
+    case "want": {
+      // 「これやりたい」(だれでも。ホストが選ぶときの参考。投票とは別)
+      if (!room.wants) room.wants = {};
+      if (m.game == null || room.wants[p.id] === m.game) delete room.wants[p.id];
+      else if (GAME[m.game]) room.wants[p.id] = m.game;
+      else return;
+      break;
+    }
     case "where":
       p.where = typeof m.where === "string" && GAME[m.where] ? m.where : null;
       break;
     case "leave":
-      room.members.delete(p.id); delete room.votes[p.id];
-      if (room.hostId === p.id) room.hostId = null;
       ws.room = null;
-      if (!room.members.size) { rooms.delete(room.code); return; }
+      if (!removeMember(room, p.id)) return;
       break;
     default:
       return;
   }
   broadcast(room);
+  if (m.t !== "where") persist();
 }
 
 // 各ゲームの結果を受け取る(ゲームのサーバが終わったときに呼ぶ)。部屋コードが「パーティーのコード+ゲームの2文字」なら、
-// そのパーティーの通算成績に足す。rows: [{ id, name, rank }](rank が無い人は順位なし=0点。協力ゲームは全員 rank なし)
-function report(gameKey, roomCode, rows) {
+// そのパーティーの通算成績に足す。rows: [{ id, name, rank }](rank が無い人は順位なし=0点)。
+// 協力ゲームは全員同じ結果(成功なら全員 rank 1、失敗なら rank なし)。note は記録に添える一言(「解除成功」など)
+function report(gameKey, roomCode, rows, note) {
   try {
     const code = String(roomCode || "");
     if (code.length !== 6) return;
@@ -181,9 +239,9 @@ function report(gameKey, roomCode, rows) {
     }
     if (!res.length) return;
     res.sort((a, b) => (a.rank || 99) - (b.rank || 99));
-    room.history.push({ game: g.name, at: Date.now(), res });
+    room.history.push({ game: g.name, at: Date.now(), res, note: typeof note === "string" ? note.slice(0, 40) : "" });
     if (room.history.length > 50) room.history.shift();
-    broadcast(room);
+    broadcast(room); persist();
   } catch (e) { console.error("パーティー 成績の記録エラー:", e); }
 }
 // 点数(大きいほど上)から順位をつける
@@ -208,6 +266,41 @@ wss.on("connection", (ws) => {
 });
 setInterval(() => { for (const ws of wss.clients) ws.budget = Math.min(30, ws.budget + 10); }, 1000);
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, 30000);
-setInterval(() => { const now = Date.now(); for (const [code, room] of rooms) if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) rooms.delete(code); }, 60000);
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of rooms) {
+    if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { rooms.delete(code); persist(); continue; }
+    // 長く切断しているメンバーを外す(通算成績は残る)
+    let changed = false;
+    for (const p of [...room.members.values()]) if (!connected(p) && p.offSince && now - p.offSince > OFF_DROP_MS && room.members.size > 1) { removeMember(room, p.id); changed = true; }
+    if (changed) { broadcast(room); persist(); }
+  }
+}, 60000);
 
-module.exports = { WS_PATH, wss, GAMES, report, rankByScore, _t: { rooms, handle } };
+// ---- 保存: パーティー(メンバー・ホスト・通算成績・記録)を保存して、サーバが再起動しても戻せるようにする ----
+let persistT = null;
+function snapshot() {
+  return [...rooms.values()].map((r) => ({
+    code: r.code, seq: r.seq, game: r.game, scores: r.scores, history: r.history, hostId: r.hostId, mode: r.mode, votes: r.votes, wants: r.wants || {},
+    emptySince: r.emptySince || Date.now(),
+    members: [...r.members.values()].map((p) => ({ id: p.id, token: p.token, name: p.name, joinedAt: p.joinedAt, where: p.where, offSince: p.offSince || Date.now() })),
+  }));
+}
+function persist() { clearTimeout(persistT); persistT = setTimeout(() => store.save("parties", snapshot()), 2000); }
+function saveNow() { clearTimeout(persistT); return store.save("parties", snapshot()); }
+async function restore() {
+  const data = await store.load("parties");
+  if (!Array.isArray(data)) return 0;
+  const now = Date.now();
+  for (const r of data) {
+    if (!r || typeof r.code !== "string" || rooms.has(r.code) || now - (r.emptySince || now) > ROOM_IDLE_MS) continue;
+    const members = new Map();
+    for (const p of r.members || []) members.set(p.id, { id: p.id, token: p.token, name: p.name, joinedAt: p.joinedAt, sockets: new Set(), where: null, offSince: now });
+    if (!members.size) continue;
+    rooms.set(r.code, { code: r.code, members, game: r.game || null, seq: r.seq || 0, emptySince: now, scores: r.scores || {}, history: r.history || [], hostId: r.hostId || null, mode: r.mode === "vote" ? "vote" : "host", votes: r.votes || {}, wants: r.wants || {} });
+  }
+  console.log(`パーティーの保存先: ${store.remote ? "Upstash Redis" : "ローカルファイル(反映のたびに消える場合あり)"} / ${rooms.size}件を復元`);
+  return rooms.size;
+}
+
+module.exports = { WS_PATH, wss, GAMES, report, rankByScore, restore, saveNow, _t: { rooms, handle, snapshot } };

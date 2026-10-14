@@ -606,6 +606,18 @@ const server = http.createServer((req, res) => {
       res.end(buf);
     });
   }
+  // 招待リンクのQRコード(パーティー・部屋を対面で共有するため)。このサイトのリンクだけ作る
+  if (url.pathname === "/qr.svg") {
+    const text = String(url.searchParams.get("t") || "").slice(0, 300);
+    const host = String(req.headers.host || "");
+    let ok = false; try { ok = !!host && new URL(text).host === host; } catch {}
+    if (!ok) { res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("このサイトのリンクだけQRコードにできます"); }
+    return require("qrcode").toString(text, { type: "svg", margin: 1, errorCorrectionLevel: "M" }, (e, svg) => {
+      if (e) { res.writeHead(500); return res.end(); }
+      res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
+      res.end(svg);
+    });
+  }
   if (serveStatic(url.pathname, res)) return;
   const page = PAGES[url.pathname];
   if (page) {
@@ -664,4 +676,28 @@ setInterval(() => {
 party.setTierTopics(allTopics);
 party.setNumberTopics(number.TOPICS);
 
-loadTopics().then(() => server.listen(PORT, () => console.log(`起動しました: http://localhost:${PORT}`)));
+// 文字チャットは、その部屋(パーティー)のメンバーだけが読み書きできる
+{
+  const MODS = { tier: { rooms }, number, liar, party, bridge: party, bomb: party, memory: party, shotgun, eshiri, monopoly, insider, coyote, challengers, eldorado, guessclub, heat, mortar, citychase, matchy, bombanana };
+  chat.setVerify((page, code, pid, token) => {
+    const room = page === "lobby" ? lobby._t.rooms.get(code) : MODS[page] && MODS[page].rooms ? MODS[page].rooms.get(code) : null;
+    const p = room && (room.players || room.members) ? (room.players || room.members).get(pid) : null;
+    return p && p.token === token ? p.name || "だれか" : null;
+  });
+}
+// 止まる前のお知らせ: 本番への反映・再起動のとき(Render は止める前に SIGTERM を送る)、遊んでいる全員に知らせて、
+// パーティーと通算成績を保存してから止まる。ゲームの部屋そのものは保存しないので、遊んでいた途中のゲームは終わってしまう
+let stopping = false;
+async function shutdown(sig) {
+  if (stopping) return; stopping = true;
+  const msg = { t: "info", maint: true, msg: "🔧 サーバを更新します。数十秒〜1分ほどで自動でつながり直します(遊んでいる途中のゲームは終わります。パーティーと通算成績は残ります)" };
+  const all = [wss, number.wss, liar.wss, party.wss, shotgun.wss, eshiri.wss, monopoly.wss, insider.wss, coyote.wss, challengers.wss, eldorado.wss, guessclub.wss, heat.wss, mortar.wss, citychase.wss, matchy.wss, lobby.wss, bombanana.wss];
+  for (const w of all) for (const c of w.clients) try { if (c.readyState === 1) c.send(JSON.stringify(msg)); } catch {}
+  console.log(`${sig}: 止まる前にパーティーを保存します`);
+  try { await Promise.race([lobby.saveNow(), new Promise((r) => setTimeout(r, 4000))]); } catch {}
+  setTimeout(() => process.exit(0), 600);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+Promise.all([loadTopics(), lobby.restore().catch((e) => console.error("パーティーの復元に失敗:", e.message))]).then(() => server.listen(PORT, () => console.log(`起動しました: http://localhost:${PORT}`)));

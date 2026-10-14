@@ -165,6 +165,12 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .rolecard .who { font-size: 12px; font-weight: 700; color: var(--accent); }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
 .checks label { display: inline-flex; gap: 4px; align-items: center; }
+/* 停電: 画面がほとんど見えなくなる(見ざるには関係ない) */
+body.blackout #main, body.blackout #side { filter: brightness(.13); transition: filter .4s; }
+.darkbar { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 28; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; background: #111; color: #ffd27a; padding: 8px 14px; border-radius: 12px; border: 1.5px solid #ffd27a; max-width: calc(100vw - 24px); }
+.darkbar button { background: #ffd27a; color: #181b23; border-color: #ffd27a; }
+.hints { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 13px; }
+.hints b { font-weight: 700; }
 /* マニュアル(言わざる) */
 .man { display: grid; gap: 8px; }
 .mtabs { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -380,7 +386,11 @@ function playFx(f) {
     case "strike": T(150, 0, 0.45, "sawtooth", 0.16); T(110, 0.05, 0.5, "sawtooth", 0.12); break;
     case "solved": T(988, 0, 0.12); T(1318, 0.1, 0.25); break;
     case "clear": [523, 659, 784, 1046].forEach((x, i) => T(x, i * 0.12, 0.35, "triangle", 0.14)); break;
-    case "boom": Sound.noise(1.8, 0.5, 400); T(60, 0, 1.2, "sine", 0.4); break;
+    case "boom": { // 爆発: 低い衝撃+だんだん消える轟音
+      Sound.noise(0.25, 0.7, 6000); Sound.noise(2.6, 0.45, 300);
+      if (Sound.ctx && Sound.on) { const c = Sound.ctx, o = c.createOscillator(), gn = c.createGain(), t0 = c.currentTime; o.frequency.setValueAtTime(90, t0); o.frequency.exponentialRampToValueAtTime(28, t0 + 1.4); gn.gain.setValueAtTime(0.55, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6); o.connect(gn).connect(c.destination); o.start(t0); o.stop(t0 + 1.7); }
+      break;
+    }
     case "slap": Sound.noise(0.08, 0.35, 5000); break;
     case "banana": T(500, 0, 0.12, "triangle"); T(320, 0.4, 0.15, "triangle"); break;
     case "alarm": for (let i = 0; i < 4; i++) { T(880, i * 0.5, 0.25, "square", 0.07); T(660, i * 0.5 + 0.25, 0.25, "square", 0.07); } break;
@@ -388,7 +398,7 @@ function playFx(f) {
   }
 }
 // 続く音: 騒音(ラジオ)とアラーム、時計のカチカチ
-let noiseSrc = null, lastTick = 0;
+let noiseSrc = null, lastTick = 0, lastHiss = 0, tickTock = false;
 function loopSounds() {
   const g = S?.game, play = g && g.step === "play" && S.phase === "play";
   const wantNoise = play && g.hazard?.noise && canHear() && Sound.on;
@@ -396,8 +406,12 @@ function loopSounds() {
   if (!wantNoise && noiseSrc) { try { noiseSrc.stop(); } catch {} noiseSrc = null; }
   if (play && canHear() && g.bomb) {
     const left = g.bomb.end - (Date.now() + offset), gap = left < 30000 ? 500 : 1000;
-    if (Date.now() - lastTick >= gap) { lastTick = Date.now(); Sound.tone(left < 30000 ? 1500 : 1200, 0, 0.03, "square", 0.03); }
-    if (g.bomb.mods.some((m) => m.kind === "alarm" && m.active) && Date.now() % 1000 < 260) Sound.tone(900, 0, 0.2, "square", 0.05);
+    // 時計: チク・タクを交互に(残り30秒からは速く高く)
+    if (Date.now() - lastTick >= gap) { lastTick = Date.now(); tickTock = !tickTock; Sound.tone(left < 30000 ? 1700 : tickTock ? 1250 : 950, 0, 0.025, "square", 0.035); }
+    if (g.bomb.mods.some((m) => m.active && (m.kind === "alarm" || m.chaos)) && Date.now() % 1000 < 260) Sound.tone(900, 0, 0.2, "square", 0.05);
+    // カオスが危ないとき: シューという音が強くなる(見ざる・言わざるに聞こえる。聞かざるは針が見える)
+    const lv = Math.max(0, ...g.bomb.mods.map((m) => m.lvl || 0));
+    if (lv && Date.now() - lastHiss >= (lv === 2 ? 700 : 1600)) { lastHiss = Date.now(); Sound.noise(0.3, lv === 2 ? 0.16 : 0.06, 5000); }
   }
 }
 setInterval(loopSounds, 250);
@@ -455,7 +469,11 @@ const Voice = {
       const a = this.audio[id] || (this.audio[id] = new Audio()); a.srcObject = e.streams[0];
       a.play().catch(() => flash("ボイスを聞くには、画面のどこかをタップしてください"));
     };
-    pc.onconnectionstatechange = () => { if (["failed", "closed"].includes(pc.connectionState) && this.pcs[id] === pc) delete this.pcs[id]; };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed" && !this.warned) { this.warned = true; flash("ボイスがつながりませんでした(回線が直接つながれない環境のようです)。声は文字の「話す」で送れます", true); addCap("🎙 ボイスがつながりませんでした。文字の「話す」を使ってください"); }
+      if (pc.connectionState === "connected") this.warned = false;
+      if (["failed", "closed"].includes(pc.connectionState) && this.pcs[id] === pc) delete this.pcs[id];
+    };
     this.pcs[id] = pc; return pc;
   },
   async call(id) {
@@ -510,8 +528,10 @@ function visualFx(f) {
   const flashIt = (cls) => { if (!box) return; box.classList.remove(cls); void box.offsetWidth; box.classList.add(cls); };
   if (f.kind === "strike" && ro !== "blind") flashIt("flashred");
   if ((f.kind === "solved" || f.kind === "clear") && ro !== "blind") flashIt("flashgreen");
-  if (f.kind === "boom") flashIt("boomfx");
-  if (f.kind === "emote" && scene3d) scene3d.showBubble(f.from, EMO_T[f.e] || "?");
+  if (f.kind === "boom") { flashIt("boomfx"); scene3d?.boom(); }
+  if (f.kind === "clear") scene3d?.confetti();
+  if (f.kind === "strike") scene3d?.strikeFx();
+  if (f.kind === "emote" && scene3d) { scene3d.showBubble(f.from, EMO_T[f.e] || "?"); scene3d.gesture(f.from, f.e); }
   if ((f.kind === "slap" || f.kind === "banana") && scene3d) scene3d.anim(f.kind, f.from, f.to);
   if (f.kind === "slap" && f.to === me) toast(`${nameOf(f.from)} にビンタされた！`);
   if (f.kind === "banana" && f.to === me) toast(`${nameOf(f.from)} にバナナを投げられた！`);
@@ -528,7 +548,7 @@ function renderMeta() {
   m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
     h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
   const g = S.game;
-  if (g) m.append(h("span", { class: "pill" }, g.mode === "campaign" ? `レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目・${g.score}点` : "カスタム"),
+  if (g) m.append(h("span", { class: "pill" }, g.mode === "campaign" ? `レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目・${g.score}点` : g.mode === "tutorial" ? "練習" : "カスタム"),
     h("span", { class: "pill rolebadge" }, ROLE_ICON[myRole()], ROLE_JA[myRole()]));
 }
 function renderSide() {
@@ -597,15 +617,15 @@ async function loadScene() {
   sceneLoading = true;
   try {
     B3D = await import("/js/bb3d.js");
-    scene3d = B3D.createScene($("stage"), { onClick, onHover, offset: () => offset });
+    scene3d = B3D.createScene($("stage"), { onClick, onHover, onLong, offset: () => offset });
   } catch (e) { console.error(e); flash("3Dの表示を読み込めませんでした。ページを再読み込みしてください", true); }
   sceneLoading = false; applyRole(); updatePlay();
 }
 function applyRole() {
   const g = S?.game; if (!scene3d || !g) return;
-  const k = `${me}:${myRole()}:${JSON.stringify(g.role)}`;
-  if (k === roleKey) return; roleKey = k;
-  scene3d.setRole(myRole(), { me, roles: g.role, names: Object.fromEntries(g.order.map((id) => [id, nameOf(id) + (id === me ? "(あなた)" : "")])) });
+  const k = `${me}:${myRole()}:${JSON.stringify(g.role)}:${g.guide}`;
+  if (k === roleKey) return; roleKey = k; local.kbd = -1;
+  scene3d.setRole(myRole(), { me, guide: g.guide, roles: g.role, names: Object.fromEntries(g.order.map((id) => [id, nameOf(id) + (id === me ? "(あなた)" : "")])) });
   local.focus = null; renderTool(true);
 }
 
@@ -634,7 +654,7 @@ function drawOverlay() {
     const b = g.bomb, mods = b.mods.map((m) => m.kind === "hidden" ? null : MOD_JA[m.kind]).filter(Boolean);
     const sec = Math.max(0, Math.ceil((b.briefUntil - (Date.now() + offset)) / 1000));
     sig = "brief" + sec + g.level + g.wave;
-    kids = [h("div", { class: "eyebrow", style: "color:#ddd" }, g.mode === "campaign" ? `キャンペーン レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目` : "カスタム"),
+    kids = [h("div", { class: "eyebrow", style: "color:#ddd" }, g.mode === "campaign" ? `キャンペーン レベル${g.level}` : g.mode === "endless" ? `エンドレス ${g.wave + 1}ウェーブ目` : g.mode === "tutorial" ? "練習" : "カスタム"),
       h("h3", {}, "爆弾が届いた！"),
       myRole() === "mute" ? h("p", {}, `モジュール ${b.mods.length}個(あなたには爆弾は見えません。マニュアルを開いて待とう)`) : h("div", { class: "modlist" }, ...mods.map((x) => h("span", {}, x))),
       h("p", {}, `${b.mistakes + 1}回ミスしたら爆発。${sec}秒後にスタート`)];
@@ -646,7 +666,9 @@ function drawOverlay() {
       h("p", {}, r.ok ? `のこり ${r.left}秒で解除しました` : `${r.why}`),
       g.mode === "endless" ? h("p", {}, `記録: ${r.wave || 0}ウェーブ・${r.score || 0}点`) : null,
       g.mode === "campaign" && r.ok && g.level === 30 ? h("p", {}, "全30レベルクリア！おめでとう！") : null,
-      inGame ? h("div", { class: "btns", style: "justify-content:center" }, h("button", { class: "big", type: "button", onclick: () => act("next") }, nextLabel), h("button", { type: "button", class: "ghost", style: "color:#fff;background:transparent", onclick: () => send({ t: "again" }) }, "待機画面に戻る")) : h("p", {}, "観戦中")];
+      inGame ? h("div", { class: "btns", style: "justify-content:center" }, h("button", { class: "big", type: "button", onclick: () => act("next") }, nextLabel),
+        h("button", { type: "button", onclick: () => act("next", { rotate: true }) }, "🔄 役割を回して" + (g.mode === "campaign" && r.ok && g.level < 30 ? "次へ" : "もう一度")),
+        h("button", { type: "button", class: "ghost", style: "color:#fff;background:transparent", onclick: () => send({ t: "again" }) }, "待機画面に戻る")) : h("p", {}, "観戦中")];
   }
   if (el.dataset.sig === sig) return;
   el.dataset.sig = sig; el.hidden = !sig;
@@ -663,12 +685,12 @@ function drawModbar() {
     g.bomb.mods.forEach((m, i) => kids.push(h("button", { type: "button", class: local.focus === i ? "on" : "", onclick: () => setFocus(i) }, `${i + 1}${m.solved ? "✓" : ""}`)));
   }
   if (ro === "blind" && !isHover) kids.push(h("span", { class: "seg", role: "group", "aria-label": "タップの動作" },
-    h("button", { type: "button", class: local.blindMode === "touch" ? "on" : "", onclick: () => { local.blindMode = "touch"; drawModbar(); } }, "✋ さわる"),
-    h("button", { type: "button", class: local.blindMode === "press" ? "on" : "", onclick: () => { local.blindMode = "press"; drawModbar(); } }, "👆 押す")));
+    h("button", { type: "button", class: local.blindMode === "press" ? "on" : "", onclick: () => { local.blindMode = "press"; drawModbar(); } }, "👆 タップで押す"),
+    h("button", { type: "button", class: local.blindMode === "touch" ? "on" : "", onclick: () => { local.blindMode = "touch"; drawModbar(); } }, "✋ タップもさわるだけ")));
   el.replaceChildren(...kids);
   const hint = $("stagehint");
-  if (hint) hint.textContent = ro === "blind" ? (isHover ? "マウスを乗せると「さわる」(点字・熱さ・音が分かる)、クリックで「押す・切る・回す」。ドラッグで見回せます。" : "「さわる」でタップすると点字・熱さ・音が分かり、「押す」でタップすると操作します。ドラッグで見回せます。")
-    : ro === "deaf" ? "爆弾や小物をタップ/クリックすると、そこを指差します(仲間に見えます)。ドラッグで見回せます。"
+  if (hint) hint.textContent = ro === "blind" ? (isHover ? "マウスを乗せると「さわる」(点字・熱さ・音が分かる)、クリックで「押す・切る・回す」。キーボードなら ←→ で部品を順にさわり、Enter で押す(数字キーでモジュールへ)。ドラッグで見回せます。" : "長押しで「さわる」(点字・熱さ・音が分かる・押さない)、タップで「押す・切る・回す」。ドラッグで見回せます。")
+    : ro === "deaf" ? "爆弾や小物をタップ/クリックすると、そこを指差します(仲間に見えます)。台の黄色い札が見ざるの向き(手前・左・右・奥)です。ドラッグで見回せます。"
     : ro === "mute" ? "車内の小物をタップ/クリックで指差し(赤い消火器・青いクーラーボックス・緑の植木・黄色いバナナ箱で色を伝えられます)。" : "ドラッグで見回せます。";
 }
 function setFocus(i) { local.focus = i; if (scene3d) scene3d.focus(i); drawModbar(); }
@@ -676,13 +698,15 @@ function drawDark() {
   const g = S.game, dark = g.step === "play" && g.hazard?.dark && myRole() !== "blind";
   let el = $("darkov");
   if (dark && !el) {
-    el = h("div", { class: "dark", id: "darkov" }, h("div", {}, h("p", { style: "font-size:20px;font-weight:700" }, "💡 停電！真っ暗で何も見えない"),
-      h("p", {}, "手探りでランプのひもを引こう(見ざるには関係ありません)"), h("button", { type: "button", onclick: () => act("env", { what: "lamp" }) }, "ランプをつける")));
+    el = h("div", { class: "darkbar", id: "darkov" }, h("b", {}, "💡 停電！ほとんど見えない"), h("button", { type: "button", onclick: () => act("env", { what: "lamp" }) }, "手探りでランプのひもを引く"));
     document.body.append(el);
   } else if (!dark && el) el.remove();
+  document.body.classList.toggle("blackout", !!dark);
 }
 
 // ---- 3Dの舞台を触ったとき ----
+// スマホの見ざる: 長押し=さわる(押さない)
+function onLong(hit) { if (myRole() === "blind" && hit?.pick && S.phase === "play" && S.game.step === "play") { doTouch(hit.pick, true); navigator.vibrate?.(20); } }
 function onHover(pick) { if (myRole() === "blind" && pick && S.phase === "play") doTouch(pick); }
 function onClick(hit) {
   const g = S?.game; if (!g || S.phase !== "play" || g.step !== "play" || !g.order.includes(me)) return;
@@ -747,15 +771,59 @@ function doAct(P) {
   }
 }
 
+// ---- ヒント(練習・ガイドあり): 役割ごとに、いま何をすればいいか ----
+const HINT = {
+  cable: { blind: "ケーブルの本数を数えて「○本ある」と言う。聞かざるに言われた番号のケーブルを切る", deaf: "ランプの色と、ケーブルの色の並び(番号の札)を言う", mute: "本数とランプの色から、切る色を表で探して、その色の小物を指差す" },
+  slider: { blind: "4本のスライダーを、聞かざるに言われた向きへ1本ずつ動かす", deaf: "つまみの色を左から順に言う", mute: "色と位置で上か下かを表で探し、エモートの「上」「下」で伝える" },
+  direction: { blind: "真ん中の点字の数字を言い、言われた向きの矢印を押す(2〜3回くり返す)", deaf: "ランプの色を言う", mute: "数字と色から向きを表で探し、エモートの矢印で伝える" },
+  calc: { blind: "キーの点字を確かめ、言われた数字を押して「＝」。2段目は言われた数字を1つ押す", deaf: "画面の式を言う。2段目はランプの色を言う", mute: "式を計算して答えを伝える(数字のエモート)。2段目は色と奇数・偶数で表を見る" },
+  symbol: { blind: "ホイールを回して、チャイムが鳴ったら止めて「鳴った」と言う。言われたボタンを押す", deaf: "チャイムのとき矢印が指している記号と、ボタンの色の並びを言う", mute: "記号と段階から押す色を表で探し、色の小物を指差す" },
+  piano: { blind: "左上のオクターブの点字を言い、言われた鍵盤を順に弾く", deaf: "ランプの色を言う", mute: "オクターブと色から4つの鍵盤の番号を表で探し、数字のエモートで伝える" },
+  soundboard: { blind: "9つのボタンを触って、音が鳴ったボタンの点字と位置を言う。言われた位置を順に押す", deaf: "見ざるが触っている音のボタン(手の位置)の色を言う", mute: "点字と色から押す3か所を表で探して伝える" },
+  monkey: { blind: "4つのボタンを触って、熱いボタンの位置を言う。言われた色の順に押す", deaf: "熱いと言われたボタンの色を言い、押す色がどのボタンかを見ざるに教える", mute: "熱いボタンの色と段階から押す色を表で探す(段階ごとに最初から全部)" },
+  morse: { blind: "3つの信号ボタンを触って音を聞く。言われた数字にダイヤル(点字)を合わせて決定", deaf: "ダイヤルの数字が合っているか見る", mute: "信号の音を聞いて、表で数字に直して伝える" },
+  maze: { blind: "左上の点字(迷路の番号)を言い、言われた向きのボタンで1マスずつ進む", deaf: "赤い点(いま)と緑の点(ゴール)の場所を言う", mute: "番号の迷路に印をつけ、壁のない道をエモートの矢印で伝える" },
+  switch: { blind: "下の点字の数字を左から言い、言われたスイッチを切り替えて決定", deaf: "上のランプの色を左から言う", mute: "色ごとの決まりと数字で上か下かを決めて伝える" },
+  pressure: { blind: "ブルブル震えたら真ん中の赤いボタンを押す", deaf: "針が赤い所に近づいたら「押して」と言う", mute: "シューという音が強くなったら、見ざるに知らせる" },
+  rslider: { blind: "スライダーが上がってきたら引き下げる", deaf: "上がってきたら「下げて」と言う", mute: "シューという音が強くなったら知らせる" },
+  alarm: { blind: "サイレンが鳴ったら6つのボタンを触って、熱い3つを全部押す", deaf: "サイレンが光ったら知らせる", mute: "サイレンが聞こえたら知らせる" },
+};
+function hintsEl(g) {
+  const ro = myRole(); if (!g.guide || !g.bomb || !["blind", "deaf", "mute"].includes(ro)) return null;
+  if (ro === "mute") return h("div", { class: "box2" }, h("h3", {}, "💡 ヒント"), h("ol", { class: "hints" },
+    h("li", {}, "爆弾は見えません。見ざると聞かざるの声から、どのモジュールの話かを聞き取って、マニュアルのタブを開こう。"),
+    h("li", {}, "答えは、色なら車内の色の小物(赤い消火器・青いクーラーボックス・緑の植木・黄色いバナナ箱)を指差し、数字や向きはエモートで。"),
+    h("li", {}, "あなたのエモートは聞かざるに見えます。聞かざるが見ざるへ言い直してくれます。")));
+  const todo = g.bomb.mods.map((m, i) => [m, i]).filter(([m]) => !m.solved && HINT[m.kind]);
+  if (!todo.length) return null;
+  return h("div", { class: "box2" }, h("h3", {}, "💡 ヒント(いま何をする?)"), h("ol", { class: "hints" },
+    ...todo.slice(0, 4).map(([m, i]) => h("li", {}, h("b", {}, `${i + 1}. ${MOD_JA[m.kind]}: `), HINT[m.kind][ro]))));
+}
+
+// ---- 見ざる(PC)のキーボード操作: ←→で部品を順にさわる、Enterで押す、数字キーでモジュールへ ----
+document.addEventListener("keydown", (e) => {
+  if (myRole() !== "blind" || S?.phase !== "play" || S.game?.step !== "play" || !scene3d) return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+  const list = scene3d.parts(); if (!list.length) return;
+  let i = local.kbd ?? -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") i = (i + 1) % list.length;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") i = (i - 1 + list.length) % list.length;
+  else if (/^[1-9]$/.test(e.key)) { const k = list.findIndex((p) => p.mod === +e.key - 1); if (k < 0) return; i = k; setFocus(+e.key - 1); }
+  else if ((e.key === "Enter" || e.key === " ") && list[i]) { e.preventDefault(); doTouch(list[i], true); doAct(list[i]); return; }
+  else return;
+  e.preventDefault(); local.kbd = i; doTouch(list[i], true);
+});
+
 // ---- 右側: 役割ごとの道具(話す・エモート・ビンタ・マニュアル・ボイス) ----
 function renderTool(force) {
   const el = $("tool"), g = S?.game; if (!el || !g) return;
   const ro = myRole(), inGame = g.order.includes(me);
-  const sig = JSON.stringify([ro, inGame, !!MANUAL, local.tab, Voice.on, !!Voice.stream, g.step, g.hazard?.noise, g.hazard?.dark, g.order]);
+  const sig = JSON.stringify([ro, inGame, !!MANUAL, local.tab, Voice.on, !!Voice.stream, g.step, g.hazard?.noise, g.hazard?.dark, g.order, g.guide, g.bomb?.mods.map((m) => m.kind + m.solved).join()]);
   if (!force && sig === local.toolSig) return; local.toolSig = sig;
   // 入力中の文字は作り直しても残す
   const draft = $("sayIn")?.value || "", hadFocus = document.activeElement?.id === "sayIn";
   const kids = [h("div", { class: "box2" }, h("h3", {}, `${ROLE_ICON[ro]} あなたは「${ROLE_JA[ro]}」`), h("p", { class: "small", style: "margin:0" }, ROLE_DO[ro]))];
+  const hb = inGame ? hintsEl(g) : null; if (hb) kids.push(hb);
   if (inGame && canSpeak()) {
     const inp = h("input", { type: "text", id: "sayIn", maxlength: 60, placeholder: ro === "blind" ? "言わざるに話す(例: 点字は7)" : "見ざる・言わざるに話す(例: 赤いケーブル)", autocomplete: "off", value: draft });
     const form = h("form", { class: "speak", onsubmit: (e) => { e.preventDefault(); const t = inp.value.trim(); if (t) { act("say", { text: t }); inp.value = ""; } } }, inp, h("button", { type: "submit", class: "primary" }, "話す"));
@@ -785,7 +853,7 @@ function renderTool(force) {
   }
   if (ro === "mute") {
     if (!MANUAL && inGame) { act("manual"); kids.push(h("p", { class: "muted" }, "マニュアルを開いています…")); }
-    else if (MANUAL) kids.splice(1, 0, manualEl()); // マニュアルは言わざるの一番の道具なので上に
+    else if (MANUAL) kids.splice(hb ? 2 : 1, 0, manualEl()); // マニュアルは言わざるの一番の道具なので上に
   }
   el.replaceChildren(...kids);
   if (hadFocus) { const i = $("sayIn"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -877,9 +945,11 @@ function renderLobby(main) {
   const camp = DB?.campaign || [];
   const lvLabel = (i) => { const L = camp[i - 1]; if (!L) return `レベル${i}`; const mods = L.mods.map((k) => ({ E: "かんたん", M: "ふつう", H: "むずかしい" })[k] || MOD_JA[k]).join("・"); return `レベル${i}(${clock(L.secs * 1000)}・ミス${L.mistakes}回まで・${mods}${L.chaos.length ? "+カオス" + L.chaos.length : ""})`; };
   const settings = h("div", { class: "settings" },
-    sel("モード", st.mode, [["campaign", "キャンペーン(30レベル)"], ["endless", "エンドレス"], ["custom", "カスタム"]], (v) => send({ t: "settings", s: { mode: v } })));
+    sel("モード", st.mode, [["tutorial", "練習(はじめての人向け)"], ["campaign", "キャンペーン(30レベル)"], ["endless", "エンドレス"], ["custom", "カスタム"]], (v) => send({ t: "settings", s: { mode: v } })),
+    st.mode !== "tutorial" ? h("label", { class: "field" }, "ガイド", h("label", { class: "small", style: "color:var(--fg)" }, h("input", { type: "checkbox", disabled: !gm, checked: st.guide, onchange: (e) => send({ t: "settings", s: { guide: e.target.checked } }) }), " ヒントと番号の札を出す")) : null);
   if (st.mode === "campaign") settings.append(sel("レベル", st.level, Array.from({ length: 30 }, (_, i) => [i + 1, lvLabel(i + 1)]), (v) => send({ t: "settings", s: { level: v } })));
   main.append(h("h2", {}, "モード"), settings);
+  if (st.mode === "tutorial") main.append(h("p", { class: "small muted" }, "ケーブルと方向の2つだけ。10分・ミス5回まで。役割ごとに「いま何をすればいいか」のヒントが出ます。慣れたら役割を回して3人とも体験してみよう。"));
   if (st.mode === "campaign") main.append(h("p", { class: "small muted" }, "レベルが上がるとモジュールが増え、カオスモジュールや停電・騒音(レベル11から)も出ます。成功すると次のレベルへ進めます。"));
   if (st.mode === "endless") main.append(h("p", { class: "small muted" }, "爆弾が次々に届きます。モジュールを1つ解くごとに1点・30秒延長。何ウェーブ耐えられるか挑戦。"));
   if (st.mode === "custom") {

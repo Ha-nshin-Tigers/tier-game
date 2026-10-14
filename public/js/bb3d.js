@@ -7,7 +7,7 @@ export const COL = { red: 0xe5484d, blue: 0x3a7bd5, green: 0x2fa35a, yellow: 0xf
 const BRAILLE = { 1: [1], 2: [1, 2], 3: [1, 4], 4: [1, 4, 5], 5: [1, 5], 6: [1, 2, 4], 7: [1, 2, 4, 5], 8: [1, 2, 5], 9: [2, 4], 0: [2, 4, 5] };
 // 席: 見ざる=爆弾の正面、聞かざる=左、言わざる=右(マニュアルを持って爆弾に背を向ける)
 const SEATS = { blind: { x: 0, z: 1.55, ry: Math.PI }, deaf: { x: -1.6, z: 0.15, ry: -Math.PI / 2 }, mute: { x: 1.75, z: 0.3, ry: Math.PI / 2 } };
-const CAM = { blind: [0, 2.6, 2.3], deaf: [-2.3, 2.5, 0.6], mute: [2.55, 1.9, 0.45], watch: [0, 3.4, 3.2] };
+const CAM = { blind: [0, 2.1, 1.45], deaf: [-2.3, 2.5, 0.6], mute: [2.55, 1.9, 0.45], watch: [0, 3.4, 3.2] };
 
 export function drawSymbol(ctx, name, x, y, s, color = "#181b23") {
   ctx.save(); ctx.translate(x, y); ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = s * 0.09;
@@ -33,12 +33,14 @@ export function createScene(canvas, hooks) {
   const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(2, 5, 3); scene.add(sun);
   const lamp = new THREE.PointLight(0xffe2a8, 6, 6); lamp.position.set(0, 2.4, 0); scene.add(lamp);
 
-  const st = { role: "watch", blindView: false, mods: [], modKeys: [], modGroups: [], monkeys: {}, hands: {}, pointLines: {}, picks: [], hover: null, dark: false, t0: performance.now(), bomb: null, env: {}, live: [] };
+  const st = { role: "watch", blindView: false, mods: [], modKeys: [], modGroups: [], monkeys: {}, hands: {}, pointLines: {}, pointKey: {}, picks: [], particles: [], shakeUntil: 0, shakeAmp: 0, hover: null, dark: false, t0: performance.now(), bomb: null, env: {}, live: [] };
   const world = new THREE.Group(); scene.add(world);
   const bombG = new THREE.Group(); world.add(bombG);
   const fxG = new THREE.Group(); scene.add(fxG);
 
   // ---- 部品づくり ----
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+  const blackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
   const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.65, metalness: 0.05, ...o });
   const box = (w, h, d, c, o) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c, o));
   const cyl = (r, h, c, seg = 16) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(c));
@@ -55,6 +57,19 @@ export function createScene(canvas, hooks) {
     for (const d of dots) { const col = d <= 3 ? 0 : 1, row = (d - 1) % 3; const b = sph(s * 0.35, 0xd8d0b8); b.position.set((col - 0.5) * s, 0.005, (row - 1) * s); b.scale.y = 0.5; g.add(b); }
     return g;
   }
+  // 使い終わった形・素材・画像を片付ける(作り直すたびに捨てないと、長く遊ぶほど重くなる)
+  function disposeTree(root) {
+    root.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      for (const m of [o.material, o.userData && o.userData.origMat]) {
+        if (!m || m === blackMat || m === edgeMat) continue;
+        if (m.map) m.map.dispose();
+        m.dispose();
+      }
+    });
+  }
+  const drop = (parent, obj) => { if (!obj) return; parent.remove(obj); disposeTree(obj); };
+  const setMap = (material, tex) => { if (material.map) material.map.dispose(); material.map = tex; material.needsUpdate = true; };
   // 押せる・触れる部品: userData に { mod, part, act } をつける
   const pick = (obj, mod, part, act) => { obj.traverse((o) => { if (o.isMesh) o.userData.pick = { mod, part, act }; }); return obj; };
 
@@ -75,6 +90,13 @@ export function createScene(canvas, hooks) {
   // 時間とミスの表示(爆弾の手前)
   const timerMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.12), new THREE.MeshBasicMaterial({ map: textTex("0:00", 256, 85, { fg: "#ff5a4f" }) }));
   timerMesh.position.set(0, 0.92, 0.48); world.add(timerMesh);
+  // 向きの目印: 見ざるの席の側(手前)が分かるように。聞かざるは横から見ているので「奥・手前・左・右」を見ざる基準で言える
+  const sideMark = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.09), new THREE.MeshBasicMaterial({ map: textTex(["▼ 手前 = 見ざるの側 ▼"], 512, 74, { bg: "#f2c94c", fg: "#181b23", size: 40 }) }));
+  sideMark.rotation.x = -Math.PI / 2; sideMark.position.set(0, 0.825, 0.56); sideMark.userData.screen = true; world.add(sideMark);
+  for (const [txt, x, z, rz] of [["見ざるの左", -0.8, 0.1, -Math.PI / 2], ["見ざるの右", 0.8, 0.1, Math.PI / 2], ["奥", 0, -0.56, Math.PI]]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(txt.length > 1 ? 0.42 : 0.12, 0.08), new THREE.MeshBasicMaterial({ map: textTex([txt], txt.length > 1 ? 384 : 96, 72, { bg: "#f2c94c", fg: "#181b23", size: 38 }) }));
+    m.rotation.set(-Math.PI / 2, 0, rz); m.position.set(x, 0.826, z); m.userData.screen = true; world.add(m);
+  }
   // 環境のもの: ランプ・ラジオ・色のついた小物(指差しで色を伝える用)
   const lampG = new THREE.Group(); const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.2, 18, 1, true), mat(0xf0e0b0, { side: THREE.DoubleSide, emissive: 0xffd27a, emissiveIntensity: 0.8 })); shade.position.y = 2.35; lampG.add(shade);
   const cord = cyl(0.008, 0.2, 0x222222); cord.position.y = 2.5; lampG.add(cord); world.add(lampG); pick(lampG, -1, "lamp", "env");
@@ -131,8 +153,12 @@ export function createScene(canvas, hooks) {
   function panel(color = 0x3b4148) { const p = box(PW, 0.04, PW, color); p.position.y = 0.02; return p; }
   function led(color, x, z) { const l = sph(0.025, color ? COL[color] : 0x333333, color ? { emissive: COL[color], emissiveIntensity: 1.2 } : {}); l.position.set(x, 0.06, z); return l; }
   function btn(color, x, z, w = 0.07, h = 0.03) { const b = cyl(w / 2, h, color != null ? COL[color] ?? color : 0x9aa0a8); b.position.set(x, 0.04 + h / 2, z); return b; }
+  // 番号の札(ガイドありのとき)。見ざるの読み上げの「何本目・何番」と同じ番号を、見える人の画面に出す
+  function tag(g, txt, x, z) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.04), new THREE.MeshBasicMaterial({ map: textTex([txt], 64, 64, { bg: "#ffffff", fg: "#181b23", size: 46 }), transparent: true })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.075, z); m.userData.screen = true; g.add(m); }
   function buildModule(mv, i) {
     const g = new THREE.Group(); g.add(pick(panel(), i, "panel", "read"));
+    // モジュールの番号(左上): 「寄る」ボタン・読み上げの「モジュール○」と同じ
+    tag(g, String(i + 1), -PW / 2 + 0.03, PW / 2 - 0.03);
     const k = mv.kind;
     if (mv.solved) { const ok = led("green", PW / 2 - 0.04, -PW / 2 + 0.04); g.add(ok); }
     if (k === "hidden") { const cover = box(PW, 0.05, PW, 0x2a2f36); cover.position.y = 0.045; g.add(cover); return g; }
@@ -145,6 +171,7 @@ export function createScene(canvas, hooks) {
         else { const w = cyl(0.016, 0.32, color); w.rotation.z = Math.PI / 2; w.position.set(0, 0.07, z); cg.add(w); }
         for (const s of [-1, 1]) { const pin = box(0.03, 0.04, 0.04, 0x777777); pin.position.set(s * 0.17, 0.06, z); cg.add(pin); }
         g.add(pick(cg, i, c, "cut"));
+        if (st.guide) tag(g, String(c + 1), 0.2, z);
       }
     } else if (k === "slider") {
       for (let s = 0; s < 4; s++) {
@@ -152,6 +179,7 @@ export function createScene(canvas, hooks) {
         const knob = box(0.06, 0.05, 0.045, mv.colors ? COL[mv.colors[s]] : 0x888888); knob.position.set(x, 0.07, -(mv.pos[s]) * 0.09); g.add(pick(knob, i, s, "knob"));
         const up = btn(0x666666, x, -0.17, 0.05, 0.02), dn = btn(0x666666, x, 0.17, 0.05, 0.02);
         g.add(pick(up, i, s, "up")); g.add(pick(dn, i, s, "down"));
+        if (st.guide) tag(g, String(s + 1), x, 0.2);
       }
     } else if (k === "direction") {
       g.add(led(mv.led, -PW / 2 + 0.05, -PW / 2 + 0.05));
@@ -176,7 +204,7 @@ export function createScene(canvas, hooks) {
       g.add(pick(wg, i, "wheel", "read"));
       const ptrA = mv.ptr * Math.PI / 2 - Math.PI / 2, ptr = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 3), mat(0xe5484d)); ptr.rotation.x = Math.PI / 2; ptr.rotation.z = -ptrA - Math.PI / 2; ptr.position.set(-0.05 + Math.cos(ptrA) * 0.16, 0.08, -0.03 + Math.sin(ptrA) * 0.16); g.add(ptr);
       const l = btn(0x666666, -0.17, 0.16, 0.05), r = btn(0x666666, 0.07, 0.16, 0.05); g.add(pick(l, i, -1, "turn")); g.add(pick(r, i, 1, "turn"));
-      for (let p = 0; p < 4; p++) g.add(pick(btn(mv.buttons ? mv.buttons[p] : null, 0.15, -0.14 + p * 0.09, 0.06), i, p, "press"));
+      for (let p = 0; p < 4; p++) { g.add(pick(btn(mv.buttons ? mv.buttons[p] : null, 0.15, -0.14 + p * 0.09, 0.06), i, p, "press")); if (st.guide) tag(g, String(p + 1), 0.195, -0.14 + p * 0.09); }
       for (let s = 0; s < mv.stages; s++) g.add(led(s < mv.stage ? "green" : null, -0.17 + s * 0.035, -PW / 2 + 0.04));
     } else if (k === "piano") {
       g.add(led(mv.led, PW / 2 - 0.05, -PW / 2 + 0.05));
@@ -207,6 +235,7 @@ export function createScene(canvas, hooks) {
         const base = box(0.05, 0.02, 0.07, 0x222222); base.position.set(x, 0.05, -0.02); g.add(base);
         const lever = cyl(0.012, 0.08, 0xcccccc); lever.position.set(x, 0.09, -0.02); lever.rotation.x = mv.up[p] ? -0.6 : 0.6; g.add(pick(lever, i, p, "toggle")); g.add(pick(base.clone(), i, p, "toggle"));
         const br = braille(mv.nums[p], 0.014); br.position.set(x, 0.045, 0.08); g.add(pick(br, i, p, "read"));
+        if (st.guide) tag(g, String(p + 1), x, 0.13);
       }
       const en = box(0.2, 0.03, 0.05, 0xf0a03c); en.position.set(0, 0.055, 0.16); g.add(pick(en, i, "enter", "enter"));
     } else if (k === "pressure") {
@@ -220,14 +249,12 @@ export function createScene(canvas, hooks) {
       const tri = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.01, 3), mat(COL.yellow)); tri.position.set(0.16, 0.05, -0.17); g.add(tri);
     } else if (k === "alarm") {
       const siren = sph(0.05, mv.active ? 0xff2020 : 0x552222, mv.active ? { emissive: 0xff0000, emissiveIntensity: 1.5 } : {}); siren.position.set(0, 0.08, -0.15); g.add(siren); g.userData.siren = siren;
-      for (let p = 0; p < 6; p++) g.add(pick(btn(0xa0a6ae, -0.12 + (p % 3) * 0.12, 0.0 + Math.floor(p / 3) * 0.12, 0.08), i, p, "press"));
+      for (let p = 0; p < 6; p++) { g.add(pick(btn(0xa0a6ae, -0.12 + (p % 3) * 0.12, 0.0 + Math.floor(p / 3) * 0.12, 0.08), i, p, "press")); if (st.guide) tag(g, String(p + 1), -0.12 + (p % 3) * 0.12 + 0.05, 0.0 + Math.floor(p / 3) * 0.12 - 0.05); }
       const tri = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.01, 3), mat(COL.yellow)); tri.position.set(0.16, 0.05, -0.17); g.add(tri);
     }
     return g;
   }
   // 見ざるの見え方: 黒地に白い輪郭だけ(色・画面・ランプは見えない)
-  const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
-  const blackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
   function blindify(root, on = true) {
     const list = []; root.traverse((o) => { if (o.isMesh) list.push(o); });
     for (const o of list) {
@@ -245,8 +272,8 @@ export function createScene(canvas, hooks) {
   }
   // ---- 状態の反映 ----
   function setRole(role, names) {
-    st.role = role; st.blindView = role === "blind";
-    for (const g of Object.values(st.monkeys)) world.remove(g);
+    st.role = role; st.blindView = role === "blind"; st.guide = !!names.guide;
+    for (const g of Object.values(st.monkeys)) drop(world, g);
     st.monkeys = {};
     for (const [id, ro] of Object.entries(names.roles)) st.monkeys[id] = makeMonkey(ro, names.names[id] || ro);
     for (const g of Object.values(st.monkeys)) monkeyLook(g);
@@ -262,13 +289,13 @@ export function createScene(canvas, hooks) {
     const b = v.bomb;
     if (!b) return;
     const n = b.mods.length;
-    if (st.modGroups.length !== n) { for (const g of st.modGroups) if (g) bombG.remove(g); st.modGroups = new Array(n).fill(null); st.modKeys = []; bombG.scale.setScalar(fitScale(n)); }
+    if (st.modGroups.length !== n) { for (const g of st.modGroups) if (g) drop(bombG, g); st.modGroups = new Array(n).fill(null); st.modKeys = []; bombG.scale.setScalar(fitScale(n)); }
     b.mods.forEach((mv, i) => {
       const live = mv.kind === "pressure" || mv.kind === "rslider";
       const key = JSON.stringify(live ? { ...mv, v: null, urgent: null } : mv);
       if (st.modKeys[i] === key && st.modGroups[i]) { st.modGroups[i].userData.mv = mv; st.modGroups[i].userData.got = performance.now(); return; }
       st.modKeys[i] = key;
-      if (st.modGroups[i]) bombG.remove(st.modGroups[i]);
+      if (st.modGroups[i]) drop(bombG, st.modGroups[i]);
       const g = buildModule(mv, i); g.userData.mv = mv; g.userData.got = performance.now();
       const [x, z] = slotPos(i, n); g.position.set(x, 0, z);
       if (st.blindView) blindify(g);
@@ -289,21 +316,24 @@ export function createScene(canvas, hooks) {
     // 指差し
     for (const [id, p] of Object.entries(v.points || {})) {
       const mk = st.monkeys[id]; if (!mk) continue;
-      if (st.pointLines[id]) { scene.remove(st.pointLines[id]); st.pointLines[id] = null; }
-      const arm = mk.userData.arms[1];
-      if (!p || Date.now() - p.t > 6000) { arm.rotation.x = 0; continue; }
+      const arm = mk.userData.arms[1], live = p && Date.now() - p.t <= 6000, pk = live ? p.at.join() + ":" + p.t : "";
+      if (st.pointKey[id] === pk) continue; // 同じ指差しなら作り直さない
+      st.pointKey[id] = pk;
+      if (st.pointLines[id]) { drop(scene, st.pointLines[id]); st.pointLines[id] = null; }
+      mk.userData.pointing = !!live;
+      if (!live) { arm.rotation.x = 0; continue; }
       const from = new THREE.Vector3(); mk.userData.head.getWorldPosition(from); from.y -= 0.25;
       const to = new THREE.Vector3(...p.at);
       const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
       const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0xffe14a, dashSize: 0.05, gapSize: 0.03 })); line.computeLineDistances();
       const dot = sph(0.03, 0xffe14a, { emissive: 0xffe14a, emissiveIntensity: 1 }); dot.position.copy(to); line.add(dot);
-      line.visible = !st.blindView; scene.add(line); st.pointLines[id] = line; arm.rotation.x = -1.3;
+      line.userData.t = p.t; line.visible = !st.blindView; scene.add(line); st.pointLines[id] = line; arm.rotation.x = -1.3;
     }
   }
   // エモート(吹き出し)・ビンタ・バナナ
   function showBubble(id, text, ms = 2600) {
     const mk = st.monkeys[id]; if (!mk) return;
-    const b = mk.userData.bubble; b.material.map = textTex([text], 256, 128, { bg: "#ffffff", fg: "#181b23", size: text.length > 4 ? 34 : 64 }); b.material.needsUpdate = true;
+    const b = mk.userData.bubble; setMap(b.material, textTex([text], 256, 128, { bg: "#ffffff", fg: "#181b23", size: text.length > 4 ? 34 : 64 }));
     b.visible = !st.blindView; b.userData.until = performance.now() + ms;
   }
   function anim(kind, from, to) {
@@ -325,11 +355,19 @@ export function createScene(canvas, hooks) {
     const solid = hits.filter((h) => h.object.isMesh && h.object.visible);
     return solid.length ? { pick: solid[0].object.userData.pick || null, point: solid[0].point } : null;
   }
-  let downAt = null;
-  canvas.addEventListener("pointerdown", (ev) => { downAt = { x: ev.clientX, y: ev.clientY, t: performance.now() }; });
+  let downAt = null, longT = null;
+  canvas.addEventListener("pointerdown", (ev) => {
+    downAt = { x: ev.clientX, y: ev.clientY, t: performance.now(), long: false };
+    // 指で長押し(0.4秒)=「さわる」。押さずに点字・熱さ・音を確かめられる
+    clearTimeout(longT);
+    if (ev.pointerType !== "mouse") { const d = downAt; longT = setTimeout(() => { if (downAt === d) { d.long = true; hooks.onLong && hooks.onLong(hitAt(ev)); } }, 400); }
+  });
+  canvas.addEventListener("pointermove", (ev) => { if (downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8) clearTimeout(longT); });
+  canvas.addEventListener("pointercancel", () => { clearTimeout(longT); downAt = null; });
   canvas.addEventListener("pointerup", (ev) => {
-    if (!downAt) return; const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8; downAt = null;
-    if (moved) return; // 視点を回しただけ
+    clearTimeout(longT);
+    if (!downAt) return; const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8, long = downAt.long; downAt = null;
+    if (moved || long) return; // 視点を回しただけ・長押しでさわっただけ
     const h = hitAt(ev); hooks.onClick && hooks.onClick(h, ev);
   });
   canvas.addEventListener("pointermove", (ev) => {
@@ -341,10 +379,12 @@ export function createScene(canvas, hooks) {
 
   // ---- 毎フレーム ----
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); } }
-  let timerText = "";
+  let timerText = "", lastNow = performance.now();
+  const camBase = new THREE.Vector3();
   function frame() {
     requestAnimationFrame(frame); resize(); controls.update();
-    const now = performance.now(), t = (now - st.t0) / 1000;
+    const now = performance.now(), t = (now - st.t0) / 1000, dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
+    stepParticles(now, dt);
     // カオスモジュールの動き(見た目): サーバの値から少し先を見て滑らかに
     for (const g of st.modGroups) {
       if (!g) continue; const mv = g.userData.mv; if (!mv) continue;
@@ -356,7 +396,7 @@ export function createScene(canvas, hooks) {
     if (st.bomb && st.v) {
       const left = st.v.step === "play" ? Math.max(0, st.bomb.end - (Date.now() + (hooks.offset ? hooks.offset() : 0))) : st.v.step === "brief" ? (st.bomb.end || 0) : 0;
       const s = Math.ceil(left / 1000), txt = st.v.step === "brief" ? "READY" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}  ${"✕".repeat(st.bomb.strikes)}`;
-      if (txt !== timerText) { timerText = txt; timerMesh.material.map = textTex([txt], 256, 85, { fg: "#ff5a4f", size: 44 }); timerMesh.material.needsUpdate = true; timerMesh.visible = !st.blindView; }
+      if (txt !== timerText) { timerText = txt; setMap(timerMesh.material, textTex([txt], 256, 85, { fg: "#ff5a4f", size: 44 })); timerMesh.visible = !st.blindView; }
     }
     // サルの動き: しゃべる口・ビンタ・バナナ・吹き出し
     for (const mk of Object.values(st.monkeys)) {
@@ -366,11 +406,31 @@ export function createScene(canvas, hooks) {
       if (u.slapT && now - u.slapT < 450) u.arms[0].rotation.x = -Math.sin((now - u.slapT) / 450 * Math.PI) * 1.8; else u.arms[0].rotation.x = 0;
       if (u.hitT && now > u.hitT && now - u.hitT < 500) u.head.rotation.y = Math.sin((now - u.hitT) / 500 * Math.PI * 4) * 0.5; else u.head.rotation.y = 0;
       if (u.bubble.visible && u.bubble.userData.until < now) u.bubble.visible = false;
+      // エモートの身ぶり(1.4秒)
+      const gs = u.gest, gk = gs ? (now - gs.t0) / 1400 : 1;
+      if (gk < 1) {
+        const w = Math.sin(gk * Math.PI);
+        if (gs.e === "yes" || gs.e === "ok") u.head.rotation.x = Math.sin(gk * Math.PI * 6) * 0.35 * w;
+        else if (gs.e === "no") u.head.rotation.y = Math.sin(gk * Math.PI * 6) * 0.5 * w;
+        else if (gs.e === "wave") { u.arms[1].rotation.z = -2.6 * w; u.arms[1].rotation.x = Math.sin(gk * Math.PI * 8) * 0.4; }
+        else if (gs.e === "angry") { u.arms[0].rotation.z = 2.4 * w; u.arms[1].rotation.z = -2.4 * w; u.head.rotation.y = Math.sin(gk * Math.PI * 10) * 0.2; }
+        else if (gs.e === "laugh") { mk.position.y = Math.abs(Math.sin(gk * Math.PI * 6)) * 0.08; u.head.rotation.x = -0.3 * w; }
+        else if (gs.e === "what") u.head.rotation.z = 0.4 * w;
+        else { u.arms[1].rotation.z = -2.2 * w; } // 数字・向き: 手を挙げて見せる
+      } else if (gs) { u.gest = null; u.head.rotation.x = 0; mk.position.y = 0; u.arms[0].rotation.z = 0.25 * -1; u.arms[1].rotation.z = 0.25; }
+      // 見ざるが触っている間は、手を爆弾へ伸ばす
+      if (u.role === "blind" && !u.gest && !u.pointing) { const hd = Object.entries(st.hands).find(([hid]) => st.monkeys[hid] === mk); u.arms[1].rotation.x = hd && hd[1].visible ? -1.1 : 0; }
     }
-    for (const b of [...fxG.children]) { const k = (now - b.userData.t0) / 600; if (k >= 1) { fxG.remove(b); continue; } b.position.lerpVectors(b.userData.p0, b.userData.p1, k); b.position.y += Math.sin(k * Math.PI) * 0.5; b.rotation.z = k * 10; }
+    for (const b of [...fxG.children]) { if (!b.userData.p0) continue; const k = (now - b.userData.t0) / 600; if (k >= 1) { drop(fxG, b); continue; } b.position.lerpVectors(b.userData.p0, b.userData.p1, k); b.position.y += Math.sin(k * Math.PI) * 0.5; b.rotation.z = k * 10; }
+    for (const [id, line] of Object.entries(st.pointLines)) if (line && Date.now() - line.userData.t > 6000) { drop(scene, line); st.pointLines[id] = null; st.pointKey[id] = ""; const mk = st.monkeys[id]; if (mk) { mk.userData.pointing = false; mk.userData.arms[1].rotation.x = 0; } }
     // 停電(見ざるはもともと見えないので関係ない)
-    if (!st.blindView) { lamp.intensity = st.dark ? 0 : 6; scene.children.forEach((o) => { if (o.isHemisphereLight) o.intensity = st.dark ? 0.08 : 1.1; if (o.isDirectionalLight) o.intensity = st.dark ? 0.05 : 1.2; }); }
-    renderer.render(scene, camera);
+    if (!st.blindView) { lamp.intensity = st.dark ? 0 : 6; scene.children.forEach((o) => { if (o.isHemisphereLight) o.intensity = st.dark ? 0.035 : 1.1; if (o.isDirectionalLight) o.intensity = st.dark ? 0.02 : 1.2; }); }
+    if (now < st.shakeUntil) {
+      camBase.copy(camera.position);
+      const a = st.shakeAmp * ((st.shakeUntil - now) / 1200 + 0.3);
+      camera.position.add(new THREE.Vector3((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, (Math.random() - 0.5) * a));
+      renderer.render(scene, camera); camera.position.copy(camBase);
+    } else renderer.render(scene, camera);
   }
   frame();
   // モジュールに寄る(見ざるが手元を確かめやすいように)。i=null で元の視点
@@ -380,5 +440,57 @@ export function createScene(canvas, hooks) {
     const p = new THREE.Vector3(); g.getWorldPosition(p);
     controls.target.copy(p); camera.position.set(p.x, p.y + 0.62, p.z + 0.42); controls.update();
   }
-  return { _st: st, setRole, update, focus, showBubble, anim, talk, camera, controls, renderer, three: THREE };
+  // 部品の一覧(キーボードで順に触るため): モジュールの順、その中は奥→手前・左→右
+  function parts() {
+    const out = [];
+    st.modGroups.forEach((g, i) => {
+      if (!g) return;
+      const seen = new Map();
+      g.traverse((o) => {
+        const p = o.isMesh && o.userData.pick; if (!p || p.mod !== i || p.part === "panel") return;
+        const k = p.part + ":" + p.act; if (seen.has(k)) return;
+        const w = new THREE.Vector3(); o.getWorldPosition(w); seen.set(k, { ...p, z: w.z, x: w.x });
+      });
+      out.push(...[...seen.values()].sort((a, b) => (Math.abs(a.z - b.z) > 0.03 ? a.z - b.z : a.x - b.x)).map(({ mod, part, act }) => ({ mod, part, act })));
+    });
+    return out;
+  }
+  // ---- 演出: 爆発・紙吹雪・揺れ ----
+  function shake(ms, amp) { st.shakeUntil = performance.now() + ms; st.shakeAmp = amp; }
+  function particle(mesh, vel, life, opt = {}) { mesh.userData = { vel, life, t0: performance.now(), ...opt }; fxG.add(mesh); st.particles.push(mesh); }
+  function boom() {
+    shake(1200, 0.08);
+    const c = new THREE.Vector3(0, 1.05, 0);
+    const flash = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshBasicMaterial({ color: st.blindView ? 0xffffff : 0xffb340, transparent: true, opacity: 1 }));
+    flash.position.copy(c); particle(flash, new THREE.Vector3(), 900, { grow: 9 });
+    for (let k = 0; k < 26; k++) {
+      const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.06 + Math.random() * 0.08, 10, 8), new THREE.MeshBasicMaterial({ color: st.blindView ? 0xffffff : k % 3 ? 0x444444 : 0xff6a1a, transparent: true, opacity: 0.9 }));
+      smoke.position.copy(c);
+      particle(smoke, new THREE.Vector3((Math.random() - 0.5) * 2.2, 0.6 + Math.random() * 1.6, (Math.random() - 0.5) * 2.2), 1600 + Math.random() * 800, { grow: 2.5, drag: 0.96 });
+    }
+  }
+  function confetti() {
+    const cols = [COL.red, COL.blue, COL.green, COL.yellow, 0xffffff];
+    for (let k = 0; k < 140; k++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.05), new THREE.MeshBasicMaterial({ color: cols[k % cols.length], side: THREE.DoubleSide }));
+      m.position.set((Math.random() - 0.5) * 3, 2.5 + Math.random() * 0.5, (Math.random() - 0.5) * 2.5);
+      particle(m, new THREE.Vector3((Math.random() - 0.5) * 0.4, -0.5 - Math.random() * 0.6, (Math.random() - 0.5) * 0.4), 4000, { spin: Math.random() * 8 });
+    }
+  }
+  function strikeFx() { shake(350, 0.035); }
+  function stepParticles(now, dt) {
+    st.particles = st.particles.filter((m) => {
+      const u = m.userData, k = (now - u.t0) / u.life;
+      if (k >= 1) { drop(fxG, m); return false; }
+      m.position.addScaledVector(u.vel, dt);
+      if (u.drag) u.vel.multiplyScalar(u.drag);
+      if (u.grow) m.scale.setScalar(1 + k * u.grow);
+      if (u.spin) { m.rotation.x += u.spin * dt; m.rotation.y += u.spin * dt * 0.7; }
+      if (m.material.transparent) m.material.opacity = Math.max(0, 1 - k);
+      return true;
+    });
+  }
+  // ---- サルの身ぶり(エモートに合わせて) ----
+  function gesture(id, e) { const mk = st.monkeys[id]; if (mk) mk.userData.gest = { e, t0: performance.now() }; }
+  return { _st: st, setRole, update, focus, parts, boom, confetti, strikeFx, gesture, showBubble, anim, talk, camera, controls, renderer, three: THREE };
 }

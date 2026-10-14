@@ -91,10 +91,13 @@ const CAMPAIGN = [
 // 環境ギミック(停電・騒音)は、キャンペーンでは11レベル目から(出る時期は公表されていないのでこのサイトで決めた)
 const HAZARD_FROM = 11;
 
-const DEFAULTS = { mode: "campaign", level: 1, custom: { secs: 300, mistakes: 3, mods: ["cable", "direction", "calc", "slider"], chaos: [], hazards: false }, roles: {} };
+// 練習: 時間たっぷり・ミス5回まで・ケーブルと方向だけ。ヒントと番号の札つき
+const TUTORIAL = { secs: 600, mistakes: 5, mods: ["cable", "direction"], chaos: [], hazards: false };
+const DEFAULTS = { mode: "tutorial", level: 1, guide: true, custom: { secs: 300, mistakes: 3, mods: ["cable", "direction", "calc", "slider"], chaos: [], hazards: false }, roles: {} };
 function normalize(raw) {
   const r = raw && typeof raw === "object" ? raw : {}, out = JSON.parse(JSON.stringify(DEFAULTS));
-  if (["campaign", "endless", "custom"].includes(r.mode)) out.mode = r.mode;
+  if (["tutorial", "campaign", "endless", "custom"].includes(r.mode)) out.mode = r.mode;
+  if (typeof r.guide === "boolean") out.guide = r.guide;
   if (Number.isInteger(r.level) && r.level >= 1 && r.level <= 30) out.level = r.level;
   const c = r.custom && typeof r.custom === "object" ? r.custom : {};
   if ([120, 180, 240, 300, 420, 600].includes(c.secs)) out.custom.secs = c.secs;
@@ -167,12 +170,13 @@ function start(c, settings, rnd = Math.random) {
   for (const id of order) if (!role[id]) role[id] = free.shift();
   const g = c.g = { cfg, order, role, level: cfg.level, step: "brief", bomb: null, wave: 0, score: 0, log: [], fx: [], fxId: 0, emotes: {}, points: {}, result: null, rnd, hazard: { dark: false, noise: false, next: 0 }, hands: {} };
   newBomb(c);
-  log(g, cfg.mode === "campaign" ? `キャンペーン レベル${g.level}` : cfg.mode === "endless" ? "エンドレス" : "カスタム");
+  log(g, cfg.mode === "campaign" ? `キャンペーン レベル${g.level}` : cfg.mode === "endless" ? "エンドレス" : cfg.mode === "tutorial" ? "練習" : "カスタム");
 }
 function log(g, t) { g.log.push(t); if (g.log.length > 30) g.log.splice(0, g.log.length - 30); }
 const fx = (g, kind, data = {}) => { g.fx.push({ id: ++g.fxId, kind, ...data, at: Date.now() }); if (g.fx.length > 40) g.fx.splice(0, g.fx.length - 40); };
 function loadout(g) {
   const r = g.rnd, pick = (lv) => POOL[lv][ri(POOL[lv].length, r)];
+  if (g.cfg.mode === "tutorial") return { ...TUTORIAL, mods: [...TUTORIAL.mods] };
   if (g.cfg.mode === "custom") { const cu = g.cfg.custom; return { secs: cu.secs, mistakes: cu.mistakes, mods: [...cu.mods], chaos: [...cu.chaos], hazards: cu.hazards }; }
   if (g.cfg.mode === "endless") {
     // ウェーブが進むほどモジュールが増えて難しくなる。時間はウェーブをまたいで続く(解くと延びる)
@@ -432,6 +436,8 @@ function handle(c, pid, m) {
     // キャンペーン: 成功なら次のレベル、失敗なら同じレベルをもう一度
     if (g.cfg.mode === "campaign" && g.step === "clear" && g.level < 30) g.level++;
     if (g.cfg.mode === "endless") { g.wave = 0; g.score = 0; g.bomb = null; }
+    // 役割を回す: 見ざる→聞かざる→言わざる→見ざる
+    if (m.rotate) { const next = { blind: "deaf", deaf: "mute", mute: "blind" }; for (const id of g.order) g.role[id] = next[g.role[id]]; log(g, "役割を交代した"); }
     g.result = null; newBomb(c);
     return { restart: true };
   }
@@ -448,9 +454,11 @@ function onLeave(c, pid) {
 // 見ざる: 形と触った感じだけ(色・画面・ランプは見えない)。点字の数字・熱は分かる
 // 聞かざる: 見た目は全部(色・画面・ランプ・点字の点)。熱と音は分からない
 // 言わざる: 爆弾は見えない(マニュアルを読んでいる)
+const danger = (m) => (m.v > 75 ? 2 : m.v > 50 ? 1 : 0);
 function modView(m, ro) {
   const k = m.kind, B = ro === "blind", v = { kind: k, solved: m.solved };
-  if (ro === "mute") return { kind: "hidden", solved: m.solved };
+  // 言わざる: 爆弾は見えないが、カオスの音(シューという音・サイレン)は聞こえる
+  if (ro === "mute") return { kind: "hidden", solved: m.solved, lvl: k === "pressure" || k === "rslider" ? danger(m) : undefined, active: k === "alarm" ? m.active : undefined, chaos: isChaos(m) || undefined };
   if (k === "cable") Object.assign(v, { n: m.n, cut: m.cut, colors: B ? null : m.colors, led: B ? null : m.led });
   else if (k === "slider") Object.assign(v, { colors: B ? null : m.colors, pos: m.pos });
   else if (k === "direction") Object.assign(v, { led: B ? null : m.led, num: m.num, stage: m.stage, stages: m.stages });
@@ -462,7 +470,7 @@ function modView(m, ro) {
   else if (k === "morse") Object.assign(v, { dials: m.dials, lit: null });
   else if (k === "maze") Object.assign(v, { num: m.num, at: B ? null : m.at, goal: B ? null : m.goal });
   else if (k === "switch") Object.assign(v, { lights: B ? null : m.lights, nums: m.nums, up: m.up });
-  else if (k === "pressure" || k === "rslider") Object.assign(v, { v: B ? null : Math.round(m.v), rate: m.rate, urgent: B ? m.v > 70 : null });
+  else if (k === "pressure" || k === "rslider") Object.assign(v, { v: B ? null : Math.round(m.v), rate: m.rate, urgent: B ? m.v > 70 : null, lvl: danger(m) });
   else if (k === "alarm") Object.assign(v, { active: m.active, hot: B ? m.hot : null, until: m.until });
   return v;
 }
@@ -480,7 +488,7 @@ function view(c, me) {
   const audible = new Set(["chime", "morse", "note", "beep", "click", "hiss", "snip", "alarm", "alarmoff", "boom", "noise", "quiet"]);
   const fxs = g.fx.filter((f) => !(audible.has(f.kind) && seeAs === "deaf") || ["boom", "alarm"].includes(f.kind));
   return {
-    step: g.step, mode: g.cfg.mode, level: g.level, wave: g.wave, score: g.score, order: g.order, role: g.role, me: ro,
+    step: g.step, mode: g.cfg.mode, guide: g.cfg.guide || g.cfg.mode === "tutorial", level: g.level, wave: g.wave, score: g.score, order: g.order, role: g.role, me: ro,
     bomb: b ? { mods: b.mods.map((m) => modView(m, seeAs)), strikes: b.strikes, mistakes: b.mistakes, end: b.end, briefUntil: g.briefUntil, startAt: b.startAt } : null,
     hazard: g.hazard, hands: g.hands, emotes: g.emotes, points: g.points, fx: fxs, result: g.result, log: g.log.slice(-10),
   };

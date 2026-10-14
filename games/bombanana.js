@@ -54,11 +54,13 @@ function ctxOf(room) {
 }
 function finish(room, raw) {
   clearTimer(room);
-  const rows = Object.entries(raw).map(([id, v]) => ({ id, raw: v, name: nameOf(room, id) })).sort((a, b) => b.raw - a.raw);
-  rows.forEach((r, i) => { r.rank = i > 0 && r.raw === rows[i - 1].raw ? rows[i - 1].rank : i + 1; });
+  // 協力ゲーム: 全員同じ結果。解除成功なら全員1位扱い、爆発・エンドレスは順位なし(0点)
+  const g = room.game, ok = !!(g && g.result && g.result.ok), endless = g && g.cfg.mode === "endless";
+  const rows = Object.entries(raw).map(([id, v]) => ({ id, raw: v, name: nameOf(room, id), rank: ok && !endless ? 1 : null }));
   room.ranking = rows;
   room.phase = "finished";
-  require("./lobby").report("bombanana", room.code, rows); // パーティーの通算成績へ
+  const note = !g ? "" : endless ? `エンドレス ${g.score || 0}点` : `${g.cfg.mode === "campaign" ? "レベル" + g.level + " " : ""}${ok ? "解除成功" : "爆発"}`;
+  require("./lobby").report("bombanana", room.code, rows, note); // パーティーの通算成績へ
 }
 function toLobby(room) {
   clearTimer(room);
@@ -70,7 +72,7 @@ function view(room, me) {
   return {
     t: "state", me, now: Date.now(),
     room: {
-      code: room.code, phase: room.phase, gameHostId: hostOf(room), settings: room.settings, deadline: room.deadline,
+      code: room.code, phase: room.phase, gameHostId: hostOf(room), settings: { ...room.settings, roles: Object.fromEntries(Object.entries(room.settings.roles).filter(([id]) => connected(room.players.get(id)))) }, deadline: room.deadline,
       players: order(room).map((p) => ({ id: p.id, name: p.name, connected: connected(p), inGame: room.roster.includes(p.id) })),
       roster: members(room),
       game: room.game && room.phase !== "lobby" ? core.view(ctxOf(room), me) : null,
@@ -95,6 +97,7 @@ function detach(ws) {
 function removePlayer(room, pid) {
   if (!room.players.has(pid)) return;
   room.players.delete(pid);
+  if (room.settings.roles[pid]) { const roles = { ...room.settings.roles }; delete roles[pid]; room.settings = core.normalize({ ...room.settings, roles }); }
   // 抜けた人は手番から外す(だれもいなくなったら待機画面へ)
   if (room.phase === "play") core.onLeave(ctxOf(room), pid);
   if (room.phase === "play" && members(room).length < MIN_PLAYERS) toLobby(room);
@@ -273,4 +276,4 @@ setInterval(() => {
     if (room.emptySince && now - room.emptySince > ROOM_IDLE_MS) { clearTimer(room); rooms.delete(code); }
 }, 60000);
 
-module.exports = { WS_PATH, wss };
+module.exports = { WS_PATH, wss, rooms };
