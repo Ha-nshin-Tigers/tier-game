@@ -57,7 +57,7 @@ body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: 
 .code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
 .btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 7px 13px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
-button:hover:not(:disabled) { background: var(--bg); }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--bg); } } /* スマホはタップ後も hover が残るので、マウスのある端末だけ */
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.primary { background: var(--fg); color: var(--surface); }

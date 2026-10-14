@@ -413,7 +413,8 @@ function handle(ws, m) {
   const isGM = p.id === hostOf(room);
   const inGame = room.roster.includes(p.id);
   const g = room.game;
-  if (["setPlaylist", "start", "next", "reset", "kick"].includes(m.t) && !isGM) return err(ws, "この操作はホストだけができます");
+  // 「もう一度遊ぶ」もホストだけ(ほかの人がまだ結果を見ている途中で、勝手に画面が進まないように)
+  if (["setPlaylist", "start", "next", "reset", "kick", "again"].includes(m.t) && !isGM) return err(ws, "この操作はホストだけができます");
 
   switch (m.t) {
     case "leave":
@@ -442,7 +443,8 @@ function handle(ws, m) {
       startParty(room);
       break;
     case "next":
-      // 順位発表を飛ばして次へ
+      // 順位発表を飛ばして次へ(大会だけ。単独のミニゲームには次の試合が無い)
+      if (room.mode !== "party") return;
       next(room);
       break;
     case "pick":
@@ -464,7 +466,7 @@ function handle(ws, m) {
       // おぼえて料理: 選んだ食材を提出(1回だけ)
       if (room.phase !== "play" || !g || g.key !== "memory" || g.step !== "input" || !inGame || g.answers.has(p.id)) return;
       if (!Array.isArray(m.sel)) return;
-      const sel = [...new Set(m.sel.filter((x) => typeof x === "string" && ING_IDS.has(x) && g.grid.includes(x)))].slice(0, MEM_GRID);
+      const sel = [...new Set(m.sel.filter((x) => typeof x === "string" && ING_IDS.has(x) && g.grid.includes(x)))].slice(0, g.recipe.length); // 選べるのは材料の数まで(全部選ぶだけで点が取れないように)
       g.answers.set(p.id, { sel, at: Date.now() });
       checkMemory(room);
       break;

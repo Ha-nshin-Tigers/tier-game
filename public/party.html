@@ -69,7 +69,7 @@ body.playing .top > div:first-child .eyebrow { display: none; }
 /* 共通 */
 .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
-button:hover:not(:disabled) { background: var(--bg); }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--bg); } } /* スマホはタップ後も hover が残るので、マウスのある端末だけ */
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.primary { background: var(--fg); color: var(--surface); }
@@ -105,18 +105,20 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 8px 10px;
 @keyframes bounce { 50% { transform: translateY(-8px); } }
 
 /* ひとりじめ橋 */
-.canyon { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; padding: 12px; border-radius: 10px;
+.canyon { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; padding: 12px; border-radius: 10px; overflow: hidden;
   background: linear-gradient(180deg, var(--sky) 0%, var(--sky) 55%, #5b3a22 55%, #2b1a0f 100%); }
 .bridge { position: relative; display: grid; align-content: space-between; justify-items: center; gap: 6px; min-height: 150px; padding: 8px 4px; border-radius: 6px; border: 2px solid #3a2414;
   background: repeating-linear-gradient(0deg, var(--wood) 0 14px, #6f4426 14px 16px); color: #fff; cursor: pointer; transition: transform .15s, box-shadow .15s; }
 .bridge:disabled { cursor: default; opacity: 1; }
+.bridge:hover:not(:disabled) { background: repeating-linear-gradient(0deg, var(--wood) 0 14px, #6f4426 14px 16px); }
+.bridge .val small { font-family: var(--body); font-weight: 700; font-size: 14px; margin-left: 1px; }
 .bridge .val { font-family: var(--display); font-size: 22px; text-shadow: 0 2px 0 #000; }
 .bridge.mine { box-shadow: 0 0 0 4px var(--accent); transform: translateY(-4px); }
 .bridge .who { display: grid; gap: 3px; justify-items: center; width: 100%; }
 .bridge .gain { font-family: var(--display); color: var(--gold); text-shadow: 0 2px 0 #000; font-size: 18px; }
 .bridge.collapsed { animation: fall 1.1s ease-in forwards; border-color: var(--bad); }
-.bridge.collapsed .boomtxt { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); font-family: var(--display); color: #fff; background: var(--bad); padding: 2px 8px; border-radius: 4px; font-size: 14px; white-space: nowrap; }
-@keyframes fall { 0% { transform: none; } 20% { transform: translateX(-3px) rotate(-2deg); } 35% { transform: translateX(3px) rotate(2deg); } 100% { transform: translateY(26px) rotate(6deg); opacity: .55; } }
+.bridge.collapsed .boomtxt { position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); font-family: var(--display); color: #fff; background: var(--bad); padding: 2px 8px; border-radius: 4px; font-size: 14px; white-space: nowrap; }
+@keyframes fall { 0% { transform: none; } 20% { transform: translateX(-3px) rotate(-2deg); } 35% { transform: translateX(3px) rotate(2deg); } 100% { transform: translateY(10px) rotate(4deg); opacity: .55; } }
 
 /* 爆弾回し */
 .table { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
@@ -149,10 +151,14 @@ button.seat:not(:disabled):hover { border-color: var(--bad); background: color-m
 .gbtn.ng { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, var(--surface)); }
 
 /* 大会の試合の並び */
+.scores { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.scores .sc { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; } .scores .sc.me { color: var(--fg); font-weight: 700; }
+.scores .sw { width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--fg); }
 .playlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: pl; }
 .playlist li { display: grid; grid-template-columns: 2.2em 34px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 8px; counter-increment: pl; }
 .playlist li::before { content: counter(pl) "試合"; font-size: 11px; font-weight: 700; color: var(--muted); }
 .playlist .ico { font-size: 24px; text-align: center; }
+.playlist li > * { min-width: 0; } .playlist li .orig { white-space: normal; } .playlist li button { min-height: 36px; min-width: 36px; white-space: nowrap; }
 .adders { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* 大会版ゲーム共通 */
@@ -200,7 +206,7 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
 .rank { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rank th, .rank td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 .rank th { font-size: 12px; color: var(--muted); }
-.rank td.n { font-variant-numeric: tabular-nums; text-align: right; }
+.rank td.n { font-variant-numeric: tabular-nums; text-align: right; } .rank th.n { text-align: right; }
 .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .rank .pl { font-family: var(--display); }
 .champ { font-family: var(--display); font-size: clamp(24px, 6vw, 36px); line-height: 1.25; padding: 16px; border: 2px solid var(--fg); border-radius: 8px; background: var(--gold); color: var(--ink); text-align: center; overflow-wrap: anywhere; }
@@ -509,6 +515,7 @@ function render() {
   if (!S) return;
   document.body.classList.toggle("playing", S.phase !== "lobby");
   renderMeta(); renderSide();
+  setTimeout(alignHeads, 0);
   // 文字を入力中に作り直すと入力が消えるので、その間はゲーム部分を描き直さない
   // (絵しりとりは描いている画面を作り直さない仕組みがあるので対象外)
   const ae = document.activeElement;
@@ -626,7 +633,7 @@ function renderIntro(main) {
 // ---- ひとりじめ橋 ----
 function renderBridge(main, g) {
   const show = g.step === "show";
-  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🌉 ひとりじめ橋 ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)));
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🌉 ひとりじめ橋 ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)), scoresEl(g.score));
   if (!show) {
     main.append(h("p", { class: "small" }, g.myPick == null ? "渡る橋を1本選んでください。だれかとかぶったら崩れて0点！" : "選びました。締め切りまでは選び直せます。"),
       countdown(15000));
@@ -638,7 +645,7 @@ function renderBridge(main, g) {
     const b = h("button", { type: "button", class: "bridge" + (g.myPick === i ? " mine" : "") + (collapsed ? " collapsed" : ""), disabled: show || !inGame(),
       "aria-pressed": g.myPick === i ? "true" : "false", "aria-label": `${v}点の橋`,
       onclick: () => { Sound.play("pick"); send({ t: "pick", i }); } },
-      h("span", { class: "val" }, `${v}点`),
+      h("span", { class: "val" }, String(v), h("small", {}, "点")),
       h("span", { class: "who" }, ...pickers.map((id) => chip(id))),
       show && !collapsed && pickers.length === 1 ? h("span", { class: "gain" }, `+${v}`) : h("span"),
       collapsed ? h("span", { class: "boomtxt" }, "崩落！") : null);
@@ -648,12 +655,17 @@ function renderBridge(main, g) {
   if (show) {
     const mine = g.last.gained[me] || 0, pick = g.last.picks[me];
     main.append(h("div", { class: "say " + (mine > 0 ? "good" : "red") },
-      pick == null ? "時間切れ… 0点" : mine > 0 ? `ひとりじめ成功！ +${mine}点` : "かぶって崩落… 0点"));
+      pick == null ? "時間切れ… 0点" : mine > 0 ? `ひとりじめ成功！ +${mine}点` : "かぶって崩落… 0点"), countdown(6000));
   } else {
     main.append(h("p", { class: "muted small" }, `選び終わった人: ${g.picked.length}/${S.roster.length}`));
   }
 }
 
+// ミニゲームの途中の点数(全員・多い順)
+function scoresEl(score) {
+  const ids = [...S.roster].sort((a, b) => (score[b] || 0) - (score[a] || 0));
+  return h("div", { class: "scores", "aria-label": "いまの点数" }, ...ids.map((id) => h("span", { class: "sc" + (id === me ? " me" : "") }, h("span", { class: "sw", style: `background:${colorOf(id)}` }), `${nameOf(id)} ${score[id] || 0}`)));
+}
 // ---- 爆弾回し ----
 function renderBomb(main, g) {
   const holdMe = g.step === "fuse" && g.holder === me;
@@ -661,7 +673,8 @@ function renderBomb(main, g) {
   if (g.step === "boom") {
     main.append(h("div", { class: "boom", role: "status" }, h("span", { class: "big", "aria-hidden": "true" }, "💥"), `${nameOf(g.boom)} 脱落！`));
   } else if (holdMe) {
-    main.append(h("div", { class: "hot", role: "status" }, "爆弾を持っている！ 早くだれかに渡して！"));
+    main.append(h("div", { class: "hot", role: "status" }, "爆弾を持っている！ 渡したい人をタップ！"),
+      h("p", { class: "muted small", style: "margin:0" }, Date.now() + offset < g.canPassAt ? "受け取った直後の少しのあいだは渡せません…" : "いつ爆発するかは分かりません。急いで！"));
   } else if (g.alive.includes(me)) {
     main.append(h("p", {}, `${nameOf(g.holder)} さんが爆弾を持っています…`));
   } else {
@@ -686,7 +699,7 @@ function renderBomb(main, g) {
 
 // ---- おぼえて料理 ----
 function renderMemory(main, g) {
-  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🍳 おぼえて料理 ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)));
+  main.append(h("div", { class: "head" }, h("div", { class: "say" }, `🍳 おぼえて料理 ${g.round}/${g.rounds}`), h("span", { class: "pts" }, `あなた ${g.score[me] || 0}点`)), scoresEl(g.score));
   const ingEl = (id, cls = "ing") => { const x = ING[id] || { icon: "?", name: id }; return h("div", { class: cls }, h("span", { class: "e", "aria-hidden": "true" }, x.icon), h("span", { class: "n" }, x.name)); };
   if (g.step === "show") {
     main.append(h("p", { class: "say" }, `この ${g.need}つ を覚えて！`), h("div", { class: "recipe" }, ...g.recipe.map((id) => ingEl(id))), countdown(4000));
@@ -697,12 +710,12 @@ function renderMemory(main, g) {
     if (local.selKey !== key) { local.selKey = key; local.sel = []; }
     const done = !!g.mySel;
     const sel = done ? g.mySel : local.sel;
-    main.append(h("p", { class: "small" }, done ? "提出しました。みんなを待っています…" : `材料は ${g.need}つ。選んだら「完成！」(選んだ数 ${sel.length})`), countdown(15000));
+    main.append(h("p", { class: "small" }, done ? "提出しました。みんなを待っています…" : `材料は ${g.need}つ。選んだら「完成！」(選んだ数 ${sel.length}/${g.need})`), countdown(15000));
     const grid = h("div", { class: "grid", role: "group", "aria-label": "食材" });
     for (const id of g.grid) {
       const x = ING[id] || { icon: "?", name: id }, on = sel.includes(id);
       grid.append(h("button", { type: "button", class: "gbtn" + (on ? " sel" : ""), disabled: done || !inGame(), "aria-pressed": on ? "true" : "false",
-        onclick: () => { local.sel = on ? local.sel.filter((y) => y !== id) : [...local.sel, id]; Sound.play("pick"); render(); } },
+        onclick: () => { if (!on && local.sel.length >= g.need) { flash(`選べるのは ${g.need}つまでです(外してから選び直してください)`); return; } local.sel = on ? local.sel.filter((y) => y !== id) : [...local.sel, id]; Sound.play("pick"); render(); } },
         h("span", { class: "e", "aria-hidden": "true" }, x.icon), h("span", { class: "n" }, x.name)));
     }
     main.append(grid);
@@ -712,7 +725,7 @@ function renderMemory(main, g) {
   }
   // 結果
   const L = g.last, mine = L.rows[me];
-  main.append(h("p", { class: "small muted" }, "正しい材料:"), h("div", { class: "recipe" }, ...L.recipe.map((id) => ingEl(id))));
+  main.append(countdown(6000), h("p", { class: "small muted" }, "正しい材料:"), h("div", { class: "recipe" }, ...L.recipe.map((id) => ingEl(id))));
   if (mine) {
     main.append(h("div", { class: "say " + (mine.perfect ? "good" : "red") }, mine.perfect ? `全部正解！ +${mine.pts}点` + (mine.bonus ? `(早さボーナス+${mine.bonus})` : "") : `${mine.correct}個正解・${mine.wrong}個まちがい +${mine.pts}点`));
     const myGrid = h("div", { class: "grid" }, ...mine.sel.map((id) => { const el = ingEl(id, "gbtn"); el.classList.add(L.recipe.includes(id) ? "ok" : "ng"); return el; }));
@@ -960,6 +973,13 @@ function esSubmit() {
   send({ t: "mini", a: "submit", guess, word });
 }
 
+// 結果の表: 数字の列(td.n)は見出しも右寄せにして、見出しと数字の列をそろえる
+function alignHeads() {
+  for (const t of document.querySelectorAll("table.rank")) {
+    const row = t.querySelector("tbody tr"); if (!row) continue;
+    [...t.querySelectorAll("thead th")].forEach((th, i) => th.classList.toggle("n", !!row.children[i]?.classList.contains("n")));
+  }
+}
 // ---- 順位発表 ----
 function rankTable(rows, cols) {
   return h("table", { class: "rank" }, h("thead", {}, h("tr", {}, ...cols.map((c) => h("th", {}, c[0])))),
@@ -975,7 +995,7 @@ function renderResult(main, isGM) {
   main.append(rankTable(R.rows, cols));
   if (SINGLE) {
     // 単独ゲーム: 同じメンバーでもう1試合(通算点は残る)
-    main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"),
+    main.append(h("div", { class: "btns" }, S.gameHostId !== me ? h("span", { class: "muted small" }, `ホストの ${nameOf(S.gameHostId)} さんが次へ進めます`) : h("button", { class: "primary big", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"),
       h("span", { class: "muted small" }, "同じメンバーで次の試合。合計は通算点として残ります")));
     return;
   }
@@ -990,7 +1010,7 @@ function renderFinal(main) {
   const champs = rows.filter((r) => r.place === 1);
   main.append(h("div", { class: "eyebrow" }, "総合結果"), h("div", { class: "champ" }, "🏆 総合優勝 " + champs.map((c) => c.name).join("・") + " さん"));
   main.append(rankTable(rows, [["順位", (r) => h("td", { class: "pl" }, r.place + "位")], ["名前", (r) => h("td", {}, chip(r.id))], ["合計", (r) => h("td", { class: "n pl" }, r.total + "点")]]));
-  main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ"), h("span", { class: "muted small" }, "待機画面に戻ります")));
+  main.append(h("div", { class: "btns" }, S.gameHostId === me ? h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "もう一度遊ぶ") : null, h("span", { class: "muted small" }, S.gameHostId === me ? "待機画面に戻ります" : `ホストの ${nameOf(S.gameHostId)} さんが待機画面に戻します`)));
 }
 
 // ---- タイマー表示と、爆弾の導火線の音 ----
@@ -1007,7 +1027,7 @@ setInterval(() => {
   const sec = r == null ? null : Math.ceil(r / 1000);
   if (sec !== lastSec) { lastSec = sec; if (S.phase === "play" && sec != null && sec <= 3 && sec >= 1) Sound.play("tick"); }
   // 爆弾を持っているあいだは導火線の音(時間は分からないので一定のリズム)
-  if (S.phase === "play" && S.game?.key === "bomb" && S.game.step === "fuse" && ++fuseTick % 2 === 0) Sound.play("fuse");
+  if (S.phase === "play" && S.game?.key === "bomb" && S.game.step === "fuse" && S.game.holder === me && ++fuseTick % 2 === 0) Sound.play("fuse");
 }, 250);
 
 connect();

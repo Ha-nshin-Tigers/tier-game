@@ -710,7 +710,9 @@ party.setNumberTopics(number.TOPICS);
 {
   const MODS = { tier: { rooms }, number, liar, party, bridge: party, bomb: party, memory: party, shotgun, eshiri, monopoly, insider, coyote, challengers, eldorado, guessclub, heat, mortar, citychase, matchy, bombanana };
   chat.setVerify((page, code, pid, token) => {
-    const room = page === "lobby" ? lobby._t.rooms.get(code) : MODS[page] && MODS[page].rooms ? MODS[page].rooms.get(code) : null;
+    // ドタバタ大会・単独のミニゲーム(party.js)は、部屋を「ページ名:コード」で持っている
+    const key = MODS[page] === party ? page + ":" + code : code;
+    const room = page === "lobby" ? lobby._t.rooms.get(code) : MODS[page] && MODS[page].rooms ? MODS[page].rooms.get(key) : null;
     const p = room && (room.players || room.members) ? (room.players || room.members).get(pid) : null;
     return p && p.token === token ? p.name || "だれか" : null;
   });

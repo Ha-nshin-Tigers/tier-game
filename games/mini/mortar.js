@@ -36,7 +36,7 @@ const gridSize = (n) => (n <= 3 ? 5 : 6);
 function start(c, settings, rnd = Math.random) {
   const cfg = normalize(settings);
   const order = [...c.members()];
-  const g = c.g = { cfg, order, N: gridSize(order.length), round: 0, step: "ready", seq: [], beat: 0, P: {}, boom: [], phaseAt: 0, showMs: 0, beatMs: 0, log: [], result: null, rnd };
+  const g = c.g = { cfg, order, startN: order.length, N: gridSize(order.length), round: 0, step: "ready", seq: [], beat: 0, P: {}, boom: [], phaseAt: 0, showMs: 0, beatMs: 0, log: [], result: null, rnd };
   for (const id of order) g.P[id] = { pos: null, start: null, alive: true, lives: cfg.lives, pend: null, hit: false, died: null, cleared: 0 };
   log(g, order.length === 1 ? "ひとりで練習: 何ラウンド生き残れるか" : `${order.length}人で開始。最後まで生き残った人の勝ち`);
   newRound(c);
@@ -102,7 +102,8 @@ function doBeat(c) {
 function endRound(c) {
   const g = c.g;
   for (const id of alive(g)) g.P[id].cleared = g.round;
-  const left = alive(g).length, solo = g.order.length === 1;
+  // ひとり練習かは開始時の人数で決める(対戦の途中で相手が抜けても練習にはならず、残った人の勝ち)
+  const left = alive(g).length, solo = (g.startN || g.order.length) === 1;
   // 2人以上: 生き残りが1人以下で終わり / ひとり: 吹き飛んだら終わり
   const over = solo ? left === 0 : left <= 1;
   if (over || g.round >= MAX_ROUND) return setStep(c, "result", RESULT_MS, () => finish(c));

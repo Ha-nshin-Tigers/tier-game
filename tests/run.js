@@ -37,7 +37,9 @@ async function ensureServer() {
 function runOne(f) {
   return new Promise((res) => {
     const t0 = Date.now(), out = [];
-    const p = spawn(process.execPath, ["-r", path.join(__dirname, "noguide.js"), path.join(__dirname, f)], { cwd: SHOTS, env: process.env });
+    // noguide.js: 遊び方ガイドの自動表示を「見た」ことにする(ガイドそのもののテストでは使わない)
+    const pre = f === "guide_ui.js" ? [] : ["-r", path.join(__dirname, "noguide.js")];
+    const p = spawn(process.execPath, [...pre, path.join(__dirname, f)], { cwd: SHOTS, env: process.env });
     const limit = setTimeout(() => { out.push("NG  時間切れ(" + (SLOW[f] || 240) + "秒)"); p.kill("SIGKILL"); }, (SLOW[f] || 240) * 1000);
     p.stdout.on("data", (d) => out.push(String(d)));
     p.stderr.on("data", (d) => out.push(String(d)));

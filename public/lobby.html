@@ -45,7 +45,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; 
 .status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
 .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
-button:hover:not(:disabled) { background: var(--bg); } button:disabled { opacity: .45; cursor: not-allowed; }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--bg); } } button:disabled { opacity: .45; cursor: not-allowed; }
 button.primary { background: var(--fg); color: var(--surface); } button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
 button.ghost { border-color: var(--line); font-weight: 500; } button.danger { color: var(--bad); border-color: var(--bad); }
 input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); width: 100%; }
