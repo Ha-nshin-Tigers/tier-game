@@ -21,7 +21,8 @@ const ROOM = "B" + Math.random().toString(36).slice(2, 6).toUpperCase();
   await pages[0].screenshot({ path: "l2_play_pc.png" });
   await pages[1].screenshot({ path: "l3_play_sp.png", fullPage: true });
   // 手番の人を探して2枚出す
-  const turnPage = async () => { for (const p of pages) if (await p.locator("text=あなたの番です").count()) return p; return null; };
+  // 自分の番の画面を探す(番が回ってくるまで最大6秒待つ)
+  const turnPage = async () => { for (let k = 0; k < 30; k++) { for (const p of pages) if (await p.locator("text=あなたの番です").count()) return p; await sleep(200); } return null; };
   let tp = await turnPage();
   const btns = tp.locator(".cards button.pc");
   await btns.nth(0).click(); await btns.nth(1).click();
@@ -29,6 +30,8 @@ const ROOM = "B" + Math.random().toString(36).slice(2, 6).toUpperCase();
   await pages[0].screenshot({ path: "l4_played_pc.png" });
   // 次の人がスタンプ→ウソつき
   tp = await turnPage();
+  // スマホ幅の画面はスタンプの列がたたまれている(仕様)ので、たたまれていれば開いてから押す
+  if (await tp.locator(".stampToggle").isVisible() && await tp.locator(".stamps.closed").count()) { await tp.click(".stampToggle"); await sleep(200); }
   await tp.click(".stamps button >> nth=1"); await sleep(400);
   for (const p of pages) if (p !== tp) { await p.screenshot({ path: "l5_stamp_pc.png" }); break; }
   await tp.click("button.liar"); await sleep(2600);

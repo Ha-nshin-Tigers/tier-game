@@ -28,7 +28,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let r = 0; r < 2; r++) { await sleep(6000); await A.click(".bridge >> nth=0"); await B.click(".bridge >> nth=1"); await C.click(".bridge >> nth=2"); await sleep(300); }
   await sleep(6500);
   await B.screenshot({ path: "p5_result_sp.png" });
-  await A.click("text=次のゲームへ"); await sleep(7600);
+  await A.click("text=次の試合へ"); await sleep(7600);
   // 爆弾
   await fits("bomb");
   const holderPage = async () => { for (const p of ps) if (await p.locator(".hot").count()) return p; return null; };
@@ -38,8 +38,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // 爆発まで待つ
   for (let k = 0; k < 60; k++) { if (await A.locator(".boom").count()) break; await sleep(500); }
   await B.screenshot({ path: "p8_bomb_boom_sp.png" });
-  for (let k = 0; k < 120; k++) { if (await A.locator("text=次のゲームへ").count()) break; await sleep(500); }
-  await A.click("text=次のゲームへ"); await sleep(7600);
+  for (let k = 0; k < 120; k++) { if (await A.locator("text=次の試合へ").count()) break; await sleep(500); }
+  await A.click("text=次の試合へ"); await sleep(7600);
   // 料理
   await fits("memory-show");
   await B.screenshot({ path: "p9_mem_show_sp.png" });
