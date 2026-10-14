@@ -3,6 +3,8 @@
 // ルール本体は games/mini/citychase.js。ここは部屋・入室・設定・結果だけを受け持つ。
 
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 const core = require("./mini/citychase");
 
 const WS_PATH = "/citychase/ws";
@@ -219,7 +221,7 @@ setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   }
-}, 30000);
+}, PING_MS);
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms)

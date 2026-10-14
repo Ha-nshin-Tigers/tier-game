@@ -250,22 +250,12 @@ button.tiny { padding: 3px 9px; font-size: 12px; }
   </section>
 </div>
 
+<script src="/js/common.js"></script>
 <script>
+const { $, h, player, nameOf, send } = TG; // 全ページ共通の部品(public/js/common.js)
 const TIERS = ["S", "A", "B", "C", "D"];             // 通信上の内部キー(サーバと共通)
 const LABEL = { S: "1", A: "2", B: "3", C: "4", D: "5" }; // 画面に出す順位
 const PTS_EXACT = 3, PTS_NEAR = 1, PTS_PERFECT = 5;
-const $ = (id) => document.getElementById(id);
-const h = (tag, attrs = {}, ...kids) => {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") el.className = v;
-    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-    else if (v === true) el.setAttribute(k, "");
-    else if (v !== false && v != null) el.setAttribute(k, v);
-  }
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
-  return el;
-};
 
 // ---- 端末ごとの保存(名前・前回の部屋・本人確認用ID) ----
 const store = {
@@ -385,7 +375,6 @@ function connect() {
     setTimeout(connect, Math.min(8000, 800 * 2 ** retry++));
   };
 }
-function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
 let flashMsg = "", flashWarn = false, flashT;
 function flash(msg, warn) { flashMsg = msg; flashWarn = !!warn; clearTimeout(flashT); flashT = setTimeout(() => { flashMsg = ""; render(); }, 6000); render(); }
@@ -418,8 +407,6 @@ const tierOf = (arr, w) => TIERS.find((t) => arr[t] === w) || null;
 const rankOf = (arr, w) => { const t = tierOf(arr, w); return t ? TIERS.indexOf(t) + 1 : null; };
 const complete = (arr, words) => words.length === 5 && TIERS.every((t) => arr[t] && words.includes(arr[t]));
 const allTopicNames = () => [...new Set([...Object.keys(builtin), ...topics.map((t) => t.name)])];
-const player = (id) => S?.players.find((p) => p.id === id);
-const nameOf = (id) => player(id)?.name || "退出した人";
 const remaining = () => Math.max(0, Math.ceil((S.deadline - (Date.now() + offset)) / 1000));
 
 // ---- 手元の並べ替え ----

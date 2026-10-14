@@ -1,0 +1,22 @@
+const { chromium } = require("playwright-core");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+  const R = "H" + Math.random().toString(36).slice(2, 6).toUpperCase();
+  const errs = [];
+  const A = await (await browser.newContext({ viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true })).newPage();
+  const B = await (await browser.newContext({ viewport: { width: 1100, height: 900 } })).newPage();
+  for (const p of [A, B]) p.on("pageerror", (e) => errs.push(e.message));
+  await A.goto("http://localhost:3123/shotgun"); await A.fill("#lName", "ホスト"); await A.fill("#lRoom", R); await A.click("#lJoin"); await sleep(400);
+  await B.goto("http://localhost:3123/shotgun?room=" + R); await B.fill("#lName", "ゲスト"); await B.click("#lJoin"); await sleep(3000);
+  await A.selectOption("select >> nth=2", "many"); await sleep(200);
+  await A.selectOption("select >> nth=4", "r"); await sleep(200);
+  await A.selectOption("select >> nth=7", "false"); await sleep(200);
+  await A.click(".itoggle >> nth=4"); await sleep(150); await A.click(".itoggle >> nth=4"); await sleep(200);
+  await A.screenshot({ path: "c1_settings_sp.png", fullPage: true });
+  await B.screenshot({ path: "c2_settings_guest_pc.png", fullPage: true });
+  console.log("guest sees:", await B.evaluate(() => [...document.querySelectorAll("#main select")].map((s) => s.options[s.selectedIndex].text).join(" / ")));
+  console.log("saw weight label:", await B.locator(".itoggle >> nth=4").textContent());
+  console.log("errors", errs);
+  await browser.close();
+})();

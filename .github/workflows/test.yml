@@ -1,0 +1,21 @@
+# 自動テスト: プッシュ・プルリクエストのたびに tests/ のテストを全部回す(本番への反映の前に確かめるため)
+name: テスト
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # ブラウザのテスト用の Chromium(playwright-core と同じ版)
+      - run: npx playwright-core install --with-deps chromium
+      # ブラウザを使わないテスト(速い)を先に
+      - run: npm run test:core
+      - run: npm run test:ui

@@ -5,7 +5,10 @@
   "main": "server.js",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/run.js",
+    "test:core": "node tests/run.js --core",
+    "test:ui": "node tests/run.js --ui"
   },
   "engines": {
     "node": ">=18"
@@ -14,5 +17,8 @@
     "qrcode": "1.5.4",
     "three": "0.170.0",
     "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.0"
   }
 }

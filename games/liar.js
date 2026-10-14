@@ -4,6 +4,8 @@
 // 出されたカードは「ウソつき！」で指摘されたときだけ全員に公開する。
 
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 
 const WS_PATH = "/liar/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 6, MAX_ROOMS = 500;
@@ -390,7 +392,7 @@ setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   }
-}, 30000);
+}, PING_MS);
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms)

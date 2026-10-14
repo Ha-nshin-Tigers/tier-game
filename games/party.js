@@ -8,6 +8,8 @@
 // 部屋は遊び方(mode)ごとに別。同じ部屋コードでも橋と爆弾は別の部屋になる。
 
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 // 大会で遊べるほかのゲーム(大会版)。1ゲーム=1ファイルで、start / handle / view / onLeave を持つ
 const MINI = {
   tier: require("./mini/tier"),
@@ -523,7 +525,7 @@ setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   }
-}, 30000);
+}, PING_MS);
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms)

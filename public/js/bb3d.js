@@ -23,8 +23,9 @@ export function drawSymbol(ctx, name, x, y, s, color = "#181b23") {
 }
 
 export function createScene(canvas, hooks) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+  const GFX = window.TG ? TG.gfx() : { antialias: true, pixelRatio: Math.min(window.devicePixelRatio || 1, 1.6) }; // 画質(軽量モード)
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias });
+  renderer.setPixelRatio(Math.min(GFX.pixelRatio, 1.6));
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 60);
   const controls = new OrbitControls(camera, canvas);

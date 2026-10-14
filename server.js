@@ -8,6 +8,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 const number = require("./games/number"); // かくれナンバー(/number)
 const liar = require("./games/liar");     // ウソつき酒場(/liar)
 const shotgun = require("./games/shotgun"); // 散弾ルーレット(/shotgun)
@@ -570,9 +572,17 @@ const STATIC = [
   ["/models/", path.join(__dirname, "public", "models")],
   ["/js/", path.join(__dirname, "public", "js")], // 画面どうしで共通のスクリプト(お絵かきなど)
   ["/icons/", path.join(__dirname, "public", "icons")], // サイトのアイコン・共有したときの画像
+  ["/guide/", path.join(__dirname, "public", "guide")], // 遊び方ガイドの画面写真
 ];
-const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary", ".png": "image/png", ".ico": "image/x-icon" };
-function serveStatic(pathname, res) {
+const TYPES = { ".js": "text/javascript; charset=utf-8", ".glb": "model/gltf-binary", ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon" };
+// 共通スクリプト(/js/)の版番号: 中身から作る。画面のHTMLを配るときに「/js/partybar.js?v=版番号」に書き換えるので、
+// 反映すると URL が変わり、古いスクリプトがブラウザに残らない(版番号つきは長くキャッシュしてよい)
+const logRate = new Map(); // 画面のエラーの記録: IPごとの回数(1分20件まで)
+setInterval(() => logRate.clear(), 10 * 60 * 1000);
+const JS_VER = {};
+for (const f of fs.readdirSync(path.join(__dirname, "public", "js"))) if (f.endsWith(".js")) JS_VER[f] = crypto.createHash("sha1").update(fs.readFileSync(path.join(__dirname, "public", "js", f))).digest("hex").slice(0, 10);
+const withVersions = (html) => html.replace(/"\/js\/([A-Za-z0-9_-]+\.js)"/g, (m, f) => (JS_VER[f] ? `"/js/${f}?v=${JS_VER[f]}"` : m));
+function serveStatic(pathname, res, versioned) {
   for (const [prefix, root] of STATIC) {
     if (!pathname.startsWith(prefix)) continue;
     let rel;
@@ -581,7 +591,9 @@ function serveStatic(pathname, res) {
     if (!type || !file.startsWith(root + path.sep)) return false;
     fs.readFile(file, (e, buf) => {
       if (e) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ファイルが見つかりません"); }
-      res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=86400" });
+      // /js/ の版番号なしは毎回確かめる(古いものを使い続けないように)。版番号つき・画像・モデルは長めにキャッシュ
+      const cache = prefix === "/js/" ? (versioned ? "public, max-age=31536000, immutable" : "no-cache") : "public, max-age=86400";
+      res.writeHead(200, { "Content-Type": type, "Cache-Control": cache });
       res.end(buf);
     });
     return true;
@@ -606,6 +618,24 @@ const server = http.createServer((req, res) => {
       res.end(buf);
     });
   }
+  // 画面で起きたエラーの記録(partybar.js が送る)。サーバのログに残すだけ。送りすぎは捨てる
+  if (url.pathname === "/log" && req.method === "POST") {
+    const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+    const now = Date.now(), r = logRate.get(ip) || { n: 0, t: now };
+    if (now - r.t > 60000) { r.n = 0; r.t = now; }
+    r.n++; logRate.set(ip, r);
+    let body = "";
+    req.on("data", (c) => { if (body.length < 4096) body += c; });
+    req.on("end", () => {
+      res.writeHead(204); res.end();
+      if (r.n > 20) return;
+      try {
+        const m = JSON.parse(body), cut = (x, n) => String(x == null ? "" : x).replace(/[\u0000-\u001f]/g, " ").slice(0, n);
+        console.error(`画面のエラー [${cut(m.page, 20)}] ${cut(m.msg, 300)} @ ${cut(m.src, 120)}:${cut(m.line, 8)} | ${cut(m.ua, 80)}${m.stack ? "\n  " + cut(m.stack, 600).replace(/ {2,}/g, " ") : ""}`);
+      } catch {}
+    });
+    return;
+  }
   // 招待リンクのQRコード(パーティー・部屋を対面で共有するため)。このサイトのリンクだけ作る
   if (url.pathname === "/qr.svg") {
     const text = String(url.searchParams.get("t") || "").slice(0, 300);
@@ -618,7 +648,7 @@ const server = http.createServer((req, res) => {
       res.end(svg);
     });
   }
-  if (serveStatic(url.pathname, res)) return;
+  if (serveStatic(url.pathname, res, url.searchParams.has("v"))) return;
   const page = PAGES[url.pathname];
   if (page) {
     fs.readFile(path.join(__dirname, "public", page), (e, buf) => {
@@ -627,7 +657,7 @@ const server = http.createServer((req, res) => {
       const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim() === "https" ? "https" : "http";
       const host = String(req.headers.host || "").replace(/[^A-Za-z0-9.:-]/g, "");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(buf.toString("utf8").replaceAll("%%ORIGIN%%", host ? `${proto}://${host}` : ""));
+      res.end(withVersions(buf.toString("utf8").replaceAll("%%ORIGIN%%", host ? `${proto}://${host}` : "")));
     });
     return;
   }
@@ -665,7 +695,7 @@ setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   }
-}, 30000);
+}, PING_MS);
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms)

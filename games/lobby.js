@@ -4,6 +4,8 @@
 // 各ゲームの画面は public/js/partybar.js でこのサーバにつながり、ホストが次のゲームを選ぶと自動で移動する。
 
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 const fs = require("fs");
 const path = require("path");
 const store = require("./store");
@@ -265,7 +267,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => detach(ws));
 });
 setInterval(() => { for (const ws of wss.clients) ws.budget = Math.min(30, ws.budget + 10); }, 1000);
-setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, 30000);
+setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, PING_MS);
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms) {

@@ -3,6 +3,8 @@
 // ゲームの中身とは関係なく、public/js/partybar.js のチャット欄からつながる。
 
 const { WebSocketServer } = require("ws");
+// 生存確認の間隔(タブを閉じた人に早めに気づくため)。確認に応答がないまま次の確認が来たら切断扱い=最大30秒ほどで気づく
+const PING_MS = 15000;
 
 const WS_PATH = "/chat/ws";
 const MAX_LEN = 80, KEEP = 40, GAP_MS = 800, ROOM_IDLE_MS = 60 * 60 * 1000, MAX_ROOMS = 2000;
@@ -65,7 +67,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => leave(ws));
 });
 setInterval(() => { for (const ws of wss.clients) ws.budget = Math.min(20, ws.budget + 5); }, 1000);
-setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, 30000);
+setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, PING_MS);
 setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) if (r.emptySince && now - r.emptySince > ROOM_IDLE_MS) rooms.delete(k); }, 60000);
 
 module.exports = { WS_PATH, wss, setVerify: (f) => { verify = f; } };

@@ -283,27 +283,14 @@ body.compact .items { flex-wrap: nowrap; overflow-x: auto; }
   </div>
 </div>
 
+<script>window.PB_3D = true;</script>
+<script src="/js/common.js"></script>
 <script type="module">
-const $ = (id) => document.getElementById(id);
-const h = (tag, attrs = {}, ...kids) => {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") el.className = v;
-    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-    else if (v === true) el.setAttribute(k, "");
-    else if (v !== false && v != null) el.setAttribute(k, v);
-  }
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
-  return el;
-};
+const { $, h, store, saveName } = TG; // 全ページ共通の部品(public/js/common.js)
 const SEAT_COLORS = ["#e8574f", "#f0a03c", "#e6d14a", "#5cc46a", "#4d9de0", "#a46ee0"];
 
 // ---- 端末ごとの保存 ----
 // 本人確認用ID・ニックネーム・音の設定はほかのゲームと共通(tier:)、前回の部屋と表示方法はこのゲーム用(shotgun:)
-const store = {
-  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-};
 function rnd(n, chars = "abcdefghijklmnopqrstuvwxyz0123456789") {
   const a = new Uint8Array(n); crypto.getRandomValues(a);
   return [...a].map((x) => chars[x % chars.length]).join("");
@@ -442,7 +429,6 @@ let flashMsg = "", flashWarn = false, flashT;
 function flash(msg, warn) { flashMsg = msg; flashWarn = !!warn; clearTimeout(flashT); flashT = setTimeout(() => { flashMsg = ""; render(); }, 6000); render(); }
 
 // ---- 入室 ----
-function saveName(name) { const t = store.get("tier:last") || { room: "" }; store.set("tier:last", { ...t, name }); }
 function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
 function backToLogin(msg, warn) {
   joined = false; wantRoom = null; S = null;
@@ -773,9 +759,10 @@ setInterval(() => {
 function createView3D(THREE, GLTFLoader, SkeletonUtils, host) {
   const canvas = document.createElement("canvas");
   host.prepend(canvas);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-  renderer.shadowMap.enabled = true;
+  const GFX = TG.gfx(); // 画質(軽量モードでは解像度・なめらか処理・影を落とす)
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias });
+  renderer.setPixelRatio(GFX.pixelRatio);
+  renderer.shadowMap.enabled = GFX.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.1;

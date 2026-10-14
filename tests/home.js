@@ -1,0 +1,28 @@
+const { chromium } = require("playwright-core");
+let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m); if (!c) fails++; };
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }), errs = [];
+  const ctx = await b.newContext({ viewport: { width: 390, height: 800 }, isMobile: true }), p = await ctx.newPage();
+  p.on("pageerror", (e) => errs.push(e.message));
+  await p.goto("http://localhost:3123/");
+  const vis = () => p.evaluate(() => [...document.querySelectorAll("#groups a.game")].map((a) => a.getAttribute("href")));
+  check((await vis()).length === 20 && await p.locator("#groups h2").count() === 5, "最初は全20本を5つの分類で表示");
+  await p.screenshot({ path: "h1_all_sp.png", fullPage: true });
+  await p.selectOption("#fPeople", "10");
+  check(JSON.stringify(await vis()) === JSON.stringify(["/tier", "/number", "/coyote"]), "10人: ティア表・かくれナンバー・コヨーテだけ");
+  await p.selectOption("#fPeople", "0"); await p.check("#fQuick");
+  const q = await vis();
+  check(!q.includes("/monopoly") && !q.includes("/tier") && !q.includes("/party") && q.includes("/eshiri"), "サクッと(20分以内): 不動産王・ティア表・大会は外れる " + q.join(","));
+  await p.uncheck("#fQuick"); await p.click(".chips button:has-text('お絵かき')");
+  check(JSON.stringify(await vis()) === JSON.stringify(["/eshiri"]), "「お絵かき」で絵しりとりだけ");
+  await p.selectOption("#fPeople", "10");
+  check(await p.locator("#empty").isVisible(), "該当なしの案内(お絵かき×10人)");
+  await p.reload();
+  check(await p.locator(".chips button[aria-pressed=true]").textContent() === "お絵かき" && await p.inputValue("#fPeople") === "10", "絞り込みは次に開いたときも残る");
+  await p.click(".chips button:has-text('すべて')"); await p.selectOption("#fPeople", "0");
+  await p.click("a.game[href='/monopoly']"); await p.waitForURL("**/monopoly");
+  check(true, "カードから各ゲームに入れる");
+  const sw = await (await (await b.newContext({ viewport: { width: 390, height: 800 } })).newPage()).goto("http://localhost:3123/").then(() => 0);
+  check(errs.length === 0, "ページエラーなし " + JSON.stringify(errs));
+  console.log(fails ? `NG ${fails}件` : "全項目OK"); await b.close();
+})();

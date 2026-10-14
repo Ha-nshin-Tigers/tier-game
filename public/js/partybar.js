@@ -15,6 +15,22 @@
   let ident = store.get("tier:ident");
   if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
   const page = location.pathname.replace(/\/+$/, "").slice(1);
+  // 画面で起きたエラーをサーバのログに送る(直すため。1ページ5件まで・同じものは1回・このサイトのスクリプトのものだけ)
+  {
+    const sent = new Set();
+    const report = (msg, src, line, stack) => {
+      try {
+        if (sent.size >= 5 || !msg) return;
+        if (src && !String(src).startsWith(location.origin)) return; // 拡張機能などのエラーは送らない
+        if (/ResizeObserver loop|Script error\.?$/.test(msg)) return;
+        const key = msg + "|" + src + "|" + line; if (sent.has(key)) return; sent.add(key);
+        const body = JSON.stringify({ page: page || "home", msg: String(msg).slice(0, 300), src: String(src || "").replace(location.origin, "").slice(0, 120), line, stack: String(stack || "").slice(0, 600), ua: navigator.userAgent.slice(0, 80) });
+        if (navigator.sendBeacon) navigator.sendBeacon("/log", body); else fetch("/log", { method: "POST", body, keepalive: true }).catch(() => {});
+      } catch {}
+    };
+    addEventListener("error", (e) => { if (e.message) report(e.message, e.filename, e.lineno, e.error && e.error.stack); });
+    addEventListener("unhandledrejection", (e) => { const r = e.reason; report(r && r.message ? r.message : String(r), r && r.stack ? (r.stack.match(/https?:\/\/[^\s)]+/) || [location.href])[0] : location.href, 0, r && r.stack); });
+  }
   const HUB = page === "lobby", HOME = page === "" || page === "index.html";
   const params = new URLSearchParams(location.search);
 
@@ -258,6 +274,7 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
 .pb-sheet-box button.pb-sheet-close { background: transparent; color: var(--fg, #181b23); border-color: var(--line, #cfd4de); }
 .pb-sheet-msg { margin: 0; font-size: 13px; color: var(--good, #1f8a4c); min-height: 1em; }
 .pb-sheet-box button:disabled { opacity: .4; cursor: default; }
+.pb-guide-img { display: block; width: 100%; max-height: 38vh; object-fit: contain; object-position: top; border-radius: 10px; border: 1.5px solid var(--line, #cfd4de); background: var(--bg, #e9ecf2); }
 .pb-guide-step { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; min-height: 110px; }
 .pb-guide-step p { margin: 0; font-size: 16px; line-height: 1.7; }
 .pb-guide-no { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent, #3446c4); color: #fff; font-weight: 700; font-size: 18px; }
@@ -419,7 +436,7 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     }
     i = Math.max(0, Math.min(steps.length - 1, i)); gopen.dataset.i = i;
     const title = (document.title.split(/[（(｜]/)[0] || "").trim();
-    gopen.innerHTML = `<div class="pb-sheet-box"><span class="pb-sheet-url">${esc(title)}の遊び方 ${i + 1} / ${steps.length}</span><div class="pb-guide-step"><span class="pb-guide-no">${i + 1}</span><p>${esc(steps[i])}</p></div><div class="pb-guide-dots">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div><div class="pb-guide-nav"><button type="button" data-g="prev" style="--c:#596070" ${i === 0 ? "disabled" : ""}>← 前へ</button>${i < steps.length - 1 ? '<button type="button" data-g="next" style="--c:#3446c4">次へ →</button>' : '<button type="button" data-g="close" style="--c:#1f8a4c">わかった！</button>'}</div><button type="button" data-g="close" class="pb-sheet-close">閉じる(右下の「？」でいつでも見られます)</button></div>`;
+    gopen.innerHTML = `<div class="pb-sheet-box"><span class="pb-sheet-url">${esc(title)}の遊び方 ${i + 1} / ${steps.length}</span>${i === 0 && /^[a-z]{2,12}$/.test(page) ? `<img class="pb-guide-img" src="/guide/${page}.jpg" alt="${esc(title)}の遊んでいる画面" onerror="this.remove()">` : ""}<div class="pb-guide-step"><span class="pb-guide-no">${i + 1}</span><p>${esc(steps[i])}</p></div><div class="pb-guide-dots">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div><div class="pb-guide-nav"><button type="button" data-g="prev" style="--c:#596070" ${i === 0 ? "disabled" : ""}>← 前へ</button>${i < steps.length - 1 ? '<button type="button" data-g="next" style="--c:#3446c4">次へ →</button>' : '<button type="button" data-g="close" style="--c:#1f8a4c">わかった！</button>'}</div><button type="button" data-g="close" class="pb-sheet-close">閉じる(右下の「？」でいつでも見られます)</button></div>`;
     gopen.querySelector("[data-g=next],[data-g=close]")?.focus();
   }
   // ---- 観戦中のお知らせ: ゲームの途中で入った人(このゲームの参加者でない人)に、いまの立場と次にどうなるかを出す ----
@@ -451,7 +468,19 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
     list.unshift({ page, code: s.code, title: gameTitle(), at: Date.now() });
     store.set("tier:recent", list.slice(0, 5));
   }
-  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); }, 1500);
+  // 3Dのゲームの画質ボタン(標準⇄軽量)。押すと設定を覚えて読み込み直す
+  function gfxButton() {
+    if (!window.PB_3D || !window.TG || document.getElementById("pb-gfx")) return;
+    const b = document.createElement("button");
+    b.id = "pb-gfx"; b.type = "button";
+    const lite = TG.lite();
+    b.textContent = lite ? "画質: 軽量" : "画質: 標準";
+    b.title = lite ? "押すと標準の画質にします(読み込み直します)" : "動きが重いときは押して軽量にします(読み込み直します)";
+    b.style.cssText = "position:fixed;right:12px;bottom:calc(108px + env(safe-area-inset-bottom,0px));z-index:36;padding:4px 10px;border-radius:999px;border:2px solid var(--fg,#181b23);background:var(--surface,#fff);color:var(--fg,#181b23);font:700 12px var(--body,system-ui,sans-serif);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)";
+    b.addEventListener("click", () => { store.set("tier:lite", !TG.lite()); location.reload(); });
+    document.body.append(b);
+  }
+  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); }, 1500);
   // ホーム画面に追加(PWA)のためのサービスワーカー(キャッシュはしない)
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("/sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => wake());
