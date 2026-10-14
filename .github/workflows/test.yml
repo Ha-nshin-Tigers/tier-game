@@ -3,6 +3,10 @@ name: テスト
 on:
   push:
   pull_request:
+# 同じブランチに新しく送ったら、前の(古い)テストは取り消す
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest

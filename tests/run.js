@@ -5,6 +5,7 @@
 //   npm run test:core       … ブラウザを使わないテストだけ(速い)
 //   npm run test:ui         … ブラウザのテストだけ
 //   node tests/run.js bb_   … 名前に「bb_」を含むテストだけ
+//   node tests/run.js --all … とても時間のかかるテスト(lobby_all: 全ゲームを順に開く)も含めて全部
 // ブラウザのテストは playwright-core を使う。ブラウザの場所は環境変数 CHROMIUM_PATH(無ければ playwright の既定)。
 // 合否: 終了コードが0以外・「NG」で始まる行・処理されなかったエラーがあれば失敗。スクリーンショットは tests/.shots/ に出る。
 
@@ -15,12 +16,15 @@ const http = require("http");
 
 const ROOT = path.join(__dirname, ".."), PORT = 3123, SHOTS = path.join(__dirname, ".shots");
 const SKIP = new Set(["run.js", "noguide.js"]);
+// とても時間のかかるテスト(全ゲームを順に開く・約40分)は、--all を付けたときか、名前で指定したときだけ回す
+const ONLY_ALL = new Set(["lobby_all.js"]);
 // 時間のかかるテスト(全ゲームを順に開くなど)は長めに待つ
 const SLOW = { "lobby_all.js": 2400, "audit.js": 600, "party_fix2.js": 300 };
 const args = process.argv.slice(2), coreOnly = args.includes("--core"), uiOnly = args.includes("--ui"), filters = args.filter((a) => !a.startsWith("--"));
 
 const usesBrowser = (f) => /playwright/.test(fs.readFileSync(path.join(__dirname, f), "utf8"));
 let files = fs.readdirSync(__dirname).filter((f) => f.endsWith(".js") && !SKIP.has(f)).sort();
+if (!args.includes("--all")) files = files.filter((f) => !ONLY_ALL.has(f) || filters.some((x) => f.includes(x)));
 if (coreOnly) files = files.filter((f) => !usesBrowser(f));
 if (uiOnly) files = files.filter((f) => usesBrowser(f));
 if (filters.length) files = files.filter((f) => filters.some((x) => f.includes(x)));
