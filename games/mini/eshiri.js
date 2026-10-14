@@ -6,7 +6,7 @@
 // 絵の線は c.sendTo で個別に送る(状態の一斉送信には入れない。重くなるため)
 
 const DEFAULTS = { mode: "relay", laps: 1, view: "prev", scoring: "both", drawSecs: 60 };
-const START_WORDS = ["しりとり", "りんご", "ごりら", "らっぱ", "ぱんだ", "だるま", "まくら", "らいおん", "すいか", "かめ", "めだか", "かさ", "さかな", "なす", "すずめ"];
+const START_WORDS = ["しりとり", "りんご", "ごりら", "らっぱ", "ぱんだ", "だるま", "まくら", "らくだ", "すいか", "かめ", "めだか", "かさ", "さかな", "なす", "すずめ"];
 const REVEAL_MS = 90000; // 大会では答え合わせを見せてから終える
 const MAX_STROKES = 500, MAX_POINTS = 16000, MAX_STROKE_POINTS = 800, WORD_MAX = 15;
 

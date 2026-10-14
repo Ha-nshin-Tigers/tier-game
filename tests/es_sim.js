@@ -14,6 +14,10 @@ const lastC = (w) => { const s = { "ゃ": "や", "ゅ": "ゆ", "ょ": "よ", "�
 // ことばの候補(先頭の文字 → 「ん」で終わらない言葉)
 const WORDS = { "り": "りす", "す": "すいか", "か": "からす", "ら": "らくだ", "だ": "だるま", "ま": "まくら", "ご": "ごま", "ぱ": "ぱせり", "め": "めだか", "さ": "さる", "る": "るびー", "び": "びーる", "な": "なす", "ず": "ずぼん", "い": "いす", "せ": "せみ", "み": "みかん" };
 const wordFor = (ch) => WORDS[ch] || ch + "かな";
+// お題(最初の言葉)が「ん」で終わると、次の人がだれも書けなくなる
+{ const src = require("fs").readFileSync(require("path").join(__dirname, "../games/mini/eshiri.js"), "utf8"), es = require("../games/mini/eshiri.js");
+  const list = JSON.parse(src.match(/START_WORDS = (\[[^\]]*\])/)[1]);
+  check(list.every((w) => es.lastChar(w) !== "ん"), "最初のお題に「ん」で終わる言葉がない"); }
 (async () => {
   const R = "E" + Math.random().toString(36).slice(2, 6).toUpperCase();
   const cs = ["Ann", "Bob", "Cat"].map(client); await Promise.all(cs.map((c) => c.open));
