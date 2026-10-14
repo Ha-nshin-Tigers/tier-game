@@ -92,7 +92,10 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .drawtools .tool.on { background: var(--fg); color: var(--surface); border-color: var(--fg); }
 /* 自分の番: 左に前の絵(またはお題)、右に入力欄 */
 .taskrow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 10px; align-items: start; }
-.prevpic { width: 100%; }
+.prevpic { width: 100%; cursor: zoom-in; }
+/* 前の絵はタップで大きく(もう一度タップで戻る) */
+.prevpic.zoom { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.85); color: #fff; display: grid; place-items: center; align-content: center; padding: 12px; cursor: zoom-out; }
+.prevpic.zoom > :not(:first-child) { width: min(96vw, 80vh); height: auto; max-width: none; background: #fff; border-radius: 8px; }
 .lbl { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .inputs { display: grid; gap: 6px; }
 .watch { width: min(100%, 420px); justify-self: center; }
@@ -346,7 +349,7 @@ function renderTask(main, g) {
   local.word = h("input", { type: "text", maxlength: 15, placeholder: "ひらがなで", autocomplete: "off", "aria-label": "描く言葉", oninput: () => { updateTaskStatus(); sendWords(); } });
   main.append(h("div", { class: "head" }, h("div", { class: "say" }, "あなたの番！"), h("span", { id: "cdWrap" }, cd())));
   const left = t.first ? h("div", { class: "field" }, "お題", h("span", { class: "word" }, "「" + t.start + "」"))
-    : h("div", { class: "field prevpic" }, `${nameOf(t.prevBy)} さんの絵`, t.prevEmpty ? h("p", { class: "muted small" }, "(何も描かれていません)") : Draw.view(t.prevDid));
+    : h("div", { class: "field prevpic", title: "タップで大きく", onclick: (e) => e.currentTarget.classList.toggle("zoom") }, `${nameOf(t.prevBy)} さんの絵(タップで大きく)`, t.prevEmpty ? h("p", { class: "muted small" }, "(何も描かれていません)") : Draw.view(t.prevDid));
   main.append(h("div", { class: "taskrow" }, left,
     h("div", { class: "inputs" },
       local.guess ? h("label", { class: "field" }, "① 前の絵は何だと思う？", local.guess) : null,

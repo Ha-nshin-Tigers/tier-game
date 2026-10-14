@@ -82,7 +82,9 @@ const waitFor = async (c, fn, ms = 40000) => { const t = Date.now(); while (Date
   A.send({ t: "next" }); await sleep(100);
   check(A.S.phase === "final" && A.S.players.every((p) => p.total > 0), "総合結果");
   C.send({ t: "again" }); await sleep(80);
-  check(A.S.phase === "lobby", "もう一度→待機");
+  check(A.S.phase === "final", "ホスト以外は「もう一度」で戻せない");
+  A.send({ t: "again" }); await sleep(80);
+  check(A.S.phase === "lobby", "ホストの「もう一度」→待機");
   // ---- 途中退出 ----
   A.send({ t: "setPlaylist", list: [] }); await sleep(60);
   check(A.S.playlist.length === 3, "0試合にはできない");

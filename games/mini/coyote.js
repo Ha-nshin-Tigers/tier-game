@@ -133,7 +133,8 @@ function onLeave(c, pid) {
   const g = c.g;
   if (!g || g.step === "end" || !(g.lives[pid] > 0)) return;
   g.lives[pid] = 0; g.outOrder.push(pid);
-  if (g.hands[pid]) { g.discard.push(g.hands[pid]); delete g.hands[pid]; }
+  // 数字を言っている途中なら手札を捨て札へ。公開中(コヨーテ!のあと)は、もう捨て札に入っているので入れない(二重になってカードが増える)
+  if (g.hands[pid]) { if (g.step === "bid") g.discard.push(g.hands[pid]); delete g.hands[pid]; }
   if (alive(g).length <= 1) { g.step = "end"; c.clearTimer(); return end(c); }
   if (g.step === "bid" && g.turn === pid) { g.turn = next(g, pid); arm(c); }
   if (g.nextFirst === pid) g.nextFirst = next(g, pid);

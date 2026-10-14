@@ -165,9 +165,17 @@ function onLeave(c, pid) {
     log(g, `${c.nameOf(g.ref)} が参照プレイヤーになった`);
   } else {
     const t = teamOf(g, pid);
-    if (t) { t.ids = t.ids.filter((x) => x !== pid); if (!t.ids.length) g.teams = g.teams.filter((x) => x !== t); }
+    if (t) {
+      t.ids = t.ids.filter((x) => x !== pid);
+      // ペア戦(参照プレイヤーがいない)で1人になったチームは、もう一致できないので終わり(残った人は観戦)
+      if (!t.ids.length || (!g.ref && t.ids.length === 1)) {
+        if (t.ids.length) log(g, `相方が抜けたので ${c.nameOf(t.ids[0])} のチームは終わり(観戦)`);
+        g.teams = g.teams.filter((x) => x !== t);
+      }
+    }
   }
-  if (g.teams.length < 1 || g.order.length < 2) { g.winner = g.teams[0] || null; if (g.winner) return finish(c); }
+  // 残りのチームが1つ以下(ペア戦では競う相手がいない)・遊ぶ人が2人未満なら、残ったチームの勝ちで終わる
+  if (g.teams.length < 1 || g.order.length < 2 || (!g.ref && g.teams.length === 1)) { g.winner = g.teams[0] || null; if (g.winner) return finish(c); }
   if (g.step === "call" && pid === g.caller) { g.caller = g.order[0]; }
   if (g.step === "pick" && g.order.every((x) => g.picks[x])) reveal(c);
 }

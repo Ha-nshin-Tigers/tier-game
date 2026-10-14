@@ -258,7 +258,7 @@ function onTransition(prev, cur) {
   if (g.phase !== pg.phase) Sound.play(g.phase === "deck" ? "turn" : g.phase === "match" || g.phase === "final" ? "done" : "reveal");
   const mm = g.matches.find((m) => m.a === me || m.b === me), pm = pg.matches.find((m) => m.id === mm?.id);
   if (mm && pm && mm.flag !== pm.flag && mm.flag) Sound.play(mm.flag === me ? "tap" : "tick");
-  if (mm?.prompt?.mine && !pm?.prompt?.mine) Sound.play("turn");
+  if (mm?.prompt?.mine && !pm?.prompt?.mine) { Sound.play("turn"); setTimeout(() => document.querySelector(".prompt")?.scrollIntoView({ block: "center", behavior: "smooth" }), 60); }
   if (mm?.winner && !pm?.winner) Sound.play(mm.winner === me ? "reveal" : "tick");
 }
 
@@ -360,7 +360,8 @@ function selectList(cards, min, max) {
   const box = h("div", { class: "cards" });
   for (const c of [...cards].sort((x, y) => DB.cards[y.k].power - DB.cards[x.k].power)) {
     const on = local.sel.has(c.id);
-    box.append(cardEl(c, { small: true, sel: on, onclick: () => { if (on) local.sel.delete(c.id); else if (local.sel.size < max) local.sel.add(c.id); render(); } }));
+    // 外すカードを選ぶときは、名前と効果が読める大きさで出す(小さいと名前が割れて効果も見えない)
+    box.append(cardEl(c, { sel: on, onclick: () => { if (on) local.sel.delete(c.id); else if (local.sel.size < max) local.sel.add(c.id); render(); } }));
   }
   return box;
 }
@@ -421,7 +422,7 @@ function renderEnd(main, g) {
   main.append(h("div", { class: "say good" }, `🏆 ${nameOf(r.winner)} さんの優勝！`));
   if (g.final) main.append(h("p", {}, `決勝: ${nameOf(g.final.a)} vs ${nameOf(g.final.b)}`));
   const rows = g.humans.map((id) => ({ id, total: g.totals?.[id] ?? 0, tr: g.trophies[id] })).sort((x, y) => (y.id === r.winner) - (x.id === r.winner) || (y.id === r.second) - (x.id === r.second) || y.total - x.total);
-  main.append(h("table", { class: "rank" }, h("tbody", {}, ...rows.map((x, i) => h("tr", { class: x.id === me ? "me" : "" }, h("td", {}, `${i + 1}位`), h("td", {}, chip(x.id)), h("td", { class: "n" }, `ファン ${x.total}人`), h("td", { class: "n small" }, x.tr.map((t) => `R${t.round}:${t.fans}`).join(" ")))))));
+  main.append(h("table", { class: "rank" }, h("tbody", {}, ...rows.map((x, i) => h("tr", { class: x.id === me ? "me" : "" }, h("td", { style: "white-space:nowrap" }, `${i + 1}位`), h("td", { style: "white-space:normal" }, chip(x.id), x.tr.length ? h("div", { class: "small muted", style: "white-space:normal" }, "勝ったラウンド: " + x.tr.map((t) => `R${t.round}(${t.fans})`).join(" ")) : null), h("td", { class: "n" }, `ファン ${x.total}人`))))));
   main.append(h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
 }
 

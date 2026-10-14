@@ -299,7 +299,7 @@ function settle(c) {
   }
   for (const [id, v] of Object.entries(gain)) if (g.P[id]) g.P[id].money += v;
   g.bowl = 0;
-  g.results = { round: g.round, glass: g.glass, slot: pos, fines, bonus, pot, gain, hands: Object.fromEntries(g.order.map((id) => [id, [...g.P[id].out, ...g.P[id].hand]])) };
+  g.results = { round: g.round, glass: g.glass, slot: pos, fines, bonus, pot, gain, hands: Object.fromEntries(g.order.map((id) => [id, [...g.P[id].out, ...g.P[id].hand]])), outs: Object.fromEntries(g.order.map((id) => [id, [...g.P[id].out]])), lefts: Object.fromEntries(g.order.map((id) => [id, [...g.P[id].hand]])) };
   const fineTxt = Object.entries(fines).map(([id, v]) => `${nm(c, id)} -${yen(v)}`).join("・");
   log(g, `一致は${g.glass}回。${fineTxt ? "罰金: " + fineTxt + "。" : ""}ボーナス${yen(bonus)}を足してボウルは${yen(pot)}`);
   log(g, Object.keys(gain).length ? `予想的中: ${Object.entries(gain).map(([id, v]) => `${nm(c, id)} +${yen(v)}`).join("・")}` : "予想が当たった人はいません(ボウルは銀行へ)");

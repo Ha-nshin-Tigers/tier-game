@@ -97,6 +97,7 @@ button.coyote { background: #b5371f; color: #fff; border-color: #b5371f; font-fa
 .calc { display: grid; gap: 2px; padding: 8px; border: 2px dashed var(--line); border-radius: 10px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; }
 .legend .lg { display: inline-flex; gap: 6px; align-items: center; }
+.legend .lg > :first-child { flex: none; font-size: 11px; letter-spacing: -.02em; overflow: hidden; }
 .rank { width: 100%; border-collapse: collapse; font-size: 14px; } .rank td { padding: 5px 8px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 /* プレイヤー */
 .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -227,7 +228,7 @@ const hearts = (n, max) => "♥".repeat(Math.max(0, n)) + "♡".repeat(Math.max(
 let local = { bid: "" };
 const SPECIAL = { "×2": "合計を2倍", "MAX→0": "いちばん大きい数字を0に", "？": "山札から1枚めくって足す", "夜(0)": "0。この回のあと全部シャッフル" };
 function cardEl(t, big) {
-  if (t == null) return h("div", { class: "cc back" + (big ? " big" : ""), title: "自分のカードは見えません" }, "?");
+  if (t == null) return h("div", { class: "cc back" + (big ? " big" : ""), title: "自分のカードは見えません", "aria-label": "自分のカード(見えない)" }, "🂠");
   const n = Number(t), cls = SPECIAL[t] ? "sp" : n < 0 ? "neg" : n === 0 ? "zero" : n >= 10 ? "hi" : "pos";
   return h("div", { class: "cc " + cls + (big ? " big" : ""), title: SPECIAL[t] || "" }, t === "夜(0)" ? "夜" : t);
 }
@@ -312,6 +313,9 @@ function renderBid(main, g) {
   main.append(h("div", { class: "head" }, h("div", { class: "say" }, g.turn === me ? "あなたの番！" : `${nameOf(g.turn)} さんの番`), cd()),
     h("div", { class: "bidnow" }, last ? h("span", {}, chip(last.by), " 「合計は ", h("b", { class: "num" }, last.n), " 以上！」") : h("span", { class: "muted" }, "まだだれも言っていません")));
   if (g.bids.length > 1) main.append(h("div", { class: "small muted" }, "これまで: " + g.bids.map((b) => `${nameOf(b.by)} ${b.n}`).join(" → ")));
+  // 見えているカードに特殊カードがあれば、その意味を出す(説明は待機画面にしかなかった)
+  const sp = [...new Set(Object.values(g.cards || {}).filter((x) => x && SPECIAL[x]))];
+  if (sp.length) main.append(h("div", { class: "small muted" }, "特殊カード: " + sp.map((x) => `「${x === "夜(0)" ? "夜" : x}」${SPECIAL[x]}`).join(" / ")));
   if (g.turn !== me) { main.append(h("p", { class: "small muted" }, "自分のカードは見えません。みんなの顔(数字)から合計を読みましょう。")); return; }
   const min = last ? last.n + 1 : 1;
   if (!local.bid || Number(local.bid) < min) local.bid = String(min);

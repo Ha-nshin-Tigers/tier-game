@@ -2,6 +2,12 @@
 // 以前は17ページそれぞれに同じコードが書かれていた。ここを直せば全ページに効く。
 // 使うページは「const { h, store, ... } = TG;」で取り出す。中身がページごとに違うものは、そのページに残してある。
 // S(部屋の状態)・ws・me・offset・colorOf などは各ページで決まるもので、呼ばれたときにそのページの値を使う。
+// 標準の append / replaceChildren は null や false を「null」「false」という文字にしてしまう。
+// 「条件 ? 要素 : null」をそのまま渡しても何も出ないように、null・undefined・false は取り除く(全ページ共通)
+for (const name of ["append", "prepend", "replaceChildren"]) {
+  const orig = Element.prototype[name];
+  Element.prototype[name] = function (...kids) { return orig.apply(this, kids.filter((k) => k != null && k !== false)); };
+}
 window.TG = (() => {
   const $ = (id) => document.getElementById(id);
   const h = (tag, attrs = {}, ...kids) => {

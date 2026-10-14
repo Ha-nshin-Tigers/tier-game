@@ -59,7 +59,11 @@ function finish(room, raw) {
   rows.forEach((r, i) => { r.rank = i > 0 && r.raw === rows[i - 1].raw ? rows[i - 1].rank : i + 1; });
   room.ranking = rows;
   room.phase = "finished";
-  require("./lobby").report("matchy", room.code, rows); // パーティーの通算成績へ
+  // パーティーの通算成績へ。参照プレイヤー(3人などで相手のいない人)は順位の外なので、ほかの人だけで順位をつけ直す
+  const ref = room.game && room.game.ref, rep = rows.filter((r) => r.id !== ref).map((r) => ({ ...r }));
+  rep.forEach((r, i) => { r.rank = i > 0 && r.raw === rep[i - 1].raw ? rep[i - 1].rank : i + 1; });
+  if (ref) rep.push({ id: ref, name: nameOf(room, ref), rank: null });
+  require("./lobby").report("matchy", room.code, rep);
 }
 function toLobby(room) {
   clearTimer(room);

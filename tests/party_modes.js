@@ -26,7 +26,9 @@ const waitFor = async (c, fn, ms = 60000) => { const t = Date.now(); while (Date
   check(A.S.phase === "result", "単独モードは結果画面で止まる(自動で進まない)");
   const t1 = A.S.players.map((p) => p.total).sort().join();
   B.send({ t: "again" }); await sleep(100);
-  check(A.S.phase === "intro" && A.S.game.key === "bridge", "「もう一度遊ぶ」で同じゲームの次の試合(誰でも押せる)");
+  check(A.S.phase === "result", "「もう一度遊ぶ」はホスト以外には押せない(まだ結果を見ている人がいても画面が進まない)");
+  A.send({ t: "again" }); await sleep(100);
+  check(A.S.phase === "intro" && A.S.game.key === "bridge", "ホストの「もう一度遊ぶ」で同じゲームの次の試合");
   check(A.S.players.map((p) => p.total).sort().join() === t1, "通算点は残る");
   for (let r = 1; r <= 3; r++) { await waitFor(A, (s) => s.phase === "play" && s.game.round === r && s.game.step === "pick"); A.send({ t: "pick", i: 0 }); B.send({ t: "pick", i: 1 }); await sleep(100); }
   await waitFor(A, (s) => s.phase === "result");

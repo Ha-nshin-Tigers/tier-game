@@ -317,6 +317,8 @@ function renderPick(main, g) {
     h("button", { type: "button", class: "primary", disabled: local.sel.length !== n, onclick: () => act("pick", { cards: local.sel }) }, mineSent ? "選び直して出す" : "これで決定"),
     mineSent ? h("span", { class: "small good" }, "出しました(答え合わせまでは選び直せます)") : null));
   main.append(h("p", { class: "small muted", style: "margin:0" }, "押した順に1番・2番…と並びます。並びの写真を押すと外せます。"));
+  // スマホでは一覧の下まで選んだあと上まで戻らなくていいように、決定ボタンを一覧の下にも置く
+  setTimeout(() => { const ph = main.querySelector(".photos"); if (ph && !main.querySelector(".pickBottom")) ph.after(h("div", { class: "btns pickBottom", style: "justify-content:center;margin-top:8px" }, h("button", { type: "button", class: "primary big", disabled: local.sel.length !== n, onclick: () => act("pick", { cards: local.sel }) }, `${mineSent ? "選び直して出す" : "これで決定"}(${local.sel.length}/${n}枚)`))); }, 0);
   main.append(h("div", { class: "photos" }, ...g.photos.map((_, i) => {
     const k = local.sel.indexOf(i);
     return photoEl(g, i, { no: k >= 0 ? k + 1 : null, cls: k >= 0 ? "sel" : "", onclick: () => { if (k >= 0) local.sel.splice(k, 1); else if (local.sel.length < n) local.sel.push(i); else return toast(`${n}枚までです。外してから選んでください`); render(); } });

@@ -9,7 +9,7 @@ const core = require("./mini/coyote");
 
 const WS_PATH = "/coyote/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 10, MAX_ROOMS = 500;
-const STAMPS = ["コヨーテ！", "ほんとに？", "信じて", "顔に出てる", "ナイス", "ごめん", "急いで！", "w"];
+const STAMPS = ["あやしい…", "ほんとに？", "信じて", "顔に出てる", "ナイス", "ごめん", "急いで！", "w"];
 const STAMP_GAP_MS = 1200;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 
