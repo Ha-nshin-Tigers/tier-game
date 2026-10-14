@@ -768,4 +768,4 @@ function view(c, me) {
   };
 }
 
-module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, RULES, PRESETS, MAP_NAMES, boardFor, SQ, G, RR, UT, _rentOf: rentOf, _test: { land, drawCard, advance, roll, beginTurn } };
+module.exports = { start, handle, view, onLeave, onPresence: (c) => { if (c.g && c.g.step !== "end") arm(c); }, normalize, DEFAULTS, RULES, PRESETS, MAP_NAMES, boardFor, SQ, G, RR, UT, _rentOf: rentOf, _test: { land, drawCard, advance, roll, beginTurn } };

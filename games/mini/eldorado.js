@@ -485,7 +485,7 @@ function moveWithCard(c, id, m) {
   if (symBlocked(p, need)) return `不調の呪い: ${SYMJ[need]}が使えません`;
   if (h.v > mv.left) return `パワーが足りません(必要 ${h.v} / 残り ${mv.left})`;
   if (fresh) { endMove(c); commitSource(c, id, mv); g.move = mv; }
-  mv.fixed = sym; mv.left -= h.v; mv.moved = true;
+  mv.fixed = sym; mv.left -= h.v; mv.moved = true; mv.steps = (mv.steps || 0) + 1;
   enter(c, id, mv.piece, to);
   if (g.move === mv && mv.left <= 0) endMove(c);
   pump(c);
@@ -495,6 +495,8 @@ function endMove(c) {
   const g = c.g, mv = g.move;
   if (!mv) return;
   g.move = null;
+  // 記録: だれが何で何マス進んだか(ほかの人の動きを追えるように)
+  if (mv.moved) { const nmK = mv.token != null ? (TOKENS[mv.k] || {}).name : (CARDS[mv.k] || {}).name; log(g, `${nm(c, curId(g))} が ${nmK || "カード"}で${mv.steps || 1}マス進んだ`); }
   if (mv.moved) stopAt(c, curId(g), mv.piece);
 }
 // 止まったマスでの出来事: 洞窟(となりに止まったら1つ。同じ洞窟は一度離れてから)・酒場
@@ -587,6 +589,7 @@ function enterWithCards(c, id, m) {
     else playFromHand(g, id, x, false);
   }
   if (h.t === "c") log(g, `${nm(c, id)} が${g.cfg.gt ? "キャンプ" : "ベースキャンプ"}でカードを${ids.length}枚除外`);
+  else log(g, `${nm(c, id)} が荒地へ(手札を${ids.length}枚捨てた)`);
   enter(c, id, piece, m.to);
   stopAt(c, id, piece);
   pump(c);
@@ -1188,4 +1191,4 @@ function view(c, me) {
   };
 }
 
-module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, CARDS, COURSES, BOARDS, TOKENS, CURSES, MARKET0, RESERVE0, RESERVE_HH, GT_BOARDS, GT_COURSES, GT_MARKET0, GT_RESERVE0, GUARDS, BLOCKADES_GT, _t: { buildCourse, distance, coinOf, blockadeBetween, stepTargets, neighbors, autoResolve, canExit, palBlocked, localHexes } };
+module.exports = { start, handle, view, onLeave, onPresence: (c) => { if (c.g && c.g.step !== "end") arm(c); }, normalize, DEFAULTS, CARDS, COURSES, BOARDS, TOKENS, CURSES, MARKET0, RESERVE0, RESERVE_HH, GT_BOARDS, GT_COURSES, GT_MARKET0, GT_RESERVE0, GUARDS, BLOCKADES_GT, _t: { buildCourse, distance, coinOf, blockadeBetween, stepTargets, neighbors, autoResolve, canExit, palBlocked, localHexes } };

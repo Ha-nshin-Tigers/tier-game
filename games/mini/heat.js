@@ -705,10 +705,9 @@ function autoTurn(c) {
 function arm(c) {
   const g = c.g;
   if (g.step === "draft" && g.draft) {
-    const d = g.draft, key = "draft:" + d.round + ":" + d.i;
+    const d = g.draft, who = d.order[d.i], key = "draft:" + d.round + ":" + d.i + ":" + c.live().includes(who);
     if (g.armKey === key) return;
     g.armKey = key;
-    const who = d.order[d.i];
     return c.setTimer((c.live().includes(who) ? 40 : 10) * 1000, () => { g.armKey = null; if (g.step === "draft" && g.draft && g.draft.order[g.draft.i] === who) pickUpgrade(c, who, 0); });
   }
   if (g.step === "plan") {
@@ -718,10 +717,9 @@ function arm(c) {
     return c.setTimer(g.cfg.planSecs * 1000, () => { g.armKey = null; if (g.step === "plan" && g.armKey == null) { log(g, "時間切れ(まだの人はギアそのまま・小さいカードから)"); beginMoves(c); } });
   }
   if (g.step === "move" && g.turn) {
-    const key = "turn:" + g.round + ":" + g.mi + ":" + g.turn.phase;
+    const away = !c.live().includes(g.turn.pid), key = "turn:" + g.round + ":" + g.mi + ":" + g.turn.phase + ":" + away;
     if (g.armKey === key) return;
     g.armKey = key;
-    const away = !c.live().includes(g.turn.pid);
     return c.setTimer((away ? 10 : g.cfg.turnSecs) * 1000, () => { g.armKey = null; autoTurn(c); });
   }
   c.clearTimer();
@@ -812,6 +810,6 @@ function view(c, me) {
 }
 
 module.exports = {
-  start, handle, view, onLeave, normalize, DEFAULTS, TRACKS, CARDS, UPG, WEATHER, ROAD,
+  start, handle, view, onLeave, onPresence: (c) => { if (c.g && c.g.step !== "end") arm(c); }, normalize, DEFAULTS, TRACKS, CARDS, UPG, WEATHER, ROAD,
   _t: { place, cornersBetween, nextCorner, flipSpeed, planOf, beginMoves, slipAllowed, endRound, sectorEffects, draftTargets, revealCard },
 };

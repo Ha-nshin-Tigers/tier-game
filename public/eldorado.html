@@ -99,7 +99,8 @@ button.ecard { cursor: pointer; } button.ecard:hover { transform: translateY(-2p
 .blk { display: inline-block; margin-right: 6px; font-weight: 700; } .blk.gone { opacity: .45; text-decoration: line-through; }
 .handbox, .market { display: grid; gap: 6px; padding: 8px; border: 2px solid var(--line); border-radius: 10px; }
 .endrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
-.keep { display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; }
+.keep { display: inline-flex; align-items: center; gap: 6px; margin: 2px 6px 2px 0; padding: 6px 10px; min-height: 36px; border: 1.5px solid var(--line); border-radius: 8px; cursor: pointer; }
+.keep input { width: 20px; height: 20px; margin: 0; }
 .prompt { border: 2px solid var(--accent); border-radius: 10px; padding: 8px; display: grid; gap: 6px; }
 .players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 180px; overflow: auto; }
@@ -250,7 +251,7 @@ const XBL = { xdraw: "ほかの全員が1枚引いてよい", xtrash: "ほかの
 const blText = (b) => b.t === "r" ? `手札${b.v}枚を捨てる` : b.t === "d" ? "呪いを1枚引く" : XBL[b.t] || `${SYM[b.t].n}${b.v}`;
 const blShort = (b) => b.t === "r" ? `捨${b.v}` : b.t === "d" ? "👹1" : XBL[b.t] ? { xdraw: "引", xtrash: "除", xeldo: "E+", xpay: "E-" }[b.t] : SYM[b.t].ic + b.v;
 // sel: 選んだ手札 / tsel: 選んだ洞窟トークン / mode: マスを押す待ち(原住民など)・市場を押す待ち(電信機・ヘンリー)
-let local = { sel: new Set(), tsel: new Set(), mode: null, modeCard: null, piece: 0, keep: new Set(), boost: false, access: false, sx: null, sy: null, lastFrom: null, eldo: 0 };
+let local = { sel: new Set(), tsel: new Set(), mode: null, modeCard: null, piece: 0, keep: new Set(), boost: false, access: false, sx: null, sy: null, lastFrom: null, eldo: 0, fit: false };
 const cardDef = (k) => DB.cards[k] || {};
 const symsOf = (k) => { const d = cardDef(k); return d.a ? ["a"] : d.demon ? ["x"] : d.s || []; };
 
@@ -304,11 +305,15 @@ function renderSide() {
     for (const id of g.order) {
       const p = g.P[id];
       const extra = [p.tokens.length ? `洞窟${p.tokens.length}` : "", p.curses.length ? "呪い:" + p.curses.map((x) => DB.curses[x.k]?.name).join("・") : "", p.hero ? "英雄あり" : ""].filter(Boolean).join("・");
-      ul.append(h("li", { class: id === g.cur ? "cur" : "" }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
-        h("span", { class: "pname" }, (id === g.cur ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : "")),
+      const off = player(id) && !player(id).connected;
+      const li = h("li", { class: (id === g.cur ? "cur" : "") + (off ? " off" : "") }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
+        h("span", { class: "pname" }, (id === g.cur ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : "") + (off ? "(切断中)" : "")),
         h("span", { class: "pinfo" }, `デッキ${p.deckSize}枚・🚧${p.blockades.length}` + (g.cfg.gt ? `・エルド${p.eldo}` : "") + (p.done.some(Boolean) ? "・🏁" + p.done.filter(Boolean).length : "")),
         g.cfg.gt ? h("span", { class: "pextra" }, "宝石: ", ...(p.gems.length ? p.gems.map((x) => h("b", { style: `color:${GEM[x].c}` }, "◆" + GEM[x].n + " ")) : ["まだなし"])) : null,
-        extra ? h("span", { class: "pextra" }, extra) : null));
+        extra ? h("span", { class: "pextra" }, extra) : null);
+      // ゲーム中もホストは抜けた人を外せる(戻ってこない人を待ち続けないように)
+      if (off && isGM() && id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id }), "ghost danger tiny")));
+      ul.append(li);
     }
     side.append(ul);
     if (g.cfg.caves || g.cfg.hh) side.append(h("p", { class: "small muted" }, [g.cfg.hh ? `控えの洞窟トークン${g.supply}・魔物カード${g.demons}・呪い${g.cursesLeft}・英雄${g.heroes}` : "洞窟ルールあり"].join("")));
@@ -400,7 +405,9 @@ function boardEl(g, myTurn) {
   for (const k of hm.keys()) { const [q, r] = k.split(",").map(Number), [x, y] = px(q, r); minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y); }
   const pad = HS * 1.2;
   svg.setAttribute("viewBox", `${minx - pad} ${miny - pad} ${maxx - minx + pad * 2} ${maxy - miny + pad * 2}`);
-  svg.setAttribute("width", Math.round(maxx - minx + pad * 2)); svg.setAttribute("height", Math.round(maxy - miny + pad * 2));
+  // 「全体」表示のときは枠の幅に縮めて盤全体を見せる(ゴールの位置が分かるように)
+  if (local.fit) { svg.setAttribute("width", "100%"); svg.style.display = "block"; }
+  else { svg.setAttribute("width", Math.round(maxx - minx + pad * 2)); svg.setAttribute("height", Math.round(maxy - miny + pad * 2)); }
   svg.setAttribute("class", "hexmap"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "盤面");
   const mine = g.P[me], piece = myPiece(g);
   const from = mine && piece >= 0 ? mine.pieces[piece] : null;
@@ -467,7 +474,12 @@ function boardEl(g, myTurn) {
     g.cfg.gt ? h("span", {}, "◆色のふち=神殿(止まると宝石)・👥=2人用") : null, g.cfg.eldoMod ? h("span", {}, "金の丸=エルドのタイル") : null, g.cfg.palMod ? h("span", {}, "茶色の線=柵(その辺からは入れない)") : null);
   const bls = h("div", { class: "small" }, "バリケード: ", ...g.blockades.map((b) => h("span", { class: "blk" + (b.by ? " gone" : ""), title: blText(b) }, `${b.n}:${blShort(b)}` + (b.by ? `(${nameOf(b.by)})` : ""))));
   const gds = g.cfg.gt ? h("details", { class: "small" }, h("summary", {}, "守護者(となりに止まると表になって効果。表になったものは盤に名前)"), h("ul", { class: "rules" }, ...Object.values(DB.guards).map((x) => h("li", {}, `${x.name}: ${x.text}`)))) : null;
-  return h("div", { class: "boardbox" }, wrap, legend, bls, gds);
+  // 盤が枠より大きいとき: スクロールできることを知らせ、「全体を見る」で縮小できるようにする
+  const big = (maxx - minx + pad * 2) > Math.min(innerWidth, 1180) - 40;
+  const zoomRow = big || local.fit ? h("div", { class: "btns small" },
+    h("button", { type: "button", class: "ghost tiny", onclick: () => { local.fit = !local.fit; local.sx = local.sy = null; render(); } }, local.fit ? "拡大して見る" : "全体を見る"),
+    !local.fit ? h("span", { class: "muted" }, "盤は指でずらして(スクロールして)見られます") : null) : null;
+  return h("div", { class: "boardbox" }, zoomRow, wrap, legend, bls, gds);
 }
 function tapHex(g, hx, piece) {
   if (g.steps && g.steps.mover === me) return act("step", { to: hx.k });

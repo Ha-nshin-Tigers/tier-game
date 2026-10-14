@@ -112,6 +112,7 @@ function arm(c) {
   const secs = g.step === "thief" ? g.cfg.thiefSecs : g.step === "police" ? g.cfg.policeSecs : 60;
   const away = g.step === "thief" ? !c.live().includes(g.thief) : !g.police.some((x) => c.live().includes(x));
   const ms = away ? 15000 : secs * 1000;
+  g.armAway = away;
   if (!ms) return c.clearTimer();
   c.setTimer(ms, () => {
     if (g.step === "place") { while (g.helis.length < HELIS) { const free = []; for (let x = 0; x < I; x++) for (let y = 0; y < I; y++) if (!g.helis.includes(K(x, y))) free.push(K(x, y)); g.helis.push(free[Math.floor(g.rnd() * free.length)]); } log(g, "時間切れ: 残りのヘリを置いた"); beginThief(c); }
@@ -146,4 +147,11 @@ function view(c, me) {
     last: g.last, winner: g.winner, log: g.log.slice(-14),
   };
 }
-module.exports = { start, handle, view, onLeave, normalize, DEFAULTS, ROUNDS, _t: { moves, nbB, nbI, around } };
+// 切断・再接続: 待っている側の「切断中かどうか」が変わったときだけ掛け直す(切断中は15秒)
+function onPresence(c) {
+  const g = c.g;
+  if (!g || g.step === "end" || g.step === "place") return;
+  const away = g.step === "thief" ? !c.live().includes(g.thief) : !g.police.some((x) => c.live().includes(x));
+  if (away !== g.armAway) arm(c);
+}
+module.exports = { start, handle, view, onLeave, onPresence, normalize, DEFAULTS, ROUNDS, _t: { moves, nbB, nbI, around } };

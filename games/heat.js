@@ -27,7 +27,7 @@ const connected = (p) => p && p.sockets.size > 0;
 const order = (room) => [...room.players.values()].sort((a, b) => a.joinedAt - b.joinedAt);
 const hostOf = (room) => (order(room).find(connected) || {}).id || null;
 const members = (room) => room.roster.filter((id) => room.players.has(id));
-const nameOf = (room, id) => (room.players.get(id) || {}).name || "退出した人";
+const nameOf = (room, id) => (room.players.get(id) || {}).name || (room.gone && room.gone[id]) || "退出した人"; // 抜けた人の名前は記録用に控えておく
 
 function clearTimer(room) { clearTimeout(room.timer); room.timer = null; room.deadline = 0; }
 function setTimer(room, ms, fn) {
@@ -84,17 +84,23 @@ function broadcast(room) { for (const p of room.players.values()) for (const ws 
 function broadcastRaw(room, msg) { for (const p of room.players.values()) for (const ws of p.sockets) send(ws, msg); }
 const err = (ws, msg) => send(ws, { t: "error", msg });
 
+// 切断・再接続で、待っている人の持ち時間を掛け直す(切断中は短く。持ち時間「なし」でも止まらないように)
+function presence(room) {
+  if (room.phase === "play" && room.game && core.onPresence) core.onPresence(ctxOf(room));
+}
 function detach(ws) {
   const room = ws.room;
   if (!room) return;
   const p = room.players.get(ws.pid);
   if (p) p.sockets.delete(ws);
   ws.room = null;
+  presence(room);
   if (![...room.players.values()].some(connected)) room.emptySince = Date.now();
   broadcast(room);
 }
 function removePlayer(room, pid) {
   if (!room.players.has(pid)) return;
+  (room.gone || (room.gone = {}))[pid] = room.players.get(pid).name; // 記録に「〇〇が抜けた」と名前を出すため
   room.players.delete(pid);
   // 抜けた人の車はコースから外す(2人より少なくなったら待機画面へ)
   if (room.phase === "play") core.onLeave(ctxOf(room), pid);
@@ -130,6 +136,7 @@ function handle(ws, m) {
     p.sockets.add(ws);
     ws.room = room; ws.pid = pid;
     room.emptySince = null;
+    presence(room);
     send(ws, { t: "joined", room: code });
     send(ws, { t: "db", cards: core.CARDS, weather: core.WEATHER, road: core.ROAD, tracks: Object.fromEntries(Object.entries(core.TRACKS).map(([k, t]) => [k, { name: t.name, laps: t.laps, n: t.n, corners: t.corners.length, exp: t.exp || null }])) }); // カードとコースの一覧(最初に1回)
     return broadcast(room);

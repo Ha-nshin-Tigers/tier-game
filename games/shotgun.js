@@ -27,7 +27,7 @@ const connected = (p) => p && p.sockets.size > 0;
 const order = (room) => [...room.players.values()].sort((a, b) => a.joinedAt - b.joinedAt);
 const hostOf = (room) => (order(room).find(connected) || {}).id || null;
 const members = (room) => room.roster.filter((id) => room.players.has(id));
-const nameOf = (room, id) => (room.players.get(id) || {}).name || "退出した人";
+const nameOf = (room, id) => (room.players.get(id) || {}).name || (room.gone && room.gone[id]) || "退出した人"; // 抜けた人の名前は記録用に控えておく
 
 function clearTimer(room) { clearTimeout(room.timer); room.timer = null; room.deadline = 0; }
 function setTimer(room, ms, fn) {
@@ -95,6 +95,7 @@ function detach(ws) {
 }
 function removePlayer(room, pid) {
   if (!room.players.has(pid)) return;
+  (room.gone || (room.gone = {}))[pid] = room.players.get(pid).name; // 記録に「〇〇が抜けた」と名前を出すため
   room.players.delete(pid);
   if (room.phase === "play") {
     if (members(room).length < MIN_PLAYERS) toLobby(room);

@@ -251,8 +251,14 @@ function renderSide() {
   side.append(h("h2", {}, "プレイヤー"));
   const ul = h("ul", { class: "players" });
   if (g) {
-    for (const id of g.order) ul.append(h("li", {}, h("span", { class: "sw2", style: `background:${colorOf(id)}` }), h("span", { class: "pname" }, nameOf(id) + (id === me ? "(あなた)" : "")),
-      h("span", { class: "pinfo" }, h("span", { class: "role " + (id === g.thief ? "thief" : "police") }, id === g.thief ? "犯人" : "警察"))));
+    for (const id of g.order) {
+      const off = player(id) && !player(id).connected;
+      const li = h("li", { class: off ? "off" : "" }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }), h("span", { class: "pname" }, nameOf(id) + (id === me ? "(あなた)" : "") + (off ? "(切断中)" : "")),
+        h("span", { class: "pinfo" }, h("span", { class: "role " + (id === g.thief ? "thief" : "police") }, id === g.thief ? "犯人" : "警察")));
+      // ゲーム中もホストは抜けた人を外せる(戻ってこない人を待ち続けないように)
+      if (off && isGM() && id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id }), "ghost danger tiny")));
+      ul.append(li);
+    }
   } else {
     for (const p of S.players) {
       const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
@@ -271,7 +277,7 @@ function renderSide() {
   side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
   if (g?.log?.length) side.append(h("details", { open: true }, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
   const btns = h("div", { class: "btns" });
-  if (S.phase !== "lobby" && isGM()) btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  if (S.phase !== "lobby" && isGM() && S.game?.step !== "end") btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" }))); // 終了後は下の「待機画面に戻る」だけ
   btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
   side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
 }
@@ -286,8 +292,8 @@ function renderMain() {
     : g.step === "thief" ? (thief ? (g.round === 1 ? "車を隠すビルを選んでください" : "逃げるビルを選んでください(タテヨコのとなり・痕跡のないビル)") : "犯人が逃げています…")
     : police ? "警察の番: ヘリを選んで、移動か捜索" : "警察がヘリで捜索しています";
   main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say), remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null),
-    h("p", { class: "small muted", style: "margin:0" }, "あなたは ", h("span", { class: "role " + (thief ? "thief" : "police") }, thief ? "犯人" : police ? "警察" : "観戦"), thief ? "。車の場所と痕跡はあなたにだけ見えています。" : police ? "。犯人の車は見えません。見つけた痕跡の番号が手がかりです。" : ""));
-  main.append(h("div", { class: "rounds", "aria-label": "ラウンド" }, ...Array.from({ length: g.rounds }, (_, i) => h("span", { class: i + 1 < g.round ? "done" : i + 1 === g.round && g.step !== "end" ? "now" : "" }, String(i + 1)))));
+    h("p", { class: "small muted", style: "margin:0" }, "あなたは ", h("span", { class: "role " + (thief ? "thief" : "police") }, thief ? "犯人" : police ? "警察" : "観戦"), g.step === "end" ? "。ゲーム終了: 車の場所と痕跡をみんなに見せています。" : thief ? "。車の場所と痕跡はあなたにだけ見えています。" : police ? "。犯人の車は見えません。見つけた痕跡の番号が手がかりです。" : ""));
+  main.append(h("div", { class: "rounds", "aria-label": "ラウンド" }, ...Array.from({ length: g.rounds }, (_, i) => h("span", { class: i + 1 < g.round ? "done" : i + 1 === g.round ? "now" : "" }, String(i + 1)))));
   main.append(cityEl(g));
   if (g.step === "police" && police) {
     main.append(h("div", { class: "helis" }, ...g.helis.map((_, i) => h("button", { type: "button", class: local.h === i ? "sel" : "", disabled: g.acted.includes(i), onclick: () => { local.h = local.h === i ? null : i; render(); } }, `🚁${i + 1}` + (g.acted.includes(i) ? "(行動済み)" : ""))),
@@ -332,8 +338,9 @@ function cityEl(g) {
   for (let y = 0; y < g.I; y++) for (let x = 0; x < g.I; x++) {
     const k = `${x},${y}`, X = ix(x), Y = ix(y), hi = g.helis.indexOf(k);
     const c = el("circle", { class: "ix" + (canI.has(k) ? " can" : ""), cx: X, cy: Y, r: canI.has(k) ? 12 : 6, fill: canI.has(k) ? "#ffd36b" : "#c7ccd6", stroke: "#181b23", "stroke-width": 1 });
-    if (canI.has(k)) c.addEventListener("click", () => tapI(g, k));
     svg.append(c);
+    // 押せる交差点は、見た目より大きい透明な当たり判定を重ねる(スマホで指で押しやすく)
+    if (canI.has(k)) { const hit = el("circle", { cx: X, cy: Y, r: 26, fill: "transparent", style: "cursor:pointer" }); hit.addEventListener("click", () => tapI(g, k)); svg.append(hit); }
     if (hi >= 0) {
       const hg = el("g", { style: police && g.step === "police" && !g.acted.includes(hi) ? "cursor:pointer" : "" });
       hg.append(el("circle", { cx: X, cy: Y, r: 20, fill: local.h === hi ? "#3446c4" : g.acted.includes(hi) ? "#8a909c" : "#2a7de1", stroke: "#fff", "stroke-width": 2.5 }));

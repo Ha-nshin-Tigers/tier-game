@@ -358,7 +358,7 @@ body.has-partybar { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)
       const css = document.createElement("style");
       css.textContent = `
 /* 右下の💬・？ボタンが、ページのいちばん下の内容(コピーボタンなど)に重ならないように、下に余白をつくる */
-body.has-pbchat .wrap::after { content: ""; display: block; height: 44px; }
+body.has-pbchat:not(.compact) .wrap::after { content: ""; display: block; height: calc(104px + env(safe-area-inset-bottom, 0px)); }
 .pb-chat { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 36; display: grid; justify-items: end; gap: 6px; font-family: var(--body, system-ui, sans-serif); color: var(--fg, #181b23); }
 .pb-chat .pb-cbtn { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--fg, #181b23); background: var(--surface, #fff); font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 .pb-chat .pb-badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
