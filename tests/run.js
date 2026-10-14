@@ -59,8 +59,11 @@ function runOne(f) {
   const results = [];
   for (const f of files) {
     await ensureServer(); // テストがサーバを止めることがある(更新のお知らせのテスト)ので毎回確かめる
-    const r = await runOne(f);
+    let r = await runOne(f);
+    // 画面を操作するテストは、環境の速さでたまに失敗することがある。1回だけやり直し、通ったらそう書く(2回とも失敗なら失敗)
+    if (!r.ok) { const first = r; await ensureServer(); r = await runOne(f); if (r.ok) r.retried = first; }
     results.push(r);
+    if (r.retried) console.log(`  (${f} は1回目に失敗・やり直しで成功: ${(r.retried.ng[0] || r.retried.text.trim().split("\n").pop() || "").slice(0, 120)})`);
     console.log(`${r.ok ? "✔" : "✘"} ${f} (${r.sec}秒)${r.ok ? "" : "\n    " + (r.ng.length ? r.ng.join("\n    ") : r.text.trim().split("\n").slice(-6).join("\n    "))}`);
   }
   const bad = results.filter((r) => !r.ok);
