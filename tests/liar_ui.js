@@ -43,7 +43,7 @@ const ROOM = "B" + Math.random().toString(36).slice(2, 6).toUpperCase();
   await pages[0].screenshot({ path: "l8_shot_pc.png" });
   await pages[1].screenshot({ path: "l9_shot_sp.png" });
   // 2D 表示への切り替え
-  await pages[2].click("text=3D表示"); await sleep(500);
+  await pages[2].click("text=表示: 3D"); await sleep(500);
   await pages[2].screenshot({ path: "l10_2d.png" });
   console.log("SP scrollWidth", await pages[1].evaluate(() => document.documentElement.scrollWidth));
   console.log("errors", errs);

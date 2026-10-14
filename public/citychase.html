@@ -338,9 +338,9 @@ function cityEl(g) {
   for (let y = 0; y < g.I; y++) for (let x = 0; x < g.I; x++) {
     const k = `${x},${y}`, X = ix(x), Y = ix(y), hi = g.helis.indexOf(k);
     const c = el("circle", { class: "ix" + (canI.has(k) ? " can" : ""), cx: X, cy: Y, r: canI.has(k) ? 12 : 6, fill: canI.has(k) ? "#ffd36b" : "#c7ccd6", stroke: "#181b23", "stroke-width": 1 });
+    // 押せる交差点は、見た目より大きい透明な当たり判定を下に敷く(スマホで指で押しやすく。円そのものも押せる)。ビルも押せる場面では、ビルの角にかからない大きさにする
+    if (canI.has(k)) { const hit = el("circle", { cx: X, cy: Y, r: canB.size ? 18 : 26, fill: "transparent", style: "cursor:pointer" }); hit.addEventListener("click", () => tapI(g, k)); svg.append(hit); c.addEventListener("click", () => tapI(g, k)); }
     svg.append(c);
-    // 押せる交差点は、見た目より大きい透明な当たり判定を重ねる(スマホで指で押しやすく)
-    if (canI.has(k)) { const hit = el("circle", { cx: X, cy: Y, r: 26, fill: "transparent", style: "cursor:pointer" }); hit.addEventListener("click", () => tapI(g, k)); svg.append(hit); }
     if (hi >= 0) {
       const hg = el("g", { style: police && g.step === "police" && !g.acted.includes(hi) ? "cursor:pointer" : "" });
       hg.append(el("circle", { cx: X, cy: Y, r: 20, fill: local.h === hi ? "#3446c4" : g.acted.includes(hi) ? "#8a909c" : "#2a7de1", stroke: "#fff", "stroke-width": 2.5 }));
