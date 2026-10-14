@@ -16,7 +16,7 @@ const http = require("http");
 const ROOT = path.join(__dirname, ".."), PORT = 3123, SHOTS = path.join(__dirname, ".shots");
 const SKIP = new Set(["run.js", "noguide.js"]);
 // 時間のかかるテスト(全ゲームを順に開くなど)は長めに待つ
-const SLOW = { "lobby_all.js": 1500, "audit.js": 600, "party_fix2.js": 300 };
+const SLOW = { "lobby_all.js": 2400, "audit.js": 600, "party_fix2.js": 300 };
 const args = process.argv.slice(2), coreOnly = args.includes("--core"), uiOnly = args.includes("--ui"), filters = args.filter((a) => !a.startsWith("--"));
 
 const usesBrowser = (f) => /playwright/.test(fs.readFileSync(path.join(__dirname, f), "utf8"));
