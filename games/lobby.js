@@ -19,7 +19,7 @@ const GAMES = [
   ["tier", "みんなでティア表", "TI", 2, 12], ["number", "かくれナンバー", "NU", 2, 12], ["liar", "ウソつき酒場", "LI", 2, 6], ["shotgun", "散弾ルーレット", "SG", 2, 6],
   ["insider", "インサイダー", "IN", 4, 8], ["coyote", "コヨーテ", "CO", 2, 10], ["guessclub", "ゲスクラブ", "GC", 2, 8], ["matchy", "マッチィマッチ", "MM", 3, 8],
   ["eshiri", "絵しりとり", "ES", 2, 8], ["challengers", "チャレンジャーズ", "CH", 2, 8], ["eldorado", "エルドラドを目指して", "EL", 2, 4], ["heat", "ヒート", "HE", 2, 6],
-  ["monopoly", "不動産王", "MO", 2, 8], ["citychase", "シティチェイス", "CC", 2, 4], ["mortar", "モーターメイヘム", "MT", 1, 8], ["bombanana", "ボムバナナ", "BB", 3, 3],
+  ["monopoly", "不動産王", "MO", 2, 8], ["citychase", "シティチェイス", "CC", 2, 4], ["oriflamme", "オリフラム", "OR", 2, 5], ["mortar", "モーターメイヘム", "MT", 1, 8], ["bombanana", "ボムバナナ", "BB", 3, 3],
   ["bridge", "ひとりじめ橋", "BR", 2, 8], ["bomb", "爆弾回し", "BO", 2, 8], ["memory", "おぼえて料理", "ME", 2, 8], ["party", "ドタバタ大会", "PA", 2, 8],
 ].map(([key, name, suffix, min, max]) => ({ key, name, suffix, min, max }));
 // ゲームの説明(1文目)・目安時間・分類は、トップページのカードから読む(説明を2か所に書かない)

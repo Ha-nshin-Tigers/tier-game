@@ -22,6 +22,7 @@ const eldorado = require("./games/eldorado"); // エルドラドを目指して(
 const guessclub = require("./games/guessclub"); // ゲスクラブ(/guessclub)
 const mortar = require("./games/mortar"); // モーターメイヘム(/mortar)
 const citychase = require("./games/citychase"); // シティチェイス(/citychase)
+const oriflamme = require("./games/oriflamme"); // オリフラム(/oriflamme)
 const matchy = require("./games/matchy"); // マッチィマッチ(/matchy)
 const lobby = require("./games/lobby"); // パーティー: みんなでゲームを移動する(/lobby)
 const chat = require("./games/chat"); // 全ゲーム共通の文字チャット
@@ -559,7 +560,7 @@ const PAGES = {
   "/coyote": "coyote.html", "/coyote/": "coyote.html",
   "/challengers": "challengers.html", "/challengers/": "challengers.html",
   "/eldorado": "eldorado.html", "/eldorado/": "eldorado.html",
-  "/guessclub": "guessclub.html", "/guessclub/": "guessclub.html", "/mortar": "mortar.html", "/mortar/": "mortar.html", "/citychase": "citychase.html", "/citychase/": "citychase.html", "/matchy": "matchy.html", "/matchy/": "matchy.html", "/lobby": "lobby.html", "/lobby/": "lobby.html", "/bombanana": "bombanana.html", "/bombanana/": "bombanana.html",
+  "/guessclub": "guessclub.html", "/guessclub/": "guessclub.html", "/mortar": "mortar.html", "/mortar/": "mortar.html", "/citychase": "citychase.html", "/citychase/": "citychase.html", "/oriflamme": "oriflamme.html", "/oriflamme/": "oriflamme.html", "/matchy": "matchy.html", "/matchy/": "matchy.html", "/lobby": "lobby.html", "/lobby/": "lobby.html", "/bombanana": "bombanana.html", "/bombanana/": "bombanana.html",
   "/heat": "heat.html", "/heat/": "heat.html",
   "/party": "party.html", "/party/": "party.html",
   // ミニゲームを単独で遊ぶページ(画面は大会と共通。URL で遊び方を切り替える)
@@ -669,7 +670,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 // WebSocket の振り分け: 各ゲーム専用の接続はそれぞれへ、それ以外はこれまで通りティア表へ
 server.on("upgrade", (req, socket, head) => {
   const p = new URL(req.url, "http://x").pathname;
-  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : p === chat.WS_PATH ? chat.wss : p === bombanana.WS_PATH ? bombanana.wss : wss;
+  const target = p === number.WS_PATH ? number.wss : p === liar.WS_PATH ? liar.wss : p === party.WS_PATH ? party.wss : p === shotgun.WS_PATH ? shotgun.wss : p === eshiri.WS_PATH ? eshiri.wss : p === monopoly.WS_PATH ? monopoly.wss : p === insider.WS_PATH ? insider.wss : p === coyote.WS_PATH ? coyote.wss : p === challengers.WS_PATH ? challengers.wss : p === eldorado.WS_PATH ? eldorado.wss : p === guessclub.WS_PATH ? guessclub.wss : p === heat.WS_PATH ? heat.wss : p === mortar.WS_PATH ? mortar.wss : p === citychase.WS_PATH ? citychase.wss : p === oriflamme.WS_PATH ? oriflamme.wss : p === matchy.WS_PATH ? matchy.wss : p === lobby.WS_PATH ? lobby.wss : p === chat.WS_PATH ? chat.wss : p === bombanana.WS_PATH ? bombanana.wss : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 wss.on("connection", (ws) => {
@@ -708,7 +709,7 @@ party.setNumberTopics(number.TOPICS);
 
 // 文字チャットは、その部屋(パーティー)のメンバーだけが読み書きできる
 {
-  const MODS = { tier: { rooms }, number, liar, party, bridge: party, bomb: party, memory: party, shotgun, eshiri, monopoly, insider, coyote, challengers, eldorado, guessclub, heat, mortar, citychase, matchy, bombanana };
+  const MODS = { tier: { rooms }, number, liar, party, bridge: party, bomb: party, memory: party, shotgun, eshiri, monopoly, insider, coyote, challengers, eldorado, guessclub, heat, mortar, citychase, oriflamme, matchy, bombanana };
   chat.setVerify((page, code, pid, token) => {
     // ドタバタ大会・単独のミニゲーム(party.js)は、部屋を「ページ名:コード」で持っている
     const key = MODS[page] === party ? page + ":" + code : code;
@@ -723,7 +724,7 @@ let stopping = false;
 async function shutdown(sig) {
   if (stopping) return; stopping = true;
   const msg = { t: "info", maint: true, msg: "🔧 サーバを更新します。数十秒〜1分ほどで自動でつながり直します(遊んでいる途中のゲームは終わります。パーティーと通算成績は残ります)" };
-  const all = [wss, number.wss, liar.wss, party.wss, shotgun.wss, eshiri.wss, monopoly.wss, insider.wss, coyote.wss, challengers.wss, eldorado.wss, guessclub.wss, heat.wss, mortar.wss, citychase.wss, matchy.wss, lobby.wss, bombanana.wss];
+  const all = [wss, number.wss, liar.wss, party.wss, shotgun.wss, eshiri.wss, monopoly.wss, insider.wss, coyote.wss, challengers.wss, eldorado.wss, guessclub.wss, heat.wss, mortar.wss, citychase.wss, oriflamme.wss, matchy.wss, lobby.wss, bombanana.wss];
   for (const w of all) for (const c of w.clients) try { if (c.readyState === 1) c.send(JSON.stringify(msg)); } catch {}
   console.log(`${sig}: 止まる前にパーティーを保存します`);
   try { await Promise.race([lobby.saveNow(), new Promise((r) => setTimeout(r, 4000))]); } catch {}

@@ -1,6 +1,6 @@
 const { chromium } = require("playwright-core");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const pages = ["", "lobby", "tier", "number", "liar", "shotgun", "insider", "coyote", "guessclub", "matchy", "eshiri", "challengers", "eldorado", "heat", "monopoly", "citychase", "mortar", "bridge", "bomb", "memory", "party"];
+const pages = ["", "lobby", "tier", "number", "liar", "shotgun", "insider", "coyote", "guessclub", "matchy", "eshiri", "challengers", "eldorado", "heat", "monopoly", "citychase", "oriflamme", "mortar", "bridge", "bomb", "memory", "party"];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   for (const vp of [{ width: 360, height: 640 }, { width: 1280, height: 800 }]) {

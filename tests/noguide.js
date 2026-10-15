@@ -4,6 +4,6 @@ const orig = pw.chromium.launch.bind(pw.chromium);
 pw.chromium.launch = async (...a) => {
   const b = await orig(...a);
   const nc = b.newContext.bind(b);
-  b.newContext = async (...o) => { const ctx = await nc(...o); await ctx.addInitScript(() => { for (const k of ["tier", "number", "liar", "shotgun", "insider", "coyote", "guessclub", "matchy", "eshiri", "challengers", "eldorado", "heat", "monopoly", "citychase", "mortar", "bridge", "bomb", "memory", "bombanana"]) try { localStorage.setItem("tier:guide:seen:" + k, "1"); } catch {} }); return ctx; };
+  b.newContext = async (...o) => { const ctx = await nc(...o); await ctx.addInitScript(() => { for (const k of ["tier", "number", "liar", "shotgun", "insider", "coyote", "guessclub", "matchy", "eshiri", "challengers", "eldorado", "heat", "monopoly", "citychase", "oriflamme", "mortar", "bridge", "bomb", "memory", "bombanana"]) try { localStorage.setItem("tier:guide:seen:" + k, "1"); } catch {} }); return ctx; };
   return b;
 };

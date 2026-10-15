@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>オリフラム（Oriflamme）</title>
+<meta name="description" content="王位をねらう名家どうしの、伏せカードの読み合い。カードを伏せて列に並べ、左から順に「公開して能力を使う」か「伏せたまま影響力をためる」かを選ぶ。6ラウンド後に影響力がいちばん多い家の勝ち。">
+<meta name="theme-color" content="#3446c4">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="みんなのあそびば">
+<meta property="og:title" content="オリフラム（Oriflamme）">
+<meta property="og:description" content="王位をねらう名家どうしの、伏せカードの読み合い。カードを伏せて列に並べ、左から順に「公開して能力を使う」か「伏せたまま影響力をためる」かを選ぶ。6ラウンド後に影響力がいちばん多い家の勝ち。">
+<meta property="og:image" content="%%ORIGIN%%/icons/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=列(カードの並び)と手札と操作、下=プレイヤーと招待 */
+:root {
+  --bg: #ece8e1; --surface: #ffffff; --fg: #1d1a18; --muted: #5e5852; --line: #d6cfc5; --accent: #8a2b2b;
+  --ink: #1d1a18; --gold: #e2b545; --good: #1f8a4c; --bad: #c4323a; --felt: #2f3b2f;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15130f; --surface: #201d19; --fg: #efeae3; --muted: #aba297; --line: #3a352e; --accent: #e58b7c; --good: #5fd28f; --bad: #ff7b82; --felt: #1d261d; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--bg); } }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+.say.good { color: var(--good); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+
+/* 列(テーブル) */
+.table { background: var(--felt); border-radius: 12px; padding: 12px 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.row { display: flex; gap: 6px; align-items: stretch; width: max-content; min-width: 100%; justify-content: center; padding: 4px 2px; }
+.row .empty { color: #d9d3c4; font-size: 14px; padding: 40px 12px; }
+.slot { width: 34px; flex: none; border: 2px dashed #e2b545; border-radius: 8px; background: rgba(226,181,69,.15); color: #f6e7b5; font-size: 12px; font-weight: 700; padding: 0; writing-mode: vertical-rl; letter-spacing: .1em; cursor: pointer; animation: pulse 1.2s ease-in-out infinite; }
+.stack { position: relative; flex: none; }
+.card { position: relative; width: 104px; min-height: 148px; border-radius: 9px; border: 3px solid var(--fam); background: #fbf7ef; color: #1d1a18; padding: 6px 7px 8px; display: grid; grid-template-rows: auto auto auto 1fr; align-content: start; gap: 2px; text-align: left; font-family: var(--body); font-weight: 500; box-shadow: 0 2px 0 rgba(0,0,0,.35); cursor: default; }
+.card .fam { height: 6px; border-radius: 3px; background: var(--fam); }
+.card .ic { font-size: 26px; line-height: 1.1; text-align: center; }
+.card .nm { font-family: var(--display); font-size: 15px; text-align: center; line-height: 1.2; }
+.card .tx { font-size: 10.5px; line-height: 1.35; color: #4b4540; }
+.card.back { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fam) 75%, #000) 0 8px, color-mix(in srgb, var(--fam) 55%, #000) 8px 16px); color: #fff; place-items: center; grid-template-rows: 1fr auto; }
+.card.back .q { font-family: var(--display); font-size: 30px; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.card.back.mine { outline: 2px dashed #fff; outline-offset: -7px; }
+.card.back .peek { font-size: 11px; font-weight: 700; background: rgba(0,0,0,.55); border-radius: 4px; padding: 1px 6px; text-align: center; }
+.card .who { position: absolute; left: 0; right: 0; bottom: -20px; text-align: center; font-size: 11px; font-weight: 700; color: #f2ecdf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stack { padding-bottom: 20px; }
+.tok { position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; border-radius: 13px; background: var(--gold); color: #1d1a18; font-weight: 700; font-size: 13px; display: grid; place-items: center; border: 2px solid #1d1a18; padding: 0 5px; z-index: 2; }
+.under { position: absolute; top: -8px; left: -6px; font-size: 10px; font-weight: 700; background: #1d1a18; color: #fff; border-radius: 4px; padding: 0 5px; z-index: 2; }
+.stack.cur .card { box-shadow: 0 0 0 4px #ffd36b, 0 0 18px #ffd36b; }
+.stack.done .card { filter: saturate(.75) brightness(.92); }
+.stack.can { cursor: pointer; } .stack.can .card { cursor: pointer; box-shadow: 0 0 0 4px #ff7b6b; animation: pulse 1.2s ease-in-out infinite; }
+.stack.hit .card { box-shadow: 0 0 0 4px #ff4d4d; }
+@keyframes pulse { 50% { opacity: .65; } }
+/* 手札 */
+.hand { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch; }
+.hand .card { cursor: pointer; flex: none; align-content: start; } /* 縮めずに横スクロール(スマホで文字がつぶれないように) */
+.hand .card.sel { transform: translateY(-6px); box-shadow: 0 0 0 4px var(--accent), 0 6px 0 rgba(0,0,0,.3); }
+.hand button.card { padding: 6px 7px 8px; }
+.act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.ref { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.ref li { font-size: 13px; padding: 6px 8px; border: 1.5px solid var(--line); border-radius: 8px; }
+.ref b { font-family: var(--display); font-weight: 400; }
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pinfo b { font-size: 15px; color: var(--fg); }
+.pextra { grid-column: 2 / -1; font-size: 11.5px; color: var(--muted); }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 200px; overflow: auto; }
+.rank { width: 100%; border-collapse: collapse; font-size: 15px; } .rank td { padding: 5px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.rank td.n { font-family: var(--display); text-align: right; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; animation: pop .25s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (max-width: 520px) {
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .card { width: 88px; min-height: 128px; }
+  .card .tx { font-size: 9.5px; }
+  .card .ic { font-size: 22px; }
+  .card .nm { font-size: 13.5px; }
+}
+</style>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">伏せたカードで、王位を奪いあう</div><h1>オリフラム <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（Oriflamme）</small></h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">伏せたカードで、王位を奪いあう</div><h1>オリフラム <small style="font-size:.55em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（Oriflamme）</small></h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+const { $, h, store, rnd, Sound, twoStep, saveName, COLORS, player, nameOf, isGM, remaining, send, chip } = TG; // 全ページ共通の部品(public/js/common.js)
+
+// ---- 端末ごとの保存(本人確認用ID・名前・音はほかのゲームと共通) ----
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/oriflamme/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("oriflamme:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/oriflamme?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (!el) return toast(msg); el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); if (warn) toast(msg); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null;
+  store.set("oriflamme:last", { room: "", name: myName });
+  history.replaceState(null, "", "/oriflamme");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("oriflamme:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+// ---- 共通 ----
+const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const act = (a, x = {}) => send({ t: "game", a, ...x });
+// カードの絵(絵文字)。カード名と能力の文はサーバから届く(S.cards)
+const ICON = { archer: "🏹", soldier: "⚔️", spy: "🕵️", heir: "👑", assassination: "🗡️", decree: "📜", lord: "🏰", shapeshifter: "🎭", ambush: "🪤", conspiracy: "🕯️" };
+const ORDER = ["archer", "soldier", "spy", "heir", "assassination", "decree", "lord", "shapeshifter", "ambush", "conspiracy"];
+let local = { sel: null };
+const cardName = (k) => S.cards?.[k]?.name || k;
+
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (!g || !pg) return;
+  const myTurn = (x) => (x.step === "place" && x.placer === me) || (x.pending && x.pending.by === me);
+  if (myTurn(g) && !myTurn(pg)) Sound.play("turn");
+  if (g.last && JSON.stringify(g.last) !== JSON.stringify(pg.last)) {
+    if (g.last.type === "reveal") Sound.play("reveal");
+    else if (g.last.type === "elim" || g.last.type === "spy") Sound.play("done");
+    else Sound.play("tap");
+  }
+  if (g.step === "end" && pg.step !== "end") Sound.play("reveal");
+  if (g.step !== "place" || g.placer !== me) local.sel = null;
+}
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  const g = S.game;
+  if (g && local.sel != null && !(g.hand || []).some((c) => c.id === local.sel)) local.sel = null;
+  renderMeta(); renderSide(); renderMain();
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g && g.step !== "end" && g.round) m.append(h("span", { class: "pill" }, `ラウンド${g.round}/${g.rounds}・${g.step === "place" ? "配置" : "解決"}`));
+}
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  const g = S.game;
+  side.append(h("h2", {}, g ? "名家(プレイヤー)" : "プレイヤー"));
+  const ul = h("ul", { class: "players" });
+  if (g) {
+    for (const id of g.order) {
+      const pl = g.players[id], off = player(id) && !player(id).connected;
+      const turn = (g.step === "place" && g.placer === id) || (g.pending && g.pending.by === id);
+      const li = h("li", { class: (turn ? "cur" : "") + (off ? " off" : "") }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
+        h("span", { class: "pname" }, (turn ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : "") + (off ? "(切断中)" : ""), g.order[g.first] === id && g.step !== "end" ? h("span", { class: "tag" }, "先手") : null),
+        h("span", { class: "pinfo" }, "影響力 ", h("b", {}, String(pl.inf)), `・手札${pl.hand}`),
+        pl.discard.length ? h("span", { class: "pextra" }, "捨て札: " + pl.discard.map(cardName).join("・")) : null);
+      if (off && isGM() && id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+  } else {
+    for (const p of S.players) {
+      const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+      if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+      const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm, h("span", { class: "pinfo" }, p.connected ? "" : "切断中"));
+      if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+  }
+  side.append(ul);
+  const link = location.origin + "/oriflamme?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  if (g?.log?.length) side.append(h("details", { open: true }, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM() && S.game?.step !== "end") btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+
+// カード1枚の絵。k が null なら裏向き(持ち主の色の模様)
+function cardEl(k, owner, opts = {}) {
+  const fam = colorOf(owner);
+  if (!k || opts.back) {
+    return h("div", { class: "card back" + (opts.mine ? " mine" : ""), style: `--fam:${fam}`, title: k ? `伏せたカード(あなたの${cardName(k)})` : "伏せたカード" },
+      h("div", { class: "q" }, "?"), k ? h("div", { class: "peek" }, ICON[k] + " " + cardName(k)) : h("div", {}),
+      opts.who ? h("div", { class: "who" }, opts.who) : null);
+  }
+  const d = S.cards[k];
+  return h(opts.button ? "button" : "div", { type: opts.button ? "button" : undefined, class: "card" + (opts.sel ? " sel" : ""), style: `--fam:${fam}`, onclick: opts.onclick, "aria-pressed": opts.button ? (opts.sel ? "true" : "false") : undefined },
+    h("div", { class: "fam" }), h("div", { class: "ic" }, ICON[k]), h("div", { class: "nm" }, d.name), h("div", { class: "tx" }, d.text),
+    opts.who ? h("div", { class: "who" }, opts.who) : null);
+}
+
+function renderMain() {
+  const main = $("main"); main.replaceChildren();
+  if (S.phase === "lobby") return renderLobby(main);
+  const g = S.game; if (!g) return;
+  const pd = g.pending, mine = pd && pd.by === me;
+  const curStack = g.queue.find((s) => s.id === g.cur);
+  let say;
+  if (g.step === "end") say = "ゲーム終了";
+  else if (g.step === "place") say = g.placer === me ? "あなたの番: 手札を1枚選んで、列に置いてください" : `${nameOf(g.placer)} さんがカードを置いています`;
+  else if (!pd) say = "解決中…";
+  else if (pd.type === "reveal") say = mine ? "あなたのカードの番: 公開しますか？" : `${nameOf(pd.by)} さんが、公開するか考えています`;
+  else if (pd.type === "target") say = mine ? `「${cardName(pd.as)}」の対象を選んでください(光っているカード)` : `${nameOf(pd.by)} さんが「${cardName(pd.as)}」の対象を選んでいます`;
+  else say = mine ? "「勅令」: 動かす先を選んでください(光っている「ここへ」)" : `${nameOf(pd.by)} さんが「勅令」で動かす先を選んでいます`;
+  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say),
+    remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null));
+
+  if (g.step === "end") renderResult(main, g);
+
+  // 列
+  main.append(h("div", { class: "small muted", style: "margin:0" }, g.step === "end" ? "最後の列(全部のカードを表にしています)" : `列: ${g.dir === "L" ? "左から右へ ➡" : "⬅ 右から左へ"} 順に解決します(このゲームのあいだ同じ向き)。● はカードの上にたまった影響力`));
+  main.append(tableEl(g));
+
+  // 操作
+  if (g.step === "place" && g.placer === me) {
+    const sel = local.sel;
+    main.append(h("div", { class: "act" },
+      h("button", { type: "button", class: "primary", disabled: sel == null, onclick: () => act("place", { card: sel, where: "L" }) }, "← 左端に置く"),
+      h("button", { type: "button", class: "primary", disabled: sel == null, onclick: () => act("place", { card: sel, where: "R" }) }, "右端に置く →")),
+      h("p", { class: "small muted", style: "text-align:center;margin:0" }, sel == null ? "まず下の手札から1枚選んでください。" : "左端・右端のほか、列の光っている自分のカードを押すと、その上に重ねて置けます(下のカードは隠れます)。"));
+  }
+  if (pd && pd.type === "reveal" && mine && curStack) {
+    const k = curStack.top.k;
+    main.append(h("div", { class: "act" },
+      h("button", { type: "button", class: "primary big", onclick: () => act("decide", { reveal: true }) }, `公開する(${cardName(k)})`),
+      h("button", { type: "button", class: "big", onclick: () => act("decide", { reveal: false }) }, "伏せたまま(影響力+1を上に置く)")),
+      h("p", { class: "small muted", style: "text-align:center;margin:0" }, k === "ambush" ? `待ち伏せは公開すると影響力+1(上の${curStack.top.inf}はもらえず捨てる)。伏せたままにすると上に影響力が1たまります(相手に排除されたら+4)。` : `公開すると、上にたまった影響力${curStack.top.inf}${k === "conspiracy" ? "の2倍" : ""}をもらってから能力を使います。伏せたままにすると、上に影響力が1たまります。`));
+  }
+  // 手札
+  if (g.hand) {
+    main.append(h("h2", { style: "font-size:16px" }, g.step === "end" ? `使わなかった手札(${g.hand.length}枚)` : `あなたの手札(${g.hand.length}枚)`));
+    const canPick = g.step === "place" && g.placer === me;
+    main.append(h("div", { class: "hand" }, ...[...g.hand].sort((a, b) => ORDER.indexOf(a.k) - ORDER.indexOf(b.k)).map((c) => cardEl(c.k, me, { button: true, sel: local.sel === c.id, onclick: () => { if (!canPick) return; local.sel = local.sel === c.id ? null : c.id; render(); } }))),
+      g.hand.length && !canPick && g.step === "place" ? h("p", { class: "small muted", style: "margin:0" }, "自分の番になったら、ここから1枚選んで置きます。") : null);
+  } else if (g.step !== "end") main.append(h("p", { class: "muted small" }, "観戦中です。"));
+  main.append(h("details", {}, h("summary", { class: "small" }, "カードの一覧(10種類・各家に1枚ずつ)"),
+    h("ul", { class: "ref" }, ...ORDER.map((k) => h("li", {}, ICON[k], " ", h("b", {}, S.cards[k].name), ": ", S.cards[k].text)))));
+}
+// 列の描画。押せる山(対象・重ねる先)と、勅令の置き場所(山のすきま)
+function tableEl(g) {
+  const pd = g.pending, mine = pd && pd.by === me;
+  const row = h("div", { class: "row" });
+  const canStack = (s) => (g.step === "place" && g.placer === me && local.sel != null && s.top.owner === me) || (mine && pd.type === "target" && pd.options.includes(s.id));
+  const tapStack = (s) => {
+    if (g.step === "place") return act("place", { card: local.sel, where: s.id });
+    if (pd && pd.type === "target") return act("target", { sid: s.id });
+  };
+  // 勅令の置き場所: 動かすカードを抜いたあとの列(pd.rest)で何番目に入れるか。画面では山のあいだに「ここへ」を出す
+  const moving = mine && pd.type === "move";
+  const rest = moving ? pd.rest : [];
+  const slot = (i) => moving && pd.positions.includes(i) ? h("button", { type: "button", class: "slot", "aria-label": `${i + 1}番目へ動かす`, onclick: () => act("target", { pos: i }) }, "ここへ") : null;
+  if (!g.queue.length) row.append(h("div", { class: "empty" }, "まだカードがありません"));
+  for (const s of g.queue) {
+    if (moving && rest.includes(s.id)) row.append(slot(rest.indexOf(s.id)));
+    const t = s.top, isMine = t.owner === me;
+    const can = canStack(s);
+    const lastHit = g.last && (g.last.tid === s.id) && g.step !== "end";
+    const st = h("div", { class: "stack" + (s.id === g.cur ? " cur" : "") + (g.done.includes(s.id) && s.id !== g.cur ? " done" : "") + (can ? " can" : "") + (moving && s.id === pd.tid ? " hit" : "") + (lastHit ? " hit" : ""),
+      role: can ? "button" : undefined, tabindex: can ? "0" : undefined, "aria-label": can ? (g.step === "place" ? "このカードの上に重ねる" : "このカードを選ぶ") : undefined,
+      onclick: can ? () => tapStack(s) : undefined, onkeydown: can ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapStack(s); } } : undefined },
+      // 終了後は伏せたカードも表にして見せる(「伏せ」の印つき)
+      t.up || g.step === "end" ? cardEl(t.k, t.owner, { who: nameOf(t.owner) + (t.up ? "" : "(伏せ)") }) : cardEl(t.k, t.owner, { back: true, mine: isMine, who: nameOf(t.owner) }),
+      !t.up && t.inf ? h("span", { class: "tok", title: "上にたまった影響力" }, "●" + t.inf) : null,
+      s.under.length ? h("span", { class: "under", title: s.under.map((u) => u.k ? cardName(u.k) + (u.up ? "(表)" : "(伏せ)") : "伏せたカード").join("・") }, `下に${s.under.length}枚`) : null);
+    row.append(st);
+  }
+  if (moving) row.append(slot(rest.length));
+  return h("div", { class: "table" }, row);
+}
+function renderResult(main, g) {
+  const rows = S.ranking || [];
+  main.append(h("table", { class: "rank" }, h("tbody", {}, ...rows.map((r) => h("tr", { class: r.id === me ? "me" : "" },
+    h("td", {}, r.rank === 1 ? "🏆 1位" : `${r.rank}位`), h("td", {}, h("span", { class: "sw2", style: `display:inline-block;margin-right:6px;background:${colorOf(r.id)}` }), r.name), h("td", { class: "n" }, `影響力 ${r.raw}`, rows.some((x) => x !== r && x.raw === r.raw) ? h("div", { class: "small muted" }, `列のカード${r.tie}枚`) : null))))),
+    h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+}
+function renderLobby(main) {
+  const st = S.settings, gm = isGM();
+  const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); send({ t: "settings", s: { [key]: o[0] } });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected);
+  main.append(h("h2", {}, "遊び方"),
+    h("ol", { class: "rules" },
+      h("li", {}, "みんな同じ10種類のカード(自分の家の色)から、ランダムに3枚を除いた7枚が手札になります。全6ラウンドで、影響力(点数)をいちばん多く集めた家の勝ち。最初の影響力は1。"),
+      h("li", {}, "配置: 先手から順に、手札を1枚ずつ伏せたまま「列」の左端か右端に置きます(あいだには置けません)。2ラウンド目からは、自分のカードの上に重ねて置くこともできます(下のカードは隠れて何もできず、上がなくなるとまた有効に)。"),
+      h("li", {}, "解決: 列の端から順に(向きは最初に決めて最後まで同じ)、伏せたカードの持ち主は「公開する」か「伏せたまま」を選びます。公開すると、上にたまった影響力をもらってから能力を使います。伏せたままなら、上に影響力が1たまります。"),
+      h("li", {}, "表向きのカードは、次のラウンドからも番が来るたびに能力を使います。能力は必ず使います(ほかに対象がなければ自分のカードでも)。"),
+      h("li", {}, "カードを「排除」した人は影響力+1(自分のカードでも)。排除されたカードの上の影響力はなくなります。伏せた「待ち伏せ」を相手が排除すると、待ち伏せの持ち主が+4で、排除したカードも捨て札に。"),
+      h("li", {}, "毎ラウンド先手は次の人へ。6ラウンド後(手札は1枚残ります)、影響力がいちばん多い人の勝ち。同点なら列に残っている自分のカードが多い人の勝ち。")),
+    h("details", {}, h("summary", { class: "small" }, "カードの一覧(10種類)"), h("ul", { class: "ref" }, ...ORDER.map((k) => h("li", {}, ICON[k], " ", h("b", {}, S.cards[k].name), ": ", S.cards[k].text)))),
+    h("div", { class: "settings" },
+      sel("カードを置く持ち時間", "placeSecs", [[60, "60秒"], [30, "30秒"], [90, "90秒"], [0, "なし"]]),
+      sel("公開・対象を選ぶ持ち時間", "actSecs", [[45, "45秒"], [30, "30秒"], [90, "90秒"], [0, "なし"]]),
+      sel("解決の向き", "dir", [["L", "左から右へ"], ["R", "右から左へ"], ["random", "ランダム"]])),
+    h("p", { class: "muted small" }, "3〜5人のゲーム(2人でも同じルールで遊べます)。約25分。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live.length < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live.length < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live.length > 5 ? "先に入った5人で始めます(ほかの人は観戦)" : `${live.length}人で始められます`)));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  if (r !== lastSec) { lastSec = r; const g = S.game; if (g && ((g.step === "place" && g.placer === me) || (g.pending && g.pending.by === me)) && r != null && r <= 5 && r >= 1) Sound.play("tick"); }
+}, 250);
+
+connect();
+</script>
+<script src="/js/partybar.js" defer></script>
+</body>
+</html>
