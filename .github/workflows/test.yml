@@ -20,6 +20,8 @@ jobs:
       - run: npm ci
       # ブラウザのテスト用の Chromium(playwright-core と同じ版)
       - run: npx playwright-core install --with-deps chromium
+      # 日本語フォント(無いと文字の高さが変わって画面の配置がずれ、3Dの操作のテストが手元と違う結果になる)
+      - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       # ブラウザを使わないテスト(速い)を先に
       - run: npm run test:core
       - run: npm run test:ui

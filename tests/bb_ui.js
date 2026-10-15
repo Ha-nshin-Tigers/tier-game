@@ -49,7 +49,11 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   }, idx);
   let pos = null;
   for (let t = 0; t < 12; t++) {
+    // 舞台を画面の真ん中へ(文字の大きさが違う環境では、舞台が画面の下にはみ出してケーブルを触れないことがある)
+    await A.evaluate(() => document.getElementById("stage").scrollIntoView({ block: "center" })); await sleep(150);
     pos = await where(idx);
+    const vp = A.viewportSize();
+    if (pos.x < 0 || pos.y < 0 || pos.x > vp.width || pos.y > vp.height) console.log("  (ケーブルの位置が画面の外:", JSON.stringify(pos), ")");
     await A.mouse.move(pos.x - 3, pos.y); await A.mouse.move(pos.x, pos.y); await sleep(300);
     if ((await A.locator("#readout").textContent()).includes(`奥から${idx + 1}本目`)) break;
     await sleep(400);
