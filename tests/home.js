@@ -6,7 +6,7 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("http://localhost:3123/");
   const vis = () => p.evaluate(() => [...document.querySelectorAll("#groups a.game")].map((a) => a.getAttribute("href")));
-  check((await vis()).length === 20 && await p.locator("#groups h2").count() === 5, "最初は全20本を5つの分類で表示");
+  check((await vis()).length === 21 && await p.locator("#groups h2").count() === 5, "最初は全21本を5つの分類で表示");
   await p.screenshot({ path: "h1_all_sp.png", fullPage: true });
   await p.selectOption("#fPeople", "10");
   check(JSON.stringify(await vis()) === JSON.stringify(["/tier", "/number", "/coyote"]), "10人: ティア表・かくれナンバー・コヨーテだけ");
