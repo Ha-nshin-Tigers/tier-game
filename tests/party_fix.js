@@ -10,7 +10,7 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   await A.goto("http://localhost:3123/lobby"); await A.fill("#jName", "あき"); await A.click("#jCreate"); await sleep(800);
   const code = await A.evaluate(() => Party.state.code);
   for (const [p, n] of [[B, "べに"], [C, "ちか"]]) { await p.goto("http://localhost:3123/lobby?code=" + code); await p.fill("#jName", n); await p.click("#jJoin"); await sleep(700); }
-  check(await B.locator(".games button").count() === 20, "ホスト以外にもゲームの一覧が見える");
+  check(await B.locator(".games button").count() === 21, "ホスト以外にもゲームの一覧が見える");
   check((await B.locator(".games button >> nth=0").textContent()).includes("。"), "ゲームに1行の説明がある");
   const bbText = await A.locator(".games button:has-text('ボムバナナ')").textContent();
   check(bbText.includes("3人・") && !bbText.includes("3〜3"), "「3〜3人」ではなく「3人」: " + bbText.slice(0, 30));

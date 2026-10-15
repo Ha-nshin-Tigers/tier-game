@@ -40,15 +40,24 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   const man = await C.evaluate(() => MANUAL.cable);
   const idx = m0.colors.indexOf(man[m0.n][m0.led]);
   await A.evaluate(() => scene3d.focus(0)); await sleep(400);
-  const pos = await A.evaluate((idx) => {
+  // カメラが寄り終わるのを待ってから、ケーブルの画面上の位置を求めて触る(遅い環境では寄る動きに時間がかかるので、読み上げが出るまで数回やり直す)
+  const where = (idx) => A.evaluate((idx) => {
     const st = scene3d._st, g = st.modGroups[0], cam = scene3d.camera, T = scene3d.three; let p = null;
     g.traverse((o) => { if (!p && o.isMesh && o.userData.pick && o.userData.pick.part === idx && o.geometry.type === "CylinderGeometry") { p = new T.Vector3(); o.getWorldPosition(p); } });
     p.project(cam); const r = document.getElementById("stage").getBoundingClientRect();
     return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height };
   }, idx);
-  await A.mouse.move(pos.x, pos.y); await sleep(300);
+  let pos = null;
+  for (let t = 0; t < 12; t++) {
+    pos = await where(idx);
+    await A.mouse.move(pos.x - 3, pos.y); await A.mouse.move(pos.x, pos.y); await sleep(300);
+    if ((await A.locator("#readout").textContent()).includes(`奥から${idx + 1}本目`)) break;
+    await sleep(400);
+  }
   check((await A.locator("#readout").textContent()).includes(`奥から${idx + 1}本目`), "触ると読み上げ(ケーブル何本目)");
-  await A.mouse.click(pos.x, pos.y); await sleep(800);
+  await A.mouse.click(pos.x, pos.y);
+  for (let t = 0; t < 20 && await A.evaluate(() => S.game.step) !== "clear"; t++) await sleep(200);
+  await sleep(300);
   check(await A.evaluate(() => S.game.step) === "clear", "3Dでクリックして正しいケーブルを切ると解除");
   check((await B.locator("#ov").textContent()).includes("解除成功"), "結果表示");
   await B.screenshot({ path: SH + "bb5_clear.png" });
