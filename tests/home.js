@@ -9,7 +9,7 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   check((await vis()).length === 22 && await p.locator("#groups h2").count() === 5, "最初は全22本を5つの分類で表示");
   await p.screenshot({ path: "h1_all_sp.png", fullPage: true });
   await p.selectOption("#fPeople", "10");
-  check(JSON.stringify(await vis()) === JSON.stringify(["/tier", "/number", "/coyote"]), "10人: ティア表・かくれナンバー・コヨーテだけ");
+  check(JSON.stringify(await vis()) === JSON.stringify(["/tier", "/number", "/dantier", "/coyote"]), "10人: ティア表・かくれナンバー・コヨーテ・ダンダンティアーだけ");
   await p.selectOption("#fPeople", "0"); await p.check("#fQuick");
   const q = await vis();
   check(!q.includes("/monopoly") && !q.includes("/tier") && !q.includes("/party") && q.includes("/eshiri"), "サクッと(20分以内): 不動産王・ティア表・大会は外れる " + q.join(","));
