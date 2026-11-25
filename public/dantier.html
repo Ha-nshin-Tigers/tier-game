@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ダンダンティアー（みんなでダンダンティアー！風）</title>
+<meta name="description" content="1人にだけ見える「秘密のランク」に合う言葉を出して、みんなで何ランクか当てる協力ゲーム。連続で当て続けたらクリア。みんなで1枚の表を作るモード・自分の表を当ててもらうモードも。">
+<meta name="theme-color" content="#3446c4">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あそびば">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="みんなのあそびば">
+<meta property="og:title" content="ダンダンティアー（みんなでダンダンティアー！風）">
+<meta property="og:description" content="1人にだけ見える「秘密のランク」に合う言葉を出して、みんなで何ランクか当てる協力ゲーム。">
+<meta property="og:image" content="%%ORIGIN%%/icons/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* レイアウト: 上=部屋と進行、中央=ティアー表と操作、下=プレイヤーと招待 */
+:root {
+  --bg: #eef0f6; --surface: #ffffff; --fg: #181b23; --muted: #596070; --line: #cfd4de; --accent: #3446c4;
+  --ink: #181b23; --gold: #f2c14e; --good: #1f8a4c; --bad: #c4323a;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #13151b; --surface: #1d2029; --fg: #eceef4; --muted: #a1a7b6; --line: #343947; --accent: #8f9cff; --good: #5fd28f; --bad: #ff7b82; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 1000px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); line-height: 1.2; margin: 0; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; border: 1.5px solid var(--fg); font-size: 12px; font-weight: 700; background: var(--surface); white-space: nowrap; }
+button.pill { cursor: pointer; font-family: var(--body); }
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); } .status.warn { color: var(--bad); }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.banner { position: fixed; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--fg); color: var(--surface); font-size: 13px; font-weight: 700; text-align: center; z-index: 30; }
+a { color: var(--accent); }
+body.playing .top h1 { font-size: 18px; } body.playing .top .eyebrow { display: none; }
+.login { max-width: 460px; margin: 6vh auto 0; } .login .panel { gap: 16px; }
+.or { text-align: center; font-size: 12px; color: var(--muted); }
+.code { font-family: var(--display); letter-spacing: .15em; text-transform: uppercase; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font-family: var(--body); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: 1.5px solid var(--fg); background: var(--surface); color: var(--fg); cursor: pointer; }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--bg); } }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--fg); color: var(--surface); }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.ghost { border-color: var(--line); font-weight: 500; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.big { font-size: 17px; padding: 11px 22px; }
+button.tiny { padding: 3px 9px; font-size: 12px; }
+input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
+.field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.settings select { width: 100%; min-width: 0; }
+.say { font-family: var(--display); font-size: 19px; line-height: 1.35; overflow-wrap: anywhere; }
+.say.good { color: var(--good); } .say.red { color: var(--bad); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
+.theme { font-family: var(--display); font-size: clamp(18px, 4.5vw, 24px); line-height: 1.3; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--gold) 30%, var(--surface)); border: 2px solid var(--fg); overflow-wrap: anywhere; }
+.theme small { display: block; font-family: var(--body); font-size: 12px; font-weight: 700; color: var(--muted); }
+.word { display: inline-block; font-family: var(--display); font-size: clamp(22px, 6vw, 32px); padding: 4px 14px; border-radius: 8px; background: var(--fg); color: var(--surface); overflow-wrap: anywhere; }
+.secret { display: inline-grid; place-items: center; min-width: 74px; height: 74px; padding: 0 10px; border-radius: 12px; font-family: var(--display); font-size: 40px; color: #181b23; border: 3px solid #181b23; }
+.meter { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.meter i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--fg); }
+.meter i.on { background: var(--gold); }
+/* ティアー表 */
+.tier { display: grid; gap: 3px; border-radius: 10px; overflow: hidden; border: 2px solid var(--fg); background: var(--fg); }
+.trow { display: grid; grid-template-columns: 64px minmax(0, 1fr); min-height: 52px; background: var(--surface); }
+.trow .lab { display: grid; place-items: center; font-family: var(--display); font-size: 22px; color: #181b23; }
+.trow .cells { display: flex; flex-wrap: wrap; gap: 5px; align-content: center; padding: 6px; min-width: 0; }
+.trow.can { cursor: pointer; } .trow.can .cells { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); }
+.trow.new .lab { animation: pop 0.6s ease-out; }
+.item { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; background: var(--bg); border: 1.5px solid var(--line); font-weight: 700; font-size: 14px; overflow-wrap: anywhere; max-width: 100%; }
+button.item { cursor: pointer; font-family: var(--body); }
+.item.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.item .ng { color: var(--bad); font-size: 12px; } /* はずれたラウンドの言葉(置き場所は正しいランク) */
+.item .by { font-size: 11px; color: var(--muted); font-weight: 500; }
+/* ランクを選ぶボタン */
+.ranks { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.ranks button { padding: 8px 4px; display: grid; gap: 2px; justify-items: center; font-family: var(--display); font-size: 20px; color: #181b23; border-width: 2px; }
+.ranks button.mine { box-shadow: 0 0 0 3px var(--accent); }
+.ranks button.gone { opacity: .25; text-decoration: line-through; }
+.ranks button .who { font-family: var(--body); font-size: 10.5px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranks.sm button { font-size: 15px; padding: 4px 2px; } .ranks.sm { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+.gitem { display: grid; gap: 4px; padding: 8px; border: 1.5px solid var(--line); border-radius: 8px; }
+.res { width: 100%; border-collapse: collapse; font-size: 13px; } .res td, .res th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: left; } .res .ok { color: var(--good); font-weight: 700; } .res .near { color: #b7791f; font-weight: 700; } .res .ng { color: var(--bad); }
+.verdict { padding: 10px 14px; border-radius: 8px; border: 2px solid var(--fg); font-family: var(--display); font-size: 20px; }
+.verdict.ok { background: color-mix(in srgb, var(--good) 20%, var(--surface)); } .verdict.ng { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
+.addrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
+/* プレイヤー */
+.players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.players li:last-child { border-bottom: none; }
+.players li.cur { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sw2 { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--fg); }
+.pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname .tag { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; margin-left: 6px; border: 1px solid currentColor; color: var(--accent); }
+.pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.off { opacity: .5; }
+.kick { grid-column: 2 / -1; justify-self: start; }
+.invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: grid; gap: 1px; max-height: 180px; overflow: auto; }
+.rank { width: 100%; border-collapse: collapse; font-size: 15px; } .rank td { padding: 5px 6px; border-bottom: 1px solid var(--line); } .rank tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); } .rank td.n { font-family: var(--display); text-align: right; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; }
+@keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+@media (max-width: 520px) {
+  body.playing .top h1 { font-size: 16px; }
+  .panel { padding: 10px; gap: 8px; }
+  .say { font-size: 17px; }
+  .trow { grid-template-columns: 48px minmax(0, 1fr); min-height: 44px; }
+  .trow .lab { font-size: 18px; }
+  .ranks { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+  .addrow { grid-template-columns: minmax(0, 1fr) auto; } .addrow button { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+<div class="banner" id="banner" hidden></div>
+<div class="login" id="login">
+  <div class="wrap">
+    <div><div class="eyebrow">秘密のランクを、みんなで当てろ</div><h1>ダンダンティアー <small style="font-size:.5em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（みんなでダンダンティアー！風）</small></h1></div>
+    <form class="panel" id="loginForm">
+      <label class="field">ニックネーム<input type="text" id="lName" maxlength="12" autocomplete="nickname" placeholder="例: たろう"></label>
+      <label class="field">部屋コード(友達から聞いたコード)<input type="text" id="lRoom" class="code" maxlength="6" autocomplete="off" placeholder="ABCD"></label>
+      <div class="btns"><button class="primary" type="submit" id="lJoin">この部屋に入る</button></div>
+      <div class="or">または</div>
+      <div class="btns"><button type="button" id="lCreate">新しい部屋を作る</button><span class="muted small">部屋コードが自動で決まります</span></div>
+      <p class="status" id="lMsg" aria-live="polite"></p>
+    </form>
+    <p class="small muted"><a href="/">← ゲームを選ぶ</a></p>
+  </div>
+</div>
+
+<div class="wrap" id="game" hidden>
+  <div class="top">
+    <div><div class="eyebrow">秘密のランクを、みんなで当てろ</div><h1>ダンダンティアー <small style="font-size:.5em;font-family:var(--body);font-weight:700;opacity:.75;white-space:nowrap">（みんなでダンダンティアー！風）</small></h1></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <main class="panel" id="main"></main>
+  <aside class="panel" id="side"></aside>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+const { $, h, store, rnd, Sound, twoStep, saveName, COLORS, player, nameOf, isGM, remaining, send, chip } = TG; // 全ページ共通の部品(public/js/common.js)
+
+let ident = store.get("tier:ident");
+if (!ident || !ident.pid || !ident.token) { ident = { pid: rnd(16), token: rnd(32) }; store.set("tier:ident", ident); }
+
+let ws = null, retry = 0, everOpen = false, wantRoom = null, myName = "", joined = false;
+let S = null, me = null, offset = 0;
+
+document.addEventListener("pointerdown", () => Sound.unlock());
+document.addEventListener("keydown", () => Sound.unlock());
+
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/dantier/ws");
+  const slow = setTimeout(() => showBanner("サーバを起動しています。初回は1分ほどかかることがあります…"), 2500);
+  ws.onopen = () => { clearTimeout(slow); retry = 0; everOpen = true; showBanner(""); if (wantRoom) send({ t: "join", room: wantRoom, name: myName, pid: ident.pid, token: ident.token }); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === "joined") {
+      joined = true; store.set("dantier:last", { room: m.room, name: myName }); saveName(myName);
+      history.replaceState(null, "", "/dantier?room=" + m.room);
+      $("login").hidden = true; $("game").hidden = false;
+    } else if (m.t === "state") {
+      const prev = S; S = m.room; me = m.me; offset = m.now - Date.now();
+      onTransition(prev, S); render();
+    } else if (m.t === "stamp") { const t = S?.stamps?.[m.i]; if (t) toast(`${nameOf(m.from)}「${t}」`); }
+    else if (m.t === "kicked") backToLogin("ホストによって部屋から退出しました", true);
+    else if (m.t === "error") { if (!joined) { $("lMsg").textContent = m.msg; $("lMsg").classList.add("warn"); wantRoom = null; setLoginBusy(false); } else flash(m.msg, true); }
+    else if (m.t === "info") flash(m.msg);
+  };
+  ws.onclose = () => { clearTimeout(slow); if (joined || wantRoom) showBanner(everOpen ? "接続が切れました。再接続しています…" : "サーバに接続しています…"); setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+}
+function showBanner(t) { $("banner").textContent = t; $("banner").hidden = !t; }
+let flashT;
+function flash(msg, warn) { const el = $("flashMsg"); if (warn) toast(msg); if (!el) return; el.textContent = msg; el.classList.toggle("warn", !!warn); clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ""; }, 6000); }
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const el = h("div", { class: "toast", role: "status" }, t); document.body.append(el); setTimeout(() => el.remove(), 2500); }
+
+function setLoginBusy(b) { $("lJoin").disabled = b; $("lCreate").disabled = b; }
+function backToLogin(msg, warn) {
+  joined = false; wantRoom = null; S = null;
+  store.set("dantier:last", { room: "", name: myName });
+  history.replaceState(null, "", "/dantier");
+  document.body.classList.remove("playing");
+  $("game").hidden = true; $("login").hidden = false; setLoginBusy(false);
+  $("lMsg").textContent = msg || ""; $("lMsg").classList.toggle("warn", !!warn);
+}
+function enter(code) {
+  const name = $("lName").value.trim().slice(0, 12);
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const msg = $("lMsg"); msg.classList.add("warn");
+  if (!name) { msg.textContent = "ニックネームを入れてください"; return; }
+  if (code.length < 4) { msg.textContent = "部屋コードは4〜6文字の英数字です"; return; }
+  msg.classList.remove("warn"); msg.textContent = "入室しています…";
+  myName = name; wantRoom = code; setLoginBusy(true);
+  send({ t: "join", room: code, name, pid: ident.pid, token: ident.token });
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); enter($("lRoom").value); });
+$("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"); $("lRoom").value = c; enter(c); });
+{
+  const last = store.get("dantier:last"), name = last?.name || store.get("tier:last")?.name;
+  const q = new URLSearchParams(location.search).get("room");
+  if (name) $("lName").value = name;
+  if (q) $("lRoom").value = q.toUpperCase().slice(0, 6);
+  if (last?.name && q && last.room === q.toUpperCase()) { myName = last.name; wantRoom = last.room; $("lMsg").textContent = "前回の部屋に戻っています…"; setLoginBusy(true); }
+}
+
+// ---- 共通 ----
+const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const act = (a, x = {}) => send({ t: "game", a, ...x });
+// ランクの色(上ほど赤く、下ほど青〜灰色)
+const RCOL = { SSS: "#ff4d79", SS: "#ff6b57", S: "#ff9a48", A: "#f7cf4a", B: "#b5dc5f", C: "#5ccf91", D: "#52b9e8", E: "#7b96ff", F: "#a88af0", G: "#b3b8c2" };
+const MODE = { secret: "本編(秘密のランクを当てる)", together: "みんなでティアー", mine: "じぶんのティアー" };
+let local = { sel: null, draft: "", rank: null, clue: "" };
+const isMember = () => !!S.game?.order.includes(me);
+
+function onTransition(prev, cur) {
+  if (!prev || prev.code !== cur.code) return;
+  if (cur.players.length > prev.players.length) Sound.play("join");
+  const g = cur.game, pg = prev.game;
+  if (!g || !pg) return;
+  if (g.step !== pg.step) {
+    if ((g.step === "clue" && g.cur?.giver === me) || (g.step === "make" && g.cur?.maker === me) || (g.step === "guess" && (g.mode === "secret" ? g.cur?.giver !== me : g.cur?.maker !== me))) Sound.play("turn");
+    if (g.step === "result" || g.step === "reveal" || g.step === "end") Sound.play(g.mode === "secret" && g.cur && !g.cur.ok && g.step !== "end" ? "tap" : "reveal");
+    local.sel = null;
+  }
+  if (g.step === "clue" && pg.step !== "clue") local.clue = "";
+}
+function render() {
+  if (!S) return;
+  document.body.classList.toggle("playing", S.phase !== "lobby");
+  // 入力中の文字を描き直しで消さない
+  const inp = document.activeElement && document.activeElement.id;
+  const keep = inp && $(inp) && $(inp).tagName === "INPUT" ? { id: inp, v: $(inp).value, s: $(inp).selectionStart } : null;
+  renderMeta(); renderSide(); renderMain();
+  if (keep && $(keep.id)) { const el = $(keep.id); el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} }
+}
+function renderMeta() {
+  const m = $("meta"); m.replaceChildren();
+  m.append(h("button", { type: "button", class: "pill", "aria-pressed": Sound.on ? "true" : "false", onclick: () => { Sound.setOn(!Sound.on); render(); } }, Sound.on ? "音 ON" : "音 OFF"),
+    h("span", { class: "pill" }, "部屋 ", h("span", { class: "code" }, S.code)));
+  const g = S.game;
+  if (g && g.step !== "end") m.append(h("span", { class: "pill" }, MODE[g.mode].replace(/\(.*\)/, "") + (g.round ? `・ラウンド${g.round}` : "")));
+}
+function renderSide() {
+  const side = $("side"); side.replaceChildren();
+  const g = S.game;
+  side.append(h("h2", {}, "プレイヤー"));
+  const ul = h("ul", { class: "players" });
+  if (g) {
+    for (const id of g.order) {
+      const off = player(id) && !player(id).connected;
+      const turn = g.step !== "end" && g.cur && (g.cur.giver === id || g.cur.maker === id);
+      const info = g.mode === "mine" ? `${g.scores?.[id] || 0}点` : turn ? (g.mode === "secret" ? "出題中" : "") : "";
+      const li = h("li", { class: (turn ? "cur" : "") + (off ? " off" : "") }, h("span", { class: "sw2", style: `background:${colorOf(id)}` }),
+        h("span", { class: "pname" }, (turn ? "▶ " : "") + nameOf(id) + (id === me ? "(あなた)" : "") + (off ? "(切断中)" : "")), h("span", { class: "pinfo" }, info));
+      if (off && isGM() && id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+  } else {
+    for (const p of S.players) {
+      const nm = h("span", { class: "pname" }, p.name + (p.id === me ? "(あなた)" : ""));
+      if (p.id === S.gameHostId) nm.append(h("span", { class: "tag" }, "ホスト"));
+      const li = h("li", { class: p.connected ? "" : "off" }, h("span", { class: "sw2", style: `background:${colorOf(p.id)}` }), nm, h("span", { class: "pinfo" }, p.connected ? "" : "切断中"));
+      if (isGM() && p.id !== me) li.append(h("span", { class: "kick" }, twoStep("退出させる", () => send({ t: "kick", id: p.id }), "ghost danger tiny")));
+      ul.append(li);
+    }
+  }
+  side.append(ul);
+  const link = location.origin + "/dantier?room=" + S.code;
+  const inp = h("input", { type: "text", value: link, readonly: true, "aria-label": "招待リンク", onfocus: (e) => e.target.select() });
+  side.append(h("div", { class: "field" }, "招待リンク(友達に送る)", h("div", { class: "invite" }, inp, h("button", { type: "button", class: "ghost", onclick: (e) => {
+    const b = e.currentTarget; navigator.clipboard?.writeText(link).then(() => { b.textContent = "コピー済"; setTimeout(() => (b.textContent = "コピー"), 1500); }).catch(() => inp.select());
+  } }, "コピー"))));
+  side.append(h("div", { class: "stamps", role: "group", "aria-label": "一言スタンプ" }, ...S.stamps.map((t, i) => h("button", { type: "button", onclick: () => send({ t: "stamp", i }) }, t))));
+  if (g?.log?.length) side.append(h("details", {}, h("summary", { class: "small" }, "記録"), h("ul", { class: "log" }, ...[...g.log].reverse().map((t) => h("li", {}, t)))));
+  const btns = h("div", { class: "btns" });
+  if (S.phase !== "lobby" && isGM() && S.game?.step !== "end") btns.append(twoStep("待機画面に戻す", () => send({ t: "reset" })));
+  btns.append(twoStep("部屋を出る", () => { send({ t: "leave" }); backToLogin(""); }));
+  side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
+}
+
+// ティアー表。items: [{id,text,rank,by,ok}]。opt.onRow(rank) で行を押せる、opt.onItem(it) で言葉を押せる
+function tierEl(g, items, opt = {}) {
+  const box = h("div", { class: "tier", role: "list", "aria-label": "ティアー表" });
+  for (let r = g.lo; r <= g.hi; r++) {
+    const L = g.ladder[r], can = opt.onRow && !(opt.skip || []).includes(r);
+    const row = h("div", { class: "trow" + (can ? " can" : "") + (opt.grew === L ? " new" : ""), role: "listitem", "data-rank": L,
+      onclick: can ? (e) => { if (!e.target.closest(".item")) opt.onRow(r); } : undefined },
+      h("div", { class: "lab", style: `background:${RCOL[L]}` }, L),
+      h("div", { class: "cells" }, ...items.filter((x) => x.rank === r).map((x) => opt.onItem
+        ? h("button", { type: "button", class: "item" + (local.sel === x.id ? " sel" : ""), onclick: () => opt.onItem(x) }, x.text)
+        : h("span", { class: "item", title: (x.by ? nameOf(x.by) + "さんの言葉" : "") + (x.ok === false ? "(このラウンドははずれ)" : "") }, x.text, x.ok === false ? h("span", { class: "ng", "aria-label": "はずれ" }, "✗") : null, opt.showBy && x.by ? h("span", { class: "by" }, nameOf(x.by)) : null))));
+    box.append(row);
+  }
+  return box;
+}
+// 完成したティアー表を1枚の画像にして保存
+function saveImage(g, items, title) {
+  const W = 960, LAB = 110, PAD = 14, LH = 34, FONT = '700 20px "Zen Kaku Gothic New", "Hiragino Sans", sans-serif';
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+  ctx.font = FONT;
+  // 行ごとに言葉を折り返して高さを決める
+  const rows = [];
+  for (let r = g.lo; r <= g.hi; r++) {
+    const lines = [[]]; let x = 0;
+    for (const it of items.filter((y) => y.rank === r)) { const w = ctx.measureText(it.text).width + 26; if (x + w > W - LAB - PAD * 2 && lines[lines.length - 1].length) { lines.push([]); x = 0; } lines[lines.length - 1].push([it.text, w]); x += w + 8; }
+    rows.push({ r, lines, hgt: Math.max(70, lines.length * (LH + 8) + 18) });
+  }
+  const top = 76, H = top + rows.reduce((a, x) => a + x.hgt + 4, 0) + 30;
+  cv.width = W; cv.height = H;
+  ctx.fillStyle = "#181b23"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#ffffff"; ctx.font = '400 28px "Dela Gothic One", sans-serif'; ctx.textBaseline = "middle";
+  ctx.fillText(title.slice(0, 36), PAD, 38);
+  let y = top;
+  for (const row of rows) {
+    const L = g.ladder[row.r];
+    ctx.fillStyle = RCOL[L]; ctx.fillRect(0, y, LAB, row.hgt);
+    ctx.fillStyle = "#181b23"; ctx.font = '400 34px "Dela Gothic One", sans-serif'; ctx.textAlign = "center"; ctx.fillText(L, LAB / 2, y + row.hgt / 2);
+    ctx.textAlign = "left"; ctx.fillStyle = "#2a2e38"; ctx.fillRect(LAB, y, W - LAB, row.hgt);
+    ctx.font = FONT;
+    row.lines.forEach((ln, i) => { let x = LAB + PAD; const yy = y + 12 + i * (LH + 8); for (const [t, w] of ln) { ctx.fillStyle = "#eef0f6"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, yy, w, LH, 6) : ctx.rect(x, yy, w, LH); ctx.fill(); ctx.fillStyle = "#181b23"; ctx.fillText(t, x + 13, yy + LH / 2 + 1); x += w + 8; } });
+    y += row.hgt + 4;
+  }
+  ctx.fillStyle = "#a1a7b6"; ctx.font = '500 14px "Zen Kaku Gothic New", sans-serif'; ctx.fillText("みんなのあそびば・ダンダンティアー", PAD, H - 15);
+  const a = document.createElement("a"); a.download = "tier-" + Date.now() + ".png"; a.href = cv.toDataURL("image/png"); document.body.append(a); a.click(); a.remove();
+}
+const themeEl = (g) => h("div", { class: "theme" }, h("small", {}, "お題"), g.theme);
+const cdEl = () => remaining() != null && S.game?.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null;
+
+function renderMain() {
+  const main = $("main"); main.replaceChildren();
+  if (S.phase === "lobby") return renderLobby(main);
+  const g = S.game; if (!g) return;
+  if (g.mode === "secret") renderSecret(main, g);
+  else if (g.mode === "together") renderTogether(main, g);
+  else renderMine(main, g);
+}
+
+// ---------- 本編 ----------
+function renderSecret(main, g) {
+  const cur = g.cur, giver = cur?.giver === me, guesser = isMember() && !giver;
+  const meter = h("div", { class: "meter", "aria-label": `連続正解 ${g.streak}/${g.target}` }, h("b", { class: "small" }, "連続正解 "), ...Array.from({ length: g.target }, (_, i) => h("i", { class: i < g.streak ? "on" : "" })),
+    h("span", { class: "small muted" }, ` ${g.streak}/${g.target}・ヒント残り${g.hintsLeft}・最高${g.best}`));
+  let say = "";
+  if (g.step === "end") say = g.cleared ? `🎉 ${g.target}回連続正解でクリア！(${g.round}ラウンド)` : "ゲーム終了";
+  else if (g.step === "clue") say = giver ? "あなたが出題: 秘密のランクに合う言葉を考えて送ってください" : `${nameOf(cur.giver)} さんが言葉を考えています…`;
+  else if (g.step === "guess") say = giver ? "みんなが当てるのを見守りましょう(しゃべってヒントを出すのはなし)" : "この言葉は何ランク？ 相談して選び、だれか1人が「決定」";
+  else if (g.step === "result") say = cur.ok ? "⭕ 正解！" : "❌ はずれ…";
+  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" || (g.step === "result" && cur.ok) ? " good" : g.step === "result" ? " red" : "") }, say), cdEl()), themeEl(g), meter);
+
+  if (g.step === "clue" && giver) {
+    main.append(h("div", { class: "btns" }, h("span", {}, "あなたにだけ見える秘密のランク: "), h("span", { class: "secret", style: `background:${RCOL[g.ladder[cur.secret]]}` }, g.ladder[cur.secret])),
+      h("form", { class: "addrow", onsubmit: (e) => { e.preventDefault(); const v = $("clueIn").value.trim(); if (v) act("clue", { text: v }); } },
+        h("input", { type: "text", id: "clueIn", maxlength: "24", placeholder: `「${g.theme}」で ${g.ladder[cur.secret]} ランクっぽいもの`, autocomplete: "off" }),
+        h("button", { class: "primary", type: "submit" }, "この言葉で出題")),
+      h("p", { class: "small muted", style: "margin:0" }, `今の表は ${g.ladder[g.lo]}〜${g.ladder[g.hi]}。いちばん上が ${g.ladder[g.lo]}、いちばん下が ${g.ladder[g.hi]} です。`));
+  }
+  if ((g.step === "guess" || g.step === "result") && cur) {
+    main.append(h("div", { style: "text-align:center" }, h("div", { class: "small muted" }, `${nameOf(cur.giver)} さんの言葉`), h("div", { class: "word" }, cur.text)));
+  }
+  if (g.step === "guess") {
+    const counts = {}; for (const [p, r] of Object.entries(cur.picks)) (counts[r] || (counts[r] = [])).push(p);
+    const mine = cur.picks[me];
+    const btns = [];
+    for (let r = g.lo; r <= g.hi; r++) {
+      const L = g.ladder[r], gone = cur.removed.includes(r);
+      btns.push(h("button", { type: "button", class: (mine === r ? "mine" : "") + (gone ? " gone" : "") + (giver && cur.secret === r ? " mine" : ""), style: `background:${RCOL[L]}`, disabled: !guesser || gone, "aria-pressed": mine === r ? "true" : "false",
+        onclick: () => act("pick", { rank: mine === r ? null : r }) }, L, h("span", { class: "who" }, (counts[r] || []).map(nameOf).join("・") || " ")));
+    }
+    main.append(h("div", { class: "ranks", role: "group", "aria-label": "ランクを選ぶ" }, ...btns));
+    if (guesser) main.append(h("div", { class: "btns" },
+      mine != null ? twoStep(`「${g.ladder[mine]}」で決定`, () => act("decide", { rank: mine }), "primary big") : h("span", { class: "small muted" }, "ランクを選ぶと「決定」ボタンが出ます(みんなの選んだランクが見えます)"),
+      h("button", { type: "button", class: "ghost", disabled: cur.hinted || g.hintsLeft <= 0, onclick: () => act("hint") }, cur.hinted ? "ヒント使用済み" : `ヒント(正解ではないランクを2つ消す・残り${g.hintsLeft})`)));
+    else if (giver) main.append(h("p", { class: "small muted", style: "margin:0" }, "正解は ", h("b", {}, g.ladder[cur.secret]), "(あなたにだけ見えています)"));
+  }
+  if (g.step === "result") {
+    main.append(h("div", { class: "verdict " + (cur.ok ? "ok" : "ng") }, `正解は ${g.ladder[cur.secret]} ランク`, cur.answer != null ? `(答え: ${g.ladder[cur.answer]})` : "(答えなし)",
+      cur.grew ? h("div", { class: "small", style: "font-family:var(--body)" }, `端のランクだったので「${cur.grew}」ランクが増えました！`) : null),
+      h("div", { class: "btns" }, isMember() ? h("button", { type: "button", class: "primary", onclick: () => act("next") }, "次のラウンドへ") : null, h("span", { class: "small muted" }, "(しばらくすると自動で進みます)")));
+  }
+  main.append(h("h2", { style: "font-size:16px" }, "ティアー表"), tierEl(g, g.items, { grew: g.step === "result" ? cur?.grew : null }));
+  if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => saveImage(g, g.items, g.theme) }, "表を画像で保存"), h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+}
+
+// ---------- みんなでティアー ----------
+function editor(g, items, canEdit, extra) {
+  // 言葉を書いて、ランクの行を押すとそこに置ける。置いた言葉を押して選ぶと、ほかの行へ動かしたり消したりできる
+  const box = h("div", { style: "display:grid;gap:8px" });
+  if (canEdit) {
+    box.append(h("form", { class: "addrow", onsubmit: (e) => { e.preventDefault(); } },
+      h("input", { type: "text", id: "addIn", maxlength: "24", placeholder: "言葉を書いて、置きたいランクの行を押す", autocomplete: "off" }),
+      local.sel != null ? h("button", { type: "button", class: "danger", onclick: () => { act("remove", { id: local.sel }); local.sel = null; } }, "選んだ言葉を消す") : h("span"),
+      local.sel != null ? h("button", { type: "button", class: "ghost", onclick: () => { local.sel = null; render(); } }, "選ぶのをやめる") : h("span")),
+      h("p", { class: "small muted", style: "margin:0" }, local.sel != null ? "動かす先のランクの行を押してください。" : "書いた言葉は、ランクの行を押すとそこに置かれます。置いた言葉を押すと、選んで動かせます。"));
+  }
+  box.append(tierEl(g, items, canEdit ? {
+    onRow: (r) => {
+      if (local.sel != null) { act("move", { id: local.sel, rank: r }); local.sel = null; return; }
+      const el = $("addIn"), v = el ? el.value.trim() : ""; if (!v) { flash("先に言葉を書いてください", true); el?.focus(); return; }
+      act("add", { text: v, rank: r }); el.value = ""; el.focus();
+    },
+    onItem: (x) => { local.sel = local.sel === x.id ? null : x.id; render(); },
+  } : {}));
+  if (extra) box.append(extra);
+  return box;
+}
+function renderTogether(main, g) {
+  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, g.step === "end" ? "ティアー表が完成！" : "みんなで1枚のティアー表を作ろう"), cdEl()), themeEl(g));
+  const edit = g.step === "build" && isMember();
+  main.append(editor(g, g.items, edit, edit ? h("div", { class: "btns" },
+    h("button", { type: "button", class: "ghost tiny", disabled: g.lo <= 0, onclick: () => act("expand", { side: "top" }) }, g.lo > 0 ? `上に「${g.ladder[g.lo - 1]}」を足す` : "上はSSSまで"),
+    h("button", { type: "button", class: "ghost tiny", disabled: g.hi >= g.ladder.length - 1, onclick: () => act("expand", { side: "bottom" }) }, g.hi < g.ladder.length - 1 ? `下に「${g.ladder[g.hi + 1]}」を足す` : "下はGまで"),
+    isGM() ? twoStep("これで完成", () => act("complete"), "primary") : h("span", { class: "small muted" }, "ホストが「これで完成」を押すと終わります")) : null));
+  if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => saveImage(g, g.items, g.theme) }, "表を画像で保存"), h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+}
+
+// ---------- じぶんのティアー ----------
+function renderMine(main, g) {
+  const cur = g.cur, maker = cur?.maker === me, guesser = isMember() && !maker;
+  let say = "";
+  if (g.step === "end") say = "ゲーム終了";
+  else if (g.step === "make") say = maker ? "あなたのティアー表を作ってください(3〜10個)" : `${nameOf(cur.maker)} さんがティアー表を作っています…(今${cur.count}個)`;
+  else if (g.step === "guess") say = maker ? "みんながあなたの表を当てています" : `${nameOf(cur.maker)} さんの表を当てよう: 言葉ごとにランクを選ぶ`;
+  else if (g.step === "reveal") say = `${nameOf(cur.maker)} さんの表の答え合わせ`;
+  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say), cdEl()), themeEl(g));
+  if (g.step === "make" && maker) {
+    main.append(editor(g, cur.items, true, h("div", { class: "btns" },
+      h("button", { type: "button", class: "primary", disabled: cur.items.length < 3, onclick: () => act("publish") }, `この表で出題(${cur.items.length}個)`),
+      h("span", { class: "small muted" }, "3〜10個。ほかの人は言葉だけを見て、それぞれのランクを当てます"))));
+  }
+  if (g.step === "guess" && guesser) {
+    const done = cur.done.includes(me);
+    main.append(h("div", { style: "display:grid;gap:6px" }, ...cur.items.map((x) => {
+      const sel = cur.myGuess[x.id];
+      const rb = []; for (let r = g.lo; r <= g.hi; r++) { const L = g.ladder[r]; rb.push(h("button", { type: "button", class: sel === r ? "mine" : "", style: `background:${RCOL[L]}`, disabled: done, "aria-pressed": sel === r ? "true" : "false", onclick: () => act("pick", { id: x.id, rank: r }) }, L)); }
+      return h("div", { class: "gitem" }, h("b", {}, x.text), h("div", { class: "ranks sm", role: "group", "aria-label": `${x.text}のランク` }, ...rb));
+    })), h("div", { class: "btns" }, done ? h("span", { class: "small muted" }, `回答しました。みんなを待っています(${cur.done.length}人)`) : h("button", { type: "button", class: "primary big", disabled: cur.items.some((x) => cur.myGuess[x.id] == null), onclick: () => act("gdone") }, "これで回答")));
+  } else if (g.step === "guess") main.append(h("p", { class: "muted" }, `回答した人: ${cur.done.map(nameOf).join("・") || "まだいません"}`), maker ? tierEl(g, cur.items) : null);
+  if ((g.step === "reveal" || g.step === "end") && cur && cur.guesses) {
+    main.append(h("h2", { style: "font-size:16px" }, `${nameOf(cur.maker)} さんのティアー表`), tierEl(g, cur.items));
+    const ps = g.order.filter((p) => p !== cur.maker);
+    main.append(h("div", { style: "overflow-x:auto" }, h("table", { class: "res" }, h("thead", {}, h("tr", {}, h("th", {}, "言葉"), h("th", {}, "答え"), ...ps.map((p) => h("th", {}, nameOf(p))))),
+      h("tbody", {}, ...cur.items.map((x) => h("tr", {}, h("td", {}, x.text), h("td", {}, h("b", {}, g.ladder[x.rank])), ...ps.map((p) => {
+        const gr = (cur.guesses[p] || {})[x.id]; const d = gr == null ? 9 : Math.abs(gr - x.rank);
+        return h("td", { class: d === 0 ? "ok" : d === 1 ? "near" : "ng" }, gr == null ? "—" : g.ladder[gr] + (d === 0 ? " ◎" : d === 1 ? " ○" : ""));
+      }))), h("tr", {}, h("td", {}, "点数"), h("td", {}, ""), ...ps.map((p) => h("td", {}, h("b", {}, `+${cur.pts?.[p] ?? 0}`))))))),
+      h("p", { class: "small muted", style: "margin:0" }, `ぴったり2点・1つずれ1点。作った ${nameOf(cur.maker)} さんは、当てた人の平均点 +${cur.pts?.[cur.maker] ?? 0}`));
+    if (g.step === "reveal") main.append(h("div", { class: "btns" }, isMember() ? h("button", { type: "button", class: "primary", onclick: () => act("next") }, "次へ") : null, h("button", { type: "button", class: "ghost", onclick: () => saveImage(g, cur.items, `${nameOf(cur.maker)}の「${g.theme}」`) }, "この表を画像で保存")));
+  }
+  if (g.step === "end") {
+    const rows = S.ranking || [];
+    main.append(h("h2", { style: "font-size:16px" }, "最終結果"), h("table", { class: "rank" }, h("tbody", {}, ...rows.map((r) => h("tr", { class: r.id === me ? "me" : "" }, h("td", {}, r.rank === 1 ? "🏆 1位" : `${r.rank}位`), h("td", {}, r.name), h("td", { class: "n" }, `${r.raw}点`))))),
+      h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
+  }
+}
+
+function renderLobby(main) {
+  const st = S.settings, gm = isGM();
+  const sel = (label, key, opts) => h("label", { class: "field" }, label, h("select", { disabled: !gm, onchange: (e) => {
+    const o = opts.find((x) => String(x[0]) === e.target.value); send({ t: "settings", s: { [key]: o[0] } });
+  } }, ...opts.map(([v, t]) => h("option", { value: String(v), selected: st[key] === v }, t))));
+  const live = S.players.filter((p) => p.connected);
+  const rules = {
+    secret: ["1人にだけ「秘密のランク」(S・A・B・C・Dなど)が見えます。その人は、お題に合って、そのランクっぽい言葉を1つ出します。",
+      "ほかの人は相談して「この言葉は何ランク？」を当てます。みんなの選んだランクが見えるので、話し合って、だれか1人が「決定」を押します。",
+      "当たれば連続正解+1、外れたら0に戻ります(出た言葉は表に残ります)。決めた回数だけ連続で当てたらクリア！ 出題する人は順番に交代します。",
+      "表の端のランク(いちばん上かいちばん下)が出題されると、その外側のランクが増えます。最初はS〜Dの5段で、SSS〜Gまで広がります。",
+      "ヒント(回数限定): 正解ではないランクを2つ消せます。出題する人は、言葉以外でヒントを出してはいけません。"],
+    together: ["ランクの当てっこはなし。みんなで1枚のティアー表を作ります。", "言葉を書いて、ランクの行を押すと置けます。置いた言葉は、だれでも動かしたり消したりできます。",
+      "上や下にランクを足すこともできます(SSS〜G)。できあがったらホストが「これで完成」。表は画像で保存できます。"],
+    mine: ["順番に1人ずつ、お題で自分のティアー表を作ります(3〜10個の言葉を、好きなランクに置く)。",
+      "ほかの人には言葉だけが見えます。言葉ごとに、作った人がどのランクに置いたかを当てます。",
+      "ぴったり2点・1つずれ1点。作った人には、当てた人たちの平均点が入ります。全員が作り終えたら、合計点で順位を決めます。"],
+  }[st.mode];
+  main.append(h("h2", {}, "遊び方"), h("p", { class: "small", style: "margin:0" }, h("b", {}, MODE[st.mode])), h("ol", { class: "rules" }, ...rules.map((t) => h("li", {}, t))));
+  const themeBox = h("div", { class: "field" }, "お題(空欄なら、用意したお題からランダム)",
+    h("form", { class: "addrow", onsubmit: (e) => { e.preventDefault(); send({ t: "settings", s: { theme: $("themeIn").value } }); } },
+      h("input", { type: "text", id: "themeIn", maxlength: "40", value: st.theme || "", placeholder: "例: 深夜に食べると特に美味しいもの", disabled: !gm, autocomplete: "off" }),
+      gm ? h("button", { type: "submit" }, "決める") : h("span"), gm && st.theme ? h("button", { type: "button", class: "ghost", onclick: () => send({ t: "settings", s: { theme: "" } }) }, "ランダムに戻す") : h("span")));
+  const sets = [sel("モード", "mode", [["secret", MODE.secret], ["together", MODE.together], ["mine", MODE.mine]])];
+  if (st.mode === "secret") sets.push(sel("クリアに必要な連続正解", "target", [[5, "5回"], [3, "3回"], [7, "7回"]]), sel("ヒントの回数(ゲーム全体)", "hints", [[2, "2回"], [0, "なし"], [1, "1回"], [3, "3回"], [5, "5回"]]),
+    sel("言葉を考える時間", "clueSecs", [[90, "90秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]), sel("相談する時間", "guessSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]));
+  if (st.mode === "mine") sets.push(sel("表を作る時間", "makeSecs", [[180, "180秒"], [120, "120秒"], [300, "300秒"], [0, "なし"]]), sel("当てる時間", "guessSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]), sel("作る回数", "cycles", [[1, "1人1回"], [2, "1人2回"]]));
+  main.append(themeBox, h("div", { class: "settings" }, ...sets), h("p", { class: "muted small" }, "2〜12人。1ゲーム約15分。通話しながら遊ぶのがおすすめ(文字チャットもあります)。"));
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live.length < 2, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live.length < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live.length > 12 ? "先に入った12人で始めます(ほかの人は観戦)" : `${live.length}人で始められます`)));
+  else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
+}
+let lastSec = null;
+setInterval(() => {
+  if (!S) return;
+  const r = remaining(), el = $("cdText");
+  if (el && r != null) { el.textContent = r + "秒"; el.classList.toggle("low", r <= 10); }
+  if (r !== lastSec) { lastSec = r; const g = S.game; const mineTurn = g && ((g.step === "clue" && g.cur?.giver === me) || (g.step === "make" && g.cur?.maker === me)); if (mineTurn && r != null && r <= 5 && r >= 1) Sound.play("tick"); }
+}, 250);
+
+connect();
+</script>
+<script src="/js/partybar.js" defer></script>
+</body>
+</html>
