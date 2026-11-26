@@ -79,6 +79,64 @@ const H = (c, id, m, host) => core.handle(c, id, m, host);
   check(g.step === "clue" && g.cur.giver !== gv && g.round === r0 && !g.order.includes(gv), "出題する人が抜けたら、次の人が出題(ラウンドはやり直し)");
 }
 
+// ---- 答えを言ってしまう言葉・途中で終わる ----
+{
+  const { c, g, st } = mk(["a", "b"]);
+  const gv = g.cur.giver;
+  for (const w of ["Sランク", "a", "Ｂ級", "Aティア"]) check(/ランクそのもの/.test(H(c, gv, { a: "clue", text: w }) || ""), `ランクそのものは書けない(${w})`);
+  check(["フランクフルト", "ティアラ", "SUSHI"].every((w) => !core._t.saysRank(w)), "普通の言葉(フランクフルト・ティアラ・SUSHI)は書ける");
+  H(c, gv, { a: "clue", text: "SUSHI" });
+  check(g.step === "guess", "普通の言葉で出題できる");
+  const o = g.order.find((x) => x !== gv);
+  check(H(c, o, { a: "giveup" }, false) === "終わらせるのはホストです", "途中で終えるのはホストだけ");
+  H(c, o, { a: "giveup" }, true);
+  check(g.step === "end" && !g.cleared && st.finished, "ホストは途中で終えて表を見られる");
+}
+// ---- 抜けた人がいても出題・作る順番がずれない ----
+{
+  const { c, g } = mk(["a", "b", "c", "d"], { target: 7 });
+  g.turn = 0; g.cur.giver = "a"; // a から
+  const seen = [];
+  const play = () => { const gv = g.cur.giver; seen.push(gv); H(c, gv, { a: "clue", text: "w" + seen.length }); const o = g.order.find((x) => x !== gv); H(c, o, { a: "decide", rank: g.cur.secret }); H(c, o, { a: "next" }); };
+  play(); // a
+  // b の出題中に a が抜ける → b が続けて出題 → c → d → b
+  core.onLeave(c, "a");
+  check(g.cur.giver === "b", "前の人(a)が抜けても、今の番の人(b)のまま");
+  play(); play(); play(); play();
+  check(seen.join("") === "abcdb", "抜けたあとも順番どおり(a b c d b): " + seen.join(""));
+  // 出題中の人が抜けたら次の人がやり直し
+  const before = g.cur.giver, nextId = g.order[(g.order.indexOf(before) + 1) % g.order.length];
+  core.onLeave(c, before);
+  check(g.cur.giver === nextId && g.step === "clue", "出題中の人が抜けたら次の人が出題");
+}
+{
+  const { c, g } = mk(["a", "b", "c"], { mode: "mine" });
+  const first = g.cur.maker;
+  core.onLeave(c, g.order.find((x) => x !== first && g.order.indexOf(x) < g.order.indexOf(first)) || "zz");
+  const makers = [first];
+  for (let k = 0; k < 5 && g.step !== "end"; k++) {
+    const m = g.cur.maker; if (k) makers.push(m);
+    for (const t of ["x", "y", "z"]) H(c, m, { a: "add", text: t + k, rank: 3 });
+    H(c, m, { a: "publish" });
+    for (const p of g.order.filter((x) => x !== m)) { for (const it of g.cur.items) H(c, p, { a: "pick", id: it.id, rank: 3 }); H(c, p, { a: "gdone" }); }
+    H(c, m, { a: "next" });
+  }
+  check(g.step === "end" && new Set(makers).size === g.order.length && g.order.every((p) => makers.includes(p)), "じぶんのティアー: 抜けた人がいても残りの全員が作ってから終わる: " + makers.join(""));
+}
+{
+  // 当てる時間なしで、当てる人が切断 → 残りが全員回答済みなら答え合わせ
+  const ids = ["a", "b", "c"]; let live = [...ids];
+  const st = { timer: null, finished: null };
+  const c = { g: null, members: () => ids, live: () => live, has: () => true, nameOf: (x) => x, setTimer: (ms, fn) => { st.timer = fn; }, clearTimer: () => { st.timer = null; }, finish: (r) => { st.finished = r; } };
+  core.start(c, { mode: "mine", guessSecs: 0 }, seeded(3));
+  const g = c.g, m = g.cur.maker, gs = g.order.filter((x) => x !== m);
+  for (const t of ["x", "y", "z"]) H(c, m, { a: "add", text: t, rank: 3 });
+  H(c, m, { a: "publish" });
+  for (const it of g.cur.items) H(c, gs[0], { a: "pick", id: it.id, rank: 3 });
+  H(c, gs[0], { a: "gdone" });
+  live = live.filter((x) => x !== gs[1]); core.onPresence(c);
+  check(g.step === "reveal", "当てる人が切断して、残りが全員回答済みなら答え合わせへ");
+}
 // ---- みんなでティアー ----
 {
   const { c, g, st } = mk(["a", "b"], { mode: "together", theme: "寿司ネタ" });
@@ -94,6 +152,11 @@ const H = (c, id, m, host) => core.handle(c, id, m, host);
   H(c, "a", { a: "remove", id });
   H(c, "a", { a: "complete" }, true);
   check(g.step === "end" && g.items.length === 1 && st.finished, "消す・ホストが完成");
+}
+{
+  const { c, g } = mk(["a"], { mode: "together" });
+  H(c, "a", { a: "add", text: "ひとり", rank: 3 });
+  check(g.step === "build" && g.items.length === 1, "みんなでティアーは1人でも遊べる");
 }
 
 // ---- じぶんのティアー ----

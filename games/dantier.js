@@ -9,6 +9,8 @@ const core = require("./mini/dantier");
 
 const WS_PATH = "/dantier/ws";
 const MIN_PLAYERS = 2, MAX_PLAYERS = 12, MAX_ROOMS = 500;
+// 「みんなでティアー」は1人でも遊べる(自分のティアー表を作る)
+const minFor = (mode) => mode === "together" ? 1 : MIN_PLAYERS;
 const STAMPS = ["それだ！", "うーん…", "上かな", "下かな", "ナイス！", "ごめん", "急いで！", "w"];
 const STAMP_GAP_MS = 1200;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
@@ -106,7 +108,7 @@ function removePlayer(room, pid) {
   room.players.delete(pid);
   // 抜けた人は手番から外す(2人より少なくなったら待機画面へ)
   if (room.phase === "play") core.onLeave(ctxOf(room), pid);
-  if (room.phase === "play" && members(room).length < MIN_PLAYERS) toLobby(room);
+  if (room.phase === "play" && members(room).length < minFor(room.game ? room.game.mode : room.settings.mode)) toLobby(room);
   broadcast(room);
 }
 
@@ -170,7 +172,7 @@ function handle(ws, m) {
     case "start": {
       if (room.phase !== "lobby") return;
       const live = order(room).filter(connected);
-      if (live.length < MIN_PLAYERS) return err(ws, `${MIN_PLAYERS}人以上でスタートできます`);
+      if (live.length < minFor(room.settings.mode)) return err(ws, `${minFor(room.settings.mode)}人以上でスタートできます`);
       room.roster = live.slice(0, MAX_PLAYERS).map((x) => x.id);
       room.ranking = null;
       room.phase = "play";

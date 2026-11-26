@@ -65,7 +65,7 @@ button.primary:hover:not(:disabled) { background: var(--accent); border-color: v
 button.ghost { border-color: var(--line); font-weight: 500; }
 button.danger { color: var(--bad); border-color: var(--bad); }
 button.big { font-size: 17px; padding: 11px 22px; }
-button.tiny { padding: 3px 9px; font-size: 12px; }
+button.tiny { padding: 3px 9px; font-size: 12px; min-height: 32px; } /* 指で押しやすい高さ */
 input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); min-width: 0; width: 100%; }
 .field { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
 .settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
@@ -89,7 +89,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .trow.can { cursor: pointer; } .trow.can .cells { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); }
 .trow.new .lab { animation: pop 0.6s ease-out; }
 .item { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; background: var(--bg); border: 1.5px solid var(--line); font-weight: 700; font-size: 14px; overflow-wrap: anywhere; max-width: 100%; }
-button.item { cursor: pointer; font-family: var(--body); }
+button.item { cursor: pointer; font-family: var(--body); min-height: 34px; }
 .item.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .item .ng { color: var(--bad); font-size: 12px; } /* はずれたラウンドの言葉(置き場所は正しいランク) */
 .item .by { font-size: 11px; color: var(--muted); font-weight: 500; }
@@ -101,7 +101,7 @@ button.item { cursor: pointer; font-family: var(--body); }
 .ranks button .who { font-family: var(--body); font-size: 10.5px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranks.sm button { font-size: 15px; padding: 4px 2px; } .ranks.sm { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
 .gitem { display: grid; gap: 4px; padding: 8px; border: 1.5px solid var(--line); border-radius: 8px; }
-.res { width: 100%; border-collapse: collapse; font-size: 13px; } .res td, .res th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: left; } .res .ok { color: var(--good); font-weight: 700; } .res .near { color: #b7791f; font-weight: 700; } .res .ng { color: var(--bad); }
+.res { width: 100%; border-collapse: collapse; font-size: 13px; } .res td, .res th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } /* スマホで見出しが縦に折れないように(はみ出す分は横にスクロール) */ .res .ok { color: var(--good); font-weight: 700; } .res .near { color: #b7791f; font-weight: 700; } .res .ng { color: var(--bad); }
 .verdict { padding: 10px 14px; border-radius: 8px; border: 2px solid var(--fg); font-family: var(--display); font-size: 20px; }
 .verdict.ok { background: color-mix(in srgb, var(--good) 20%, var(--surface)); } .verdict.ng { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
 .addrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
@@ -116,6 +116,7 @@ button.item { cursor: pointer; font-family: var(--body); }
 .pinfo { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .off { opacity: .5; }
 .kick { grid-column: 2 / -1; justify-self: start; }
+.offnote { padding: 8px 10px; border: 1.5px dashed var(--bad); border-radius: 8px; font-size: 13px; display: grid; gap: 6px; }
 .invite { display: flex; gap: 6px; } .invite input { font-size: 13px; } .invite button { white-space: nowrap; flex: none; }
 .stamps { display: flex; flex-wrap: wrap; gap: 6px; }
 .stamps button { padding: 4px 11px; font-size: 13px; border-radius: 999px; border-color: var(--line); }
@@ -354,6 +355,9 @@ function renderMain() {
   const main = $("main"); main.replaceChildren();
   if (S.phase === "lobby") return renderLobby(main);
   const g = S.game; if (!g) return;
+  // 切断したままの人がいると、その人の番のたびに待つことになるので、ホストに目立つ形で知らせる
+  const offs = g.step !== "end" && isGM() ? g.order.filter((id) => id !== me && player(id) && !player(id).connected) : [];
+  if (offs.length) main.append(h("div", { class: "offnote", role: "status" }, ...offs.map((id) => h("div", { class: "btns" }, h("span", {}, `${nameOf(id)} さんが切断中です(番が来るたびに少し待ちます)。戻らないときは → `), twoStep("退出させる", () => send({ t: "kick", id }), "danger")))));
   if (g.mode === "secret") renderSecret(main, g);
   else if (g.mode === "together") renderTogether(main, g);
   else renderMine(main, g);
@@ -365,7 +369,7 @@ function renderSecret(main, g) {
   const meter = h("div", { class: "meter", "aria-label": `連続正解 ${g.streak}/${g.target}` }, h("b", { class: "small" }, "連続正解 "), ...Array.from({ length: g.target }, (_, i) => h("i", { class: i < g.streak ? "on" : "" })),
     h("span", { class: "small muted" }, ` ${g.streak}/${g.target}・ヒント残り${g.hintsLeft}・最高${g.best}`));
   let say = "";
-  if (g.step === "end") say = g.cleared ? `🎉 ${g.target}回連続正解でクリア！(${g.round}ラウンド)` : "ゲーム終了";
+  if (g.step === "end") say = g.cleared ? `🎉 ${g.target}回連続正解でクリア！(${g.round}ラウンド)` : `ここで終了(${g.round}ラウンド・最高${g.best}回連続)`;
   else if (g.step === "clue") say = giver ? "あなたが出題: 秘密のランクに合う言葉を考えて送ってください" : `${nameOf(cur.giver)} さんが言葉を考えています…`;
   else if (g.step === "guess") say = giver ? "みんなが当てるのを見守りましょう(しゃべってヒントを出すのはなし)" : "この言葉は何ランク？ 相談して選び、だれか1人が「決定」";
   else if (g.step === "result") say = cur.ok ? "⭕ 正解！" : "❌ はずれ…";
@@ -402,6 +406,8 @@ function renderSecret(main, g) {
       h("div", { class: "btns" }, isMember() ? h("button", { type: "button", class: "primary", onclick: () => act("next") }, "次のラウンドへ") : null, h("span", { class: "small muted" }, "(しばらくすると自動で進みます)")));
   }
   main.append(h("h2", { style: "font-size:16px" }, "ティアー表"), tierEl(g, g.items, { grew: g.step === "result" ? cur?.grew : null }));
+  // クリアするまで終わらないので、ホストはここで終わりにして表を見られる
+  if (g.step !== "end" && isGM()) main.append(h("div", { class: "btns" }, twoStep("ここで終わりにして表を見る", () => act("giveup"), "ghost")));
   if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => saveImage(g, g.items, g.theme) }, "表を画像で保存"), h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
 }
 
@@ -418,11 +424,15 @@ function editor(g, items, canEdit, extra) {
   }
   box.append(tierEl(g, items, canEdit ? {
     onRow: (r) => {
-      if (local.sel != null) { act("move", { id: local.sel, rank: r }); local.sel = null; return; }
-      const el = $("addIn"), v = el ? el.value.trim() : ""; if (!v) { flash("先に言葉を書いてください", true); el?.focus(); return; }
+      // 入力欄に言葉があれば新しく置く(選んでいた言葉の選択はやめる)。なければ、選んだ言葉を動かす
+      const el = $("addIn"), v = el ? el.value.trim() : "";
+      if (!v && local.sel != null) { act("move", { id: local.sel, rank: r }); local.sel = null; return; }
+      local.sel = null;
+      if (!v) { flash("先に言葉を書いてください", true); el?.focus(); return; }
       act("add", { text: v, rank: r }); el.value = ""; el.focus();
     },
-    onItem: (x) => { local.sel = local.sel === x.id ? null : x.id; render(); },
+    // 入力欄に言葉が書いてあるときは、置いてある言葉の上を押しても、その行に置く(言葉が増えても置きやすいように)
+    onItem: (x) => { const el = $("addIn"), v = el ? el.value.trim() : ""; if (v) { local.sel = null; act("add", { text: v, rank: x.rank }); el.value = ""; el.focus(); return; } local.sel = local.sel === x.id ? null : x.id; render(); },
   } : {}));
   if (extra) box.append(extra);
   return box;
@@ -488,7 +498,8 @@ function renderLobby(main) {
       "ほかの人は相談して「この言葉は何ランク？」を当てます。みんなの選んだランクが見えるので、話し合って、だれか1人が「決定」を押します。",
       "当たれば連続正解+1、外れたら0に戻ります(出た言葉は表に残ります)。決めた回数だけ連続で当てたらクリア！ 出題する人は順番に交代します。",
       "表の端のランク(いちばん上かいちばん下)が出題されると、その外側のランクが増えます。最初はS〜Dの5段で、SSS〜Gまで広がります。",
-      "ヒント(回数限定): 正解ではないランクを2つ消せます。出題する人は、言葉以外でヒントを出してはいけません。"],
+      "ヒント(回数限定): 正解ではないランクを2つ消せます。出題する人は、言葉以外でヒントを出してはいけません(「Sランク」「A級」のようにランクそのものは書けません)。",
+      "クリアするまで続きます。ホストは途中で「ここで終わりにして表を見る」を押せます。"],
     together: ["ランクの当てっこはなし。みんなで1枚のティアー表を作ります。", "言葉を書いて、ランクの行を押すと置けます。置いた言葉は、だれでも動かしたり消したりできます。",
       "上や下にランクを足すこともできます(SSS〜G)。できあがったらホストが「これで完成」。表は画像で保存できます。"],
     mine: ["順番に1人ずつ、お題で自分のティアー表を作ります(3〜10個の言葉を、好きなランクに置く)。",
@@ -504,9 +515,10 @@ function renderLobby(main) {
   if (st.mode === "secret") sets.push(sel("クリアに必要な連続正解", "target", [[5, "5回"], [3, "3回"], [7, "7回"]]), sel("ヒントの回数(ゲーム全体)", "hints", [[2, "2回"], [0, "なし"], [1, "1回"], [3, "3回"], [5, "5回"]]),
     sel("言葉を考える時間", "clueSecs", [[90, "90秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]), sel("相談する時間", "guessSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]));
   if (st.mode === "mine") sets.push(sel("表を作る時間", "makeSecs", [[180, "180秒"], [120, "120秒"], [300, "300秒"], [0, "なし"]]), sel("当てる時間", "guessSecs", [[120, "120秒"], [60, "60秒"], [180, "180秒"], [0, "なし"]]), sel("作る回数", "cycles", [[1, "1人1回"], [2, "1人2回"]]));
-  main.append(themeBox, h("div", { class: "settings" }, ...sets), h("p", { class: "muted small" }, "2〜12人。1ゲーム約15分。通話しながら遊ぶのがおすすめ(文字チャットもあります)。"));
-  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live.length < 2, onclick: () => send({ t: "start" }) }, "スタート"),
-    h("span", { class: "muted small" }, live.length < 2 ? "招待リンクを友達に送ってください。2人以上で始められます" : live.length > 12 ? "先に入った12人で始めます(ほかの人は観戦)" : `${live.length}人で始められます`)));
+  main.append(themeBox, h("div", { class: "settings" }, ...sets), h("p", { class: "muted small" }, "2〜12人(「みんなでティアー」は1人でも遊べます)。1ゲーム約15分。通話しながら遊ぶのがおすすめ(文字チャットもあります)。"));
+  const need = st.mode === "together" ? 1 : 2; // みんなでティアーは1人でも(自分のティアー表を作る)
+  if (gm) main.append(h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: live.length < need, onclick: () => send({ t: "start" }) }, "スタート"),
+    h("span", { class: "muted small" }, live.length < need ? "招待リンクを友達に送ってください。2人以上で始められます(「みんなでティアー」は1人でも)" : live.length > 12 ? "先に入った12人で始めます(ほかの人は観戦)" : `${live.length}人で始められます`)));
   else main.append(h("p", { class: "muted" }, `ホストの ${nameOf(S.gameHostId)} さんがスタートするのを待っています。`));
 }
 let lastSec = null;

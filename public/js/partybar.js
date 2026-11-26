@@ -491,7 +491,24 @@ body.has-pbchat:not(.compact) .wrap::after { content: ""; display: block; height
     }
     b.hidden = busy();
   }
-  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); }, 1500);
+  // ---- スマホでは、右下の 💬 と ？ を、ページの途中を見ている間は小さく右端に寄せる(ボタンや表に重ならないように) ----
+  // ページのいちばん下(余白があって重ならない)・チャットを開いたとき・新しいメッセージがあるときは元の大きさ。小さいときも押せる
+  function tuckTick() {
+    const narrow = innerWidth <= 600, doc = document.documentElement;
+    const nearEnd = innerHeight + scrollY >= doc.scrollHeight - 140;
+    const tuck = narrow && !nearEnd && !copen && !cunread && doc.scrollHeight > innerHeight + 140;
+    if (document.body) document.body.classList.toggle("pb-tuck", tuck);
+  }
+  {
+    const css = document.createElement("style");
+    css.textContent = `
+body.pb-tuck .pb-help, body.pb-tuck .pb-chat .pb-cbtn { transform: translateX(14px) scale(.72); opacity: .55; transition: transform .2s, opacity .2s; }
+.pb-help, .pb-chat .pb-cbtn { transition: transform .2s, opacity .2s; }`;
+    document.head.append(css);
+    addEventListener("scroll", tuckTick, { passive: true });
+    addEventListener("resize", tuckTick);
+  }
+  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); tuckTick(); }, 1500);
   // 招待欄が画面に出たらすぐ「共有」ボタンを付ける(1.5秒ごとの確認を待たない)
   let shareQ = false;
   if (document.body) new MutationObserver(() => { if (shareQ) return; shareQ = true; requestAnimationFrame(() => { shareQ = false; addShare(); }); })

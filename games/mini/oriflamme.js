@@ -205,7 +205,7 @@ function applyTarget(c, sid, as, cardId, tid) {
       const victim = ownerOf(t), n = victim === me ? 0 : Math.min(1, g.P[victim].inf);
       g.P[victim].inf -= n; g.P[me].inf += n;
       g.last = { type: "spy", by: me, sid, tid };
-      log(g, victim === me ? `「密偵」: となりが自分のカードなので、自分から奪う(変わらない)` : `「密偵」: ${nm(c, me)} が ${nm(c, victim)} から影響力を${n}奪った`);
+      log(g, victim === me ? `「密偵」: となりが自分のカードなので、自分から奪う(変わらない)` : (n ? `「密偵」: ${nm(c, me)} が ${nm(c, victim)} から影響力を1奪った` : `「密偵」: ${nm(c, victim)} の影響力が0なので奪えなかった`));
       return finishCard(c, cardId);
     }
     case "shapeshifter": {
@@ -239,7 +239,7 @@ function moveTo(c, pd, pos) {
   const before = pd.rest[pos];
   g.queue.splice(before == null ? g.queue.length : idxOf(g, before), 0, s);
   g.last = { type: "move", by: pd.by, sid: pd.sid, tid: pd.tid, pos };
-  log(g, `「勅令」: ${nm(c, pd.by)} がカードを左から${idxOf(g, s.id) + 1}番目へ動かした`);
+  log(g, `「勅令」: ${nm(c, pd.by)} が ${nm(c, top(s).owner)} のカードを左から${idxOf(g, s.id) + 1}番目へ動かした`);
   finishCard(c, pd.cardId);
 }
 // 排除: 山の上のカードを捨て札へ。排除した人は影響力+1(自分のカードでも)。カードの上の影響力はなくなる

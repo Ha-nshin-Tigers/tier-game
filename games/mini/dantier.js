@@ -53,7 +53,7 @@ function start(c, settings, rnd = Math.random) {
   const order = [...c.members()];
   const theme = cfg.theme || THEMES[Math.floor(rnd() * THEMES.length)];
   const g = c.g = { cfg, mode: cfg.mode, order, theme, lo: START_LO, hi: START_HI, items: [], nid: 1, log: [], rnd, armKey: null,
-    step: null, turn: 0, round: 0, streak: 0, best: 0, hintsLeft: cfg.hints, cur: null, scores: Object.fromEntries(order.map((id) => [id, 0])), made: 0, last: null };
+    step: null, turn: 0, round: 0, streak: 0, best: 0, hintsLeft: cfg.hints, cur: null, scores: Object.fromEntries(order.map((id) => [id, 0])), played: 0, makes: {}, last: null };
   log(g, `お題「${theme}」`);
   if (g.mode === "secret") beginClue(c);
   else if (g.mode === "together") { g.step = "build"; arm(c); }
@@ -63,20 +63,29 @@ function start(c, settings, rnd = Math.random) {
 // ================= 本編(秘密のランクを当てる) =================
 function beginClue(c) {
   const g = c.g;
-  const n = g.order.length;
-  g.round++;
-  const giver = g.order[g.turn % n];
+  // g.turn は「今の番の人」の g.order での位置(抜けた人がいたら onLeave で詰める)
+  g.turn %= g.order.length;
+  g.round = g.played + 1; // 飛ばした出題(時間切れ・抜けた)は数えない
+  const giver = g.order[g.turn];
   const vis = visible(g);
   g.cur = { giver, secret: vis[Math.floor(g.rnd() * vis.length)], text: "", picks: {}, removed: [], hinted: false, answer: null, ok: null };
   g.step = "clue";
   log(g, `ラウンド${g.round}: ${nm(c, giver)} が出題(秘密のランクに合う言葉を考え中)`);
   arm(c);
 }
+// 答えを言ってしまう言葉: 「ランク」「ティア」を含む、ランク名だけ、「S級」「A位」など
+function saysRank(text) {
+  const t = text.normalize("NFKC").toUpperCase().replace(/\s+/g, "");
+  if (LADDER.includes(t.replace(/[!！?？。、.,ー~〜]+$/g, ""))) return true; // ランク名だけ
+  // ランク名のすぐ後に「ランク」「ティア」「級」などが続く(「Sランク」「Aティア」「B級」)。「フランクフルト」「ティアラ」は通す
+  return /(^|[^A-Z])(SSS|SS|[SABCDEFG])(ランク|ティア|TIER|RANK|級|位|クラス|判定|評価)/.test(t);
+}
 function clue(c, id, m) {
   const g = c.g, cur = g.cur;
   if (g.step !== "clue" || cur.giver !== id) return "あなたが出題する番ではありません";
   const text = clean(m.text, MAX_TEXT);
   if (!text) return "言葉を入れてください";
+  if (saysRank(text)) return "ランクそのもの(「Sランク」など)は書けません。お題に合う言葉で伝えてください";
   cur.text = text; g.step = "guess";
   log(g, `${nm(c, id)} の言葉「${text}」 → みんなで何ランクか相談`);
   arm(c);
@@ -109,7 +118,7 @@ function decide(c, id, m) {
 }
 function answer(c, rank, by) {
   const g = c.g, cur = g.cur;
-  cur.answer = rank; cur.ok = rank === cur.secret; cur.by = by || null;
+  cur.answer = rank; cur.ok = rank === cur.secret; cur.by = by || null; g.played++;
   g.items.push({ id: g.nid++, text: cur.text, by: cur.giver, rank: cur.secret, round: g.round, ok: cur.ok });
   if (cur.ok) { g.streak++; g.best = Math.max(g.best, g.streak); }
   else g.streak = 0;
@@ -128,6 +137,16 @@ function answer(c, rank, by) {
   }
   g.step = "result";
   arm(c);
+}
+// あきらめて表を見る(ホストだけ。本編はクリアしないと終わらないので)
+function giveup(c, id, isHost) {
+  const g = c.g;
+  if (g.mode !== "secret") return;
+  if (!isHost) return "終わらせるのはホストです";
+  g.step = "end"; g.cleared = false; c.clearTimer();
+  log(g, `ここで終了(${g.round}ラウンド・最高${g.best}回連続)`);
+  const raw = {}; for (const id2 of g.order) raw[id2] = 0;
+  c.finish(raw);
 }
 function next(c) {
   const g = c.g;
@@ -187,11 +206,14 @@ function complete(c, id, isHost) {
 }
 
 // ================= じぶんのティアー(作る人の並びを当てる) =================
+// 作る人: 今の位置から順に、まだ決めた回数だけ作っていない人。全員作り終えたら終わり
 function beginMake(c) {
   const g = c.g, n = g.order.length;
-  if (g.made >= n * g.cfg.cycles) return endMine(c);
-  g.made++; g.round++;
-  const maker = g.order[g.turn % n];
+  let maker = null;
+  for (let k = 0; k < n; k++) { const id = g.order[(g.turn + k) % n]; if ((g.makes[id] || 0) < g.cfg.cycles) { g.turn = (g.turn + k) % n; maker = id; break; } }
+  if (!maker) return endMine(c);
+  g.makes[maker] = (g.makes[maker] || 0) + 1;
+  g.round = g.played + 1;
   g.cur = { maker, items: [], guesses: {}, done: [], pts: null };
   g.step = "make";
   log(g, `ラウンド${g.round}: ${nm(c, maker)} が自分のティアー表を作っています`);
@@ -235,7 +257,7 @@ function reveal(c) {
   const vals = Object.values(pts);
   pts[cur.maker] = vals.length ? Math.floor(vals.reduce((a, b) => a + b, 0) / vals.length) : 0; // 作る人は当てた人たちの平均点
   for (const [p, v] of Object.entries(pts)) g.scores[p] = (g.scores[p] || 0) + v;
-  cur.pts = pts;
+  cur.pts = pts; g.played++;
   g.step = "reveal";
   log(g, `答え合わせ: ${Object.entries(pts).map(([p, v]) => `${nm(c, p)} +${v}`).join("・")}`);
   arm(c);
@@ -257,7 +279,8 @@ function arm(c) {
   if (g.step === "clue") { who = g.cur.giver; secs = g.cfg.clueSecs; }
   else if (g.step === "guess") secs = g.cfg.guessSecs;
   else if (g.step === "make") { who = g.cur.maker; secs = g.cfg.makeSecs; }
-  else if (g.step === "result" || g.step === "reveal") secs = 12; // 結果を見る時間(「次へ」でも進む)
+  else if (g.step === "result") secs = 12; // 結果を見る時間(「次へ」でも進む)
+  else if (g.step === "reveal") secs = 30; // 答え合わせの表は長いので長め
   const away = who != null && !c.live().includes(who);
   const key = [g.round, g.step, who, away].join("|");
   if (g.armKey === key) return;
@@ -278,12 +301,18 @@ function timeout(c) {
   }
   if (g.step === "make") {
     if (g.cur.items.length >= MINE_MIN) { log(g, "時間切れ: そのまま公開"); return publish(c, g.cur.maker); }
-    log(g, `${nm(c, g.cur.maker)} は時間切れ(次の人へ)`); g.turn++; return beginMake(c);
+    log(g, `${nm(c, g.cur.maker)} は時間切れ(次の人へ)`); g.turn++; return beginMake(c); // 作れなかった回も1回と数える(何度も待たないように)
   }
   if (g.step === "guess" && g.mode === "mine") { log(g, "時間切れ: 答え合わせ"); return reveal(c); }
   if (g.step === "result" || g.step === "reveal") return next(c);
 }
-function onPresence(c) { const g = c.g; if (g && g.step !== "end") arm(c); }
+// 切断・再接続: 持ち時間を掛け直す。じぶんのティアーで、残りの(つながっている)当てる人が全員回答済みなら答え合わせ
+function onPresence(c) {
+  const g = c.g;
+  if (!g || g.step === "end") return;
+  if (g.mode === "mine" && g.step === "guess" && g.cur.done.length && guessers(c).every((p) => g.cur.done.includes(p))) return reveal(c);
+  arm(c);
+}
 
 function handle(c, pid, m, isHost) {
   const g = c.g;
@@ -296,6 +325,7 @@ function handle(c, pid, m, isHost) {
     case "hint": return hint(c, pid);
     case "decide": return decide(c, pid, m);
     case "next": return next(c);
+    case "giveup": return giveup(c, pid, isHost);
     case "add": return add(c, pid, m);
     case "move": return move(c, pid, m);
     case "remove": return remove(c, pid, m);
@@ -310,16 +340,22 @@ function onLeave(c, pid) {
   const g = c.g;
   if (!g || g.step === "end") return;
   log(g, `${nm(c, pid)} が抜けた`);
+  // 番の人の位置を詰める: 抜けた人が今の番より前なら1つ前へ。今の番の人が抜けて、そのラウンドをやり直すときはそのまま(次の人の番になる)
+  const i = g.order.indexOf(pid), cur = g.cur;
+  const redo = cur && ((cur.giver === pid && (g.step === "clue" || g.step === "guess")) || (cur.maker === pid && (g.step === "make" || g.step === "guess")));
+  if (i >= 0 && (i < g.turn || (i === g.turn && !redo))) g.turn--;
   g.order = g.order.filter((x) => x !== pid);
+  if (g.turn < 0) g.turn = 0;
   g.armKey = null;
   if (g.order.length < 2 && g.mode !== "together") { if (g.mode === "mine") return endMine(c); g.step = "end"; return c.clearTimer(); }
+  if (!g.order.length) { g.step = "end"; return c.clearTimer(); }
   if (g.mode === "secret" && g.cur) {
     delete g.cur.picks[pid];
-    // 出題する人が抜けたら、そのラウンドはやり直し(次の人が出題。g.turn はそのままで、抜けた人の次の人に回る)
-    if (g.cur.giver === pid && (g.step === "clue" || g.step === "guess")) { g.round--; return beginClue(c); }
+    // 出題する人が抜けたら、そのラウンドはやり直し(次の人が出題)
+    if (redo) return beginClue(c);
   }
   if (g.mode === "mine" && g.cur) {
-    if (g.cur.maker === pid && (g.step === "make" || g.step === "guess")) { g.made--; g.round--; return beginMake(c); }
+    if (redo) return beginMake(c);
     if (g.step === "guess" && guessers(c).every((p) => g.cur.done.includes(p))) return reveal(c);
   }
   arm(c);
@@ -350,4 +386,4 @@ function view(c, me) {
   return v;
 }
 
-module.exports = { start, handle, view, onLeave, onPresence, normalize, DEFAULTS, LADDER, THEMES, START_LO, START_HI, MINE_MIN, MINE_MAX, _t: { answer, reveal, visible } };
+module.exports = { start, handle, view, onLeave, onPresence, normalize, DEFAULTS, LADDER, THEMES, START_LO, START_HI, MINE_MIN, MINE_MAX, _t: { answer, reveal, visible, saysRank } };

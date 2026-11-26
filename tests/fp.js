@@ -25,6 +25,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await A.screenshot({ path: "fp_right_pc.png", timeout: 60000 });
   await A.mouse.move(cx, cy); await A.mouse.down(); for (let k = 1; k <= 20; k++) await A.mouse.move(cx + k * 30, cy); await A.mouse.up(); await sleep(900);
   await A.screenshot({ path: "fp_left_pc.png", timeout: 60000 });
+  // 視点を動かすと「正面を見る」が出る。遅い環境ではドラッグが届かないことがあるので、出るまでドラッグし直す(最大3回)
+  for (let t = 0; t < 3 && !(await A.locator(".lookFront").isVisible()); t++) { await A.mouse.move(cx, cy); await A.mouse.down(); for (let k = 1; k <= 15; k++) { await A.mouse.move(cx + k * 30, cy); await sleep(16); } await A.mouse.up(); await sleep(900); }
   await A.click(".lookFront"); await sleep(900);
   // スマホ: スワイプで左を向いてスタンプを受ける
   const sb = await B.locator("#stage canvas").boundingBox();
