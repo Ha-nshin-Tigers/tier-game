@@ -15,13 +15,15 @@
 .ori .row .empty { color: #d9d3c4; font-size: 14px; padding: 40px 12px; }
 .ori .slot { width: 34px; flex: none; border: 2px dashed #e2b545; border-radius: 8px; background: rgba(226,181,69,.15); color: #f6e7b5; font-size: 12px; font-weight: 700; padding: 0; writing-mode: vertical-rl; letter-spacing: .1em; cursor: pointer; animation: ori-pulse 1.2s ease-in-out infinite; }
 .ori .stack { position: relative; flex: none; padding-bottom: 20px; }
-.ori .card { position: relative; width: 104px; min-height: 148px; border-radius: 9px; border: 3px solid var(--fam); background: #fbf7ef; color: #1d1a18; padding: 6px 7px 8px; display: grid; grid-template-rows: auto auto auto 1fr; align-content: start; gap: 2px; text-align: left; font-family: var(--body); font-weight: 500; box-shadow: 0 2px 0 rgba(0,0,0,.35); cursor: default; }
+.ori .card { position: relative; width: 104px; min-height: 148px; border-radius: 9px; border: 3px solid var(--fam); background: linear-gradient(180deg, #fffaf0 0%, #f1e6cc 100%); color: #1d1a18; padding: 6px 7px 8px; display: grid; grid-template-rows: auto auto auto 1fr; align-content: start; gap: 3px; text-align: left; font-family: var(--body); font-weight: 500; box-shadow: inset 0 0 0 2px rgba(120,90,40,.18), 0 2px 0 rgba(0,0,0,.35); cursor: default; }
 .ori .card .fam { height: 6px; border-radius: 3px; background: var(--fam); }
-.ori .card .ic { font-size: 26px; line-height: 1.1; text-align: center; }
+.ori .card .kind { position: absolute; top: 11px; right: 7px; font-size: 9.5px; font-weight: 700; color: #7a6440; letter-spacing: .05em; }
+.ori .card .ic { justify-self: center; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-size: 22px; line-height: 1; background: radial-gradient(circle at 35% 30%, #fff 0%, color-mix(in srgb, var(--fam) 30%, #fff) 70%); border: 2px solid var(--fam); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
 .ori .card .nm { font-family: var(--display); font-size: 15px; text-align: center; line-height: 1.2; }
 .ori .card .tx { font-size: 10.5px; line-height: 1.35; color: #4b4540; }
 .ori .card.back { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fam) 75%, #000) 0 8px, color-mix(in srgb, var(--fam) 55%, #000) 8px 16px); color: #fff; place-items: center; grid-template-rows: 1fr auto; }
-.ori .card.back .q { font-family: var(--display); font-size: 30px; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.ori .card.back .q { font-family: var(--display); font-size: 30px; text-shadow: 0 2px 0 rgba(0,0,0,.4); display: grid; justify-items: center; line-height: 1.1; }
+.ori .card.back .q small { font-family: var(--body); font-size: 22px; opacity: .55; }
 .ori .card.back.mine { outline: 2px dashed #fff; outline-offset: -7px; }
 .ori .card.back .peek { font-size: 11px; font-weight: 700; background: rgba(0,0,0,.55); border-radius: 4px; padding: 1px 6px; text-align: center; }
 .ori .card .who { position: absolute; left: 0; right: 0; bottom: -20px; text-align: center; font-size: 11px; font-weight: 700; color: #f2ecdf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -43,7 +45,7 @@
 @media (max-width: 520px) {
   .ori .card { width: 88px; min-height: 128px; }
   .ori .card .tx { font-size: 9.5px; }
-  .ori .card .ic { font-size: 22px; }
+  .ori .card .ic { font-size: 19px; width: 34px; height: 34px; }
   .ori .card .nm { font-size: 13.5px; }
 }`;
   { const st = document.createElement("style"); st.textContent = CSS; document.head.append(st); }
@@ -53,12 +55,12 @@
     const fam = env.colorOf(owner), name = (x) => env.cards?.[x]?.name || x;
     if (!k || opts.back) {
       return h("div", { class: "card back" + (opts.mine ? " mine" : ""), style: `--fam:${fam}`, title: k ? `伏せたカード(あなたの${name(k)})` : "伏せたカード" },
-        h("div", { class: "q" }, "?"), k ? h("div", { class: "peek" }, ICON[k] + " " + name(k)) : h("div", {}),
+        h("div", { class: "q" }, h("small", { "aria-hidden": "true" }, "⚜"), "?"), k ? h("div", { class: "peek" }, ICON[k] + " " + name(k)) : h("div", {}),
         opts.who ? h("div", { class: "who" }, opts.who) : null);
     }
     const d = env.cards[k];
     return h(opts.button ? "button" : "div", { type: opts.button ? "button" : undefined, class: "card" + (opts.sel ? " sel" : ""), style: `--fam:${fam}`, onclick: opts.onclick, "aria-pressed": opts.button ? (opts.sel ? "true" : "false") : undefined },
-      h("div", { class: "fam" }), h("div", { class: "ic" }, ICON[k]), h("div", { class: "nm" }, d.name), h("div", { class: "tx" }, d.text),
+      h("div", { class: "fam" }), h("span", { class: "kind" }, d.char ? "人物" : "策略"), h("div", { class: "ic" }, ICON[k]), h("div", { class: "nm" }, d.name), h("div", { class: "tx" }, d.text),
       opts.who ? h("div", { class: "who" }, opts.who) : null);
   }
   // 列の描画。押せる山(対象・重ねる先)と、勅令の置き場所(山のすきま)
