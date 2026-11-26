@@ -605,6 +605,8 @@ function serveStatic(pathname, res, versioned) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/healthz") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
+  // 運営の確認用: パーティー・通算成績・お題の保存先(Upstash か、反映のたびに消えるローカルファイルか)。秘密の値は出さない
+  if (url.pathname === "/healthz/store") { res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); return res.end(JSON.stringify({ store: require("./games/store").remote ? "upstash" : "file" })); }
   // 以前のティア表の招待リンク(/?room=ABCD)はティア表へ転送する
   if (url.pathname === "/" && url.searchParams.has("room")) {
     res.writeHead(302, { Location: "/tier" + url.search });

@@ -26,6 +26,7 @@ let fails = 0; const check = (c, m) => { console.log((c ? "OK  " : "NG  ") + m);
   for (const p of ps) if (p !== P) { await p.click("button:has-text('OK')"); await sleep(150); }
   await sleep(300);
   check(await A.evaluate(() => S.game.step === "write" && S.game.topic === "果物"), "お題が決まって書く段階へ");
+  await A.screenshot({ path: "gc_write_sp.png" }); // 画面写真(遊び方ガイド用にも使う)
   const sets = [["りんご", "みかん", "バナナ", "ぶどう", "もも", "なし"], ["リンゴ", "メロン", "スイカ", "いちご", "キウイ", "ばなな"], ["かき", "くり", "うめ", "ゆず", "レモン", "マンゴー"]];
   for (let i = 0; i < 3; i++) {
     const p = ps[i], inputs = p.locator(".answers input");

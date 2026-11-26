@@ -508,7 +508,28 @@ body.pb-tuck .pb-help, body.pb-tuck .pb-chat .pb-cbtn { transform: translateX(14
     addEventListener("scroll", tuckTick, { passive: true });
     addEventListener("resize", tuckTick);
   }
-  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); tuckTick(); }, 1500);
+  // ---- 3D画面が重いとき: 遊び始めてから少しのあいだ描画の速さを測り、毎秒24コマを下回ったら軽量モードを1回だけすすめる ----
+  // (端末の種類だけでは分からない重さ(古いパソコン・省電力中のスマホなど)のため。すすめるのは端末ごとに1回)
+  let fpsState = null;
+  function fpsTick() {
+    if (!window.PB_3D || !window.TG || TG.lite() || fpsState === "done" || store.get("tier:liteAsked") || !busy() || document.hidden) return;
+    if (fpsState) return;
+    fpsState = "wait";
+    setTimeout(() => {
+      let n = 0; const t0 = performance.now();
+      const step = (t) => { n++; if (t - t0 < 6000) return requestAnimationFrame(step); fpsState = "done"; const fps = n * 1000 / (t - t0); if (fps < 24 && !document.hidden) suggestLite(Math.round(fps)); };
+      requestAnimationFrame(step);
+    }, 4000); // 読み込み直後の重さは数えない
+  }
+  function suggestLite(fps) {
+    store.set("tier:liteAsked", 1);
+    const box = document.createElement("div"); box.className = "pb-sheet"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "軽量モードのおすすめ");
+    box.innerHTML = `<div class="pb-sheet-box"><b>動きが重いようです(毎秒 約${fps}コマ)</b><p class="pb-sheet-msg" style="color:inherit">軽量モードにすると、3Dの画質を少し下げて動きを軽くします。いつでも右下の「画質」ボタン(待機中)で戻せます。ページを読み込み直します。</p><button type="button" data-l="on" style="--c:#3446c4">軽量モードにする</button><button type="button" class="pb-sheet-close" data-l="off">このままにする</button></div>`;
+    box.addEventListener("click", (e) => { const a = e.target.closest("[data-l]")?.dataset.l; if (e.target === box || a === "off") box.remove(); if (a === "on") { store.set("tier:lite", true); location.reload(); } });
+    if (!sheetCss) addShare(true); // シートの見た目を読み込む
+    document.body.append(box);
+  }
+  setInterval(() => { addShare(); wake(); guideTick(); watchTick(); recentTick(); gfxButton(); tuckTick(); fpsTick(); }, 1500);
   // 招待欄が画面に出たらすぐ「共有」ボタンを付ける(1.5秒ごとの確認を待たない)
   let shareQ = false;
   if (document.body) new MutationObserver(() => { if (shareQ) return; shareQ = true; requestAnimationFrame(() => { shareQ = false; addShare(); }); })
