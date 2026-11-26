@@ -75,39 +75,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
 
-/* 列(テーブル) */
-.table { background: var(--felt); border-radius: 12px; padding: 12px 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.row { display: flex; gap: 6px; align-items: stretch; width: max-content; min-width: 100%; justify-content: center; padding: 4px 2px; }
-.row .empty { color: #d9d3c4; font-size: 14px; padding: 40px 12px; }
-.slot { width: 34px; flex: none; border: 2px dashed #e2b545; border-radius: 8px; background: rgba(226,181,69,.15); color: #f6e7b5; font-size: 12px; font-weight: 700; padding: 0; writing-mode: vertical-rl; letter-spacing: .1em; cursor: pointer; animation: pulse 1.2s ease-in-out infinite; }
-.stack { position: relative; flex: none; }
-.card { position: relative; width: 104px; min-height: 148px; border-radius: 9px; border: 3px solid var(--fam); background: #fbf7ef; color: #1d1a18; padding: 6px 7px 8px; display: grid; grid-template-rows: auto auto auto 1fr; align-content: start; gap: 2px; text-align: left; font-family: var(--body); font-weight: 500; box-shadow: 0 2px 0 rgba(0,0,0,.35); cursor: default; }
-.card .fam { height: 6px; border-radius: 3px; background: var(--fam); }
-.card .ic { font-size: 26px; line-height: 1.1; text-align: center; }
-.card .nm { font-family: var(--display); font-size: 15px; text-align: center; line-height: 1.2; }
-.card .tx { font-size: 10.5px; line-height: 1.35; color: #4b4540; }
-.card.back { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fam) 75%, #000) 0 8px, color-mix(in srgb, var(--fam) 55%, #000) 8px 16px); color: #fff; place-items: center; grid-template-rows: 1fr auto; }
-.card.back .q { font-family: var(--display); font-size: 30px; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
-.card.back.mine { outline: 2px dashed #fff; outline-offset: -7px; }
-.card.back .peek { font-size: 11px; font-weight: 700; background: rgba(0,0,0,.55); border-radius: 4px; padding: 1px 6px; text-align: center; }
-.card .who { position: absolute; left: 0; right: 0; bottom: -20px; text-align: center; font-size: 11px; font-weight: 700; color: #f2ecdf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stack { padding-bottom: 20px; }
-.tok { position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; border-radius: 13px; background: var(--gold); color: #1d1a18; font-weight: 700; font-size: 13px; display: grid; place-items: center; border: 2px solid #1d1a18; padding: 0 5px; z-index: 2; }
-.under { position: absolute; top: -8px; left: -6px; font-size: 10px; font-weight: 700; background: #1d1a18; color: #fff; border-radius: 4px; padding: 0 5px; z-index: 2; }
-.stack.cur .card { box-shadow: 0 0 0 4px #ffd36b, 0 0 18px #ffd36b; }
-.stack.done .card { filter: saturate(.75) brightness(.92); }
-.stack.can { cursor: pointer; } .stack.can .card { cursor: pointer; box-shadow: 0 0 0 4px #ff7b6b; animation: pulse 1.2s ease-in-out infinite; }
-.stack.hit .card { box-shadow: 0 0 0 4px #ff4d4d; }
-@keyframes pulse { 50% { opacity: .65; } }
-/* 手札 */
-.hand { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch; }
-.hand .card { cursor: pointer; flex: none; align-content: start; } /* 縮めずに横スクロール(スマホで文字がつぶれないように) */
-.hand .card.sel { transform: translateY(-6px); box-shadow: 0 0 0 4px var(--accent), 0 6px 0 rgba(0,0,0,.3); }
-.hand button.card { padding: 6px 7px 8px; }
-.act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.ref { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
-.ref li { font-size: 13px; padding: 6px 8px; border: 1.5px solid var(--line); border-radius: 8px; }
-.ref b { font-family: var(--display); font-weight: 400; }
+/* 列・カード・手札の見た目は /js/ori-ui.js(大会と共通) */
 /* プレイヤー */
 .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .players li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
@@ -134,10 +102,6 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
   body.playing .top h1 { font-size: 16px; }
   .panel { padding: 10px; gap: 8px; }
   .say { font-size: 17px; }
-  .card { width: 88px; min-height: 128px; }
-  .card .tx { font-size: 9.5px; }
-  .card .ic { font-size: 22px; }
-  .card .nm { font-size: 13.5px; }
 }
 </style>
 </head>
@@ -168,6 +132,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 </div>
 
 <script src="/js/common.js"></script>
+<script src="/js/ori-ui.js"></script>
 <script>
 const { $, h, store, rnd, Sound, twoStep, saveName, COLORS, player, nameOf, isGM, remaining, send, chip } = TG; // 全ページ共通の部品(public/js/common.js)
 
@@ -238,32 +203,21 @@ $("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQ
 // ---- 共通 ----
 const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
 const act = (a, x = {}) => send({ t: "game", a, ...x });
-// カードの絵(絵文字)。カード名と能力の文はサーバから届く(S.cards)
-const ICON = { archer: "🏹", soldier: "⚔️", spy: "🕵️", heir: "👑", assassination: "🗡️", decree: "📜", lord: "🏰", shapeshifter: "🎭", ambush: "🪤", conspiracy: "🕯️" };
-const ORDER = ["archer", "soldier", "spy", "heir", "assassination", "decree", "lord", "shapeshifter", "ambush", "conspiracy"];
-let local = { sel: null };
+// カード名と能力の文はサーバから届く(S.cards)。遊んでいる画面は /js/ori-ui.js(大会と共通)
 const cardName = (k) => S.cards?.[k]?.name || k;
+const env = () => ({ me, cards: S.cards, nameOf, colorOf, act, remaining, rerender: render });
 
 function onTransition(prev, cur) {
   if (!prev || prev.code !== cur.code) return;
   if (cur.players.length > prev.players.length) Sound.play("join");
   const g = cur.game, pg = prev.game;
   if (!g || !pg) return;
-  const myTurn = (x) => (x.step === "place" && x.placer === me) || (x.pending && x.pending.by === me);
-  if (myTurn(g) && !myTurn(pg)) Sound.play("turn");
-  if (g.last && JSON.stringify(g.last) !== JSON.stringify(pg.last)) {
-    if (g.last.type === "reveal") Sound.play("reveal");
-    else if (g.last.type === "elim" || g.last.type === "spy") Sound.play("done");
-    else Sound.play("tap");
-  }
+  OriUI.sound(pg, g, me, Sound);
   if (g.step === "end" && pg.step !== "end") Sound.play("reveal");
-  if (g.step !== "place" || g.placer !== me) local.sel = null;
 }
 function render() {
   if (!S) return;
   document.body.classList.toggle("playing", S.phase !== "lobby");
-  const g = S.game;
-  if (g && local.sel != null && !(g.hand || []).some((c) => c.id === local.sel)) local.sel = null;
   renderMeta(); renderSide(); renderMain();
 }
 function renderMeta() {
@@ -312,20 +266,6 @@ function renderSide() {
   side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
 }
 
-// カード1枚の絵。k が null なら裏向き(持ち主の色の模様)
-function cardEl(k, owner, opts = {}) {
-  const fam = colorOf(owner);
-  if (!k || opts.back) {
-    return h("div", { class: "card back" + (opts.mine ? " mine" : ""), style: `--fam:${fam}`, title: k ? `伏せたカード(あなたの${cardName(k)})` : "伏せたカード" },
-      h("div", { class: "q" }, "?"), k ? h("div", { class: "peek" }, ICON[k] + " " + cardName(k)) : h("div", {}),
-      opts.who ? h("div", { class: "who" }, opts.who) : null);
-  }
-  const d = S.cards[k];
-  return h(opts.button ? "button" : "div", { type: opts.button ? "button" : undefined, class: "card" + (opts.sel ? " sel" : ""), style: `--fam:${fam}`, onclick: opts.onclick, "aria-pressed": opts.button ? (opts.sel ? "true" : "false") : undefined },
-    h("div", { class: "fam" }), h("div", { class: "ic" }, ICON[k]), h("div", { class: "nm" }, d.name), h("div", { class: "tx" }, d.text),
-    opts.who ? h("div", { class: "who" }, opts.who) : null);
-}
-
 function renderMain() {
   const main = $("main"); main.replaceChildren();
   if (S.phase === "lobby") return renderLobby(main);
@@ -333,79 +273,7 @@ function renderMain() {
   // 切断したままの人がいると、その人の番のたびに待つことになるので、ホストに目立つ形で知らせる
   const offs = g.step !== "end" && isGM() ? g.order.filter((id) => id !== me && player(id) && !player(id).connected) : [];
   if (offs.length) main.append(h("div", { class: "offnote", role: "status" }, ...offs.map((id) => h("div", { class: "btns" }, h("span", {}, `${nameOf(id)} さんが切断中です(番が来るたびに少し待ちます)。戻らないときは → `), twoStep("退出させる", () => send({ t: "kick", id }), "danger")))));
-  const pd = g.pending, mine = pd && pd.by === me;
-  const curStack = g.queue.find((s) => s.id === g.cur);
-  let say;
-  if (g.step === "end") say = "ゲーム終了";
-  else if (g.step === "place") say = g.placer === me ? "あなたの番: 手札を1枚選んで、列に置いてください" : `${nameOf(g.placer)} さんがカードを置いています`;
-  else if (!pd) say = "解決中…";
-  else if (pd.type === "reveal") say = mine ? "あなたのカードの番: 公開しますか？" : `${nameOf(pd.by)} さんが、公開するか考えています`;
-  else if (pd.type === "target") say = mine ? `「${cardName(pd.as)}」の対象を選んでください(光っているカード)` : `${nameOf(pd.by)} さんが「${cardName(pd.as)}」の対象を選んでいます`;
-  else say = mine ? "「勅令」: 動かす先を選んでください(光っている「ここへ」)" : `${nameOf(pd.by)} さんが「勅令」で動かす先を選んでいます`;
-  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say),
-    remaining() != null && g.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null));
-
-  if (g.step === "end") renderResult(main, g);
-
-  // 列
-  main.append(h("div", { class: "small muted", style: "margin:0" }, g.step === "end" ? "最後の列(全部のカードを表にしています)" : `列: ${g.dir === "L" ? "左から右へ ➡" : "⬅ 右から左へ"} 順に解決します(このゲームのあいだ同じ向き)。● はカードの上にたまった影響力`));
-  main.append(tableEl(g));
-
-  // 操作
-  if (g.step === "place" && g.placer === me) {
-    const sel = local.sel;
-    main.append(h("div", { class: "act" },
-      h("button", { type: "button", class: "primary", disabled: sel == null, onclick: () => act("place", { card: sel, where: "L" }) }, "← 左端に置く"),
-      h("button", { type: "button", class: "primary", disabled: sel == null, onclick: () => act("place", { card: sel, where: "R" }) }, "右端に置く →")),
-      h("p", { class: "small muted", style: "text-align:center;margin:0" }, sel == null ? "まず下の手札から1枚選んでください。" : "左端・右端のほか、列の光っている自分のカードを押すと、その上に重ねて置けます(下のカードは隠れます)。"));
-  }
-  if (pd && pd.type === "reveal" && mine && curStack) {
-    const k = curStack.top.k;
-    main.append(h("div", { class: "act" },
-      h("button", { type: "button", class: "primary big", onclick: () => act("decide", { reveal: true }) }, `公開する(${cardName(k)})`),
-      h("button", { type: "button", class: "big", onclick: () => act("decide", { reveal: false }) }, "伏せたまま(影響力+1を上に置く)")),
-      h("p", { class: "small muted", style: "text-align:center;margin:0" }, k === "ambush" ? `待ち伏せは公開すると影響力+1(上の${curStack.top.inf}はもらえず捨てる)。伏せたままにすると上に影響力が1たまります(相手に排除されたら+4)。` : (curStack.top.inf ? `公開すると、上にたまった影響力${curStack.top.inf}${k === "conspiracy" ? "の2倍" : ""}をもらってから能力を使います。` : "公開すると、能力を使います。") + "伏せたままにすると、上に影響力が1たまります。"));
-  }
-  // 手札
-  if (g.hand) {
-    main.append(h("h2", { style: "font-size:16px" }, g.step === "end" ? `使わなかった手札(${g.hand.length}枚)` : `あなたの手札(${g.hand.length}枚)`));
-    const canPick = g.step === "place" && g.placer === me;
-    main.append(h("div", { class: "hand" }, ...[...g.hand].sort((a, b) => ORDER.indexOf(a.k) - ORDER.indexOf(b.k)).map((c) => cardEl(c.k, me, { button: true, sel: local.sel === c.id, onclick: () => { if (!canPick) return; local.sel = local.sel === c.id ? null : c.id; render(); } }))),
-      g.hand.length && !canPick && g.step === "place" ? h("p", { class: "small muted", style: "margin:0" }, "自分の番になったら、ここから1枚選んで置きます。") : null);
-  } else if (g.step !== "end") main.append(h("p", { class: "muted small" }, "観戦中です。"));
-  main.append(h("details", {}, h("summary", { class: "small" }, "カードの一覧(10種類・各家に1枚ずつ)"),
-    h("ul", { class: "ref" }, ...ORDER.map((k) => h("li", {}, ICON[k], " ", h("b", {}, S.cards[k].name), ": ", S.cards[k].text)))));
-}
-// 列の描画。押せる山(対象・重ねる先)と、勅令の置き場所(山のすきま)
-function tableEl(g) {
-  const pd = g.pending, mine = pd && pd.by === me;
-  const row = h("div", { class: "row" });
-  const canStack = (s) => (g.step === "place" && g.placer === me && local.sel != null && s.top.owner === me) || (mine && pd.type === "target" && pd.options.includes(s.id));
-  const tapStack = (s) => {
-    if (g.step === "place") return act("place", { card: local.sel, where: s.id });
-    if (pd && pd.type === "target") return act("target", { sid: s.id });
-  };
-  // 勅令の置き場所: 動かすカードを抜いたあとの列(pd.rest)で何番目に入れるか。画面では山のあいだに「ここへ」を出す
-  const moving = mine && pd.type === "move";
-  const rest = moving ? pd.rest : [];
-  const slot = (i) => moving && pd.positions.includes(i) ? h("button", { type: "button", class: "slot", "aria-label": `${i + 1}番目へ動かす`, onclick: () => act("target", { pos: i }) }, "ここへ") : null;
-  if (!g.queue.length) row.append(h("div", { class: "empty" }, "まだカードがありません"));
-  for (const s of g.queue) {
-    if (moving && rest.includes(s.id)) row.append(slot(rest.indexOf(s.id)));
-    const t = s.top, isMine = t.owner === me;
-    const can = canStack(s);
-    const lastHit = g.last && (g.last.tid === s.id) && g.step !== "end";
-    const st = h("div", { class: "stack" + (s.id === g.cur ? " cur" : "") + (g.done.includes(s.id) && s.id !== g.cur ? " done" : "") + (can ? " can" : "") + (moving && s.id === pd.tid ? " hit" : "") + (lastHit ? " hit" : ""),
-      role: can ? "button" : undefined, tabindex: can ? "0" : undefined, "aria-label": can ? (g.step === "place" ? "このカードの上に重ねる" : "このカードを選ぶ") : undefined,
-      onclick: can ? () => tapStack(s) : undefined, onkeydown: can ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapStack(s); } } : undefined },
-      // 終了後は伏せたカードも表にして見せる(「伏せ」の印つき)
-      t.up || g.step === "end" ? cardEl(t.k, t.owner, { who: nameOf(t.owner) + (t.up ? "" : "(伏せ)") }) : cardEl(t.k, t.owner, { back: true, mine: isMine, who: nameOf(t.owner) }),
-      !t.up && t.inf ? h("span", { class: "tok", title: "上にたまった影響力" }, "●" + t.inf) : null,
-      s.under.length ? h("span", { class: "under", title: s.under.map((u) => u.k ? cardName(u.k) + (u.up ? "(表)" : "(伏せ)") : "伏せたカード").join("・") }, `下に${s.under.length}枚`) : null);
-    row.append(st);
-  }
-  if (moving) row.append(slot(rest.length));
-  return h("div", { class: "table" }, row);
+  OriUI.render(main, g, { ...env(), afterHead: (box) => { if (g.step === "end") renderResult(box, g); } });
 }
 function renderResult(main, g) {
   const rows = S.ranking || [];
@@ -427,7 +295,7 @@ function renderLobby(main) {
       h("li", {}, "表向きのカードは、次のラウンドからも番が来るたびに能力を使います。能力は必ず使います(ほかに対象がなければ自分のカードでも)。"),
       h("li", {}, "カードを「排除」した人は影響力+1(自分のカードでも)。排除されたカードの上の影響力はなくなります。伏せた「待ち伏せ」を相手が排除すると、待ち伏せの持ち主が+4で、排除したカードも捨て札に。"),
       h("li", {}, "毎ラウンド先手は次の人へ。6ラウンド後(手札は1枚残ります)、影響力がいちばん多い人の勝ち。同点なら列に残っている自分のカードが多い人の勝ち。")),
-    h("details", {}, h("summary", { class: "small" }, "カードの一覧(10種類)"), h("ul", { class: "ref" }, ...ORDER.map((k) => h("li", {}, ICON[k], " ", h("b", {}, S.cards[k].name), ": ", S.cards[k].text)))),
+    OriUI.refEl(env(), "カードの一覧(10種類)"),
     h("div", { class: "settings" },
       sel("カードを置く持ち時間", "placeSecs", [[60, "60秒"], [30, "30秒"], [90, "90秒"], [0, "なし"]]),
       sel("公開・対象を選ぶ持ち時間", "actSecs", [[45, "45秒"], [30, "30秒"], [90, "90秒"], [0, "なし"]]),

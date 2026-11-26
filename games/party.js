@@ -17,6 +17,9 @@ const MINI = {
   number: require("./mini/number"),
   shotgun: require("./mini/shotgun"),
   eshiri: require("./mini/eshiri"),
+  oriflamme: require("./mini/oriflamme"),
+  // ダンダンティアーは、順位がつく「じぶんのティアー」で(本編は全員で協力するので大会には向かない)。時間は短め
+  dantier: { ...require("./mini/dantier"), start: (c) => require("./mini/dantier").start(c, { mode: "mine", makeSecs: 120, guessSecs: 90 }) },
 };
 
 const WS_PATH = "/party/ws";
@@ -94,7 +97,8 @@ function setTimer(room, ms, fn) {
     room.timer = null; room.deadline = 0;
     // ここで例外が出てもサーバ全体(ほかのゲームの部屋も)が落ちないようにする
     try { fn(); } catch (e) { console.error("ミニゲーム集 タイマー処理エラー:", e); }
-    broadcast(room);
+    // 画面の状態づくりで例外が出ても、サーバ全体(ほかのゲームの部屋も)が止まらないように
+    try { broadcast(room); } catch (e) { console.error("ミニゲーム集 送信エラー:", e); }
   }, ms);
 }
 
@@ -122,7 +126,7 @@ function startGame(room) {
   if (key === "bridge") bridgeStart(room);
   else if (key === "bomb") bombStart(room);
   else if (key === "memory") memoryStart(room);
-  else MINI[key].start(ctxOf(room));
+  else { MINI[key].start(ctxOf(room)); room.game.key = key; } // 画面を作るときに「どのゲームか」で分けるので、必ず入れておく
 }
 // 大会版ゲーム(games/mini/)に渡す、部屋の操作の窓口
 function ctxOf(room) {

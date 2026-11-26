@@ -37,7 +37,7 @@ function setTimer(room, ms, fn) {
     room.timer = null; room.deadline = 0;
     // ここで例外が出てもサーバ全体(ほかのゲームの部屋も)が落ちないようにする
     try { fn(); } catch (e) { console.error("散弾ルーレット タイマー処理エラー:", e); }
-    broadcast(room);
+    try { broadcast(room); } catch (e) { console.error("散弾ルーレット 送信エラー:", e); } // 画面の状態づくりで例外が出ても、サーバ全体は止めない
   }, ms);
 }
 function ctxOf(room) {

@@ -80,7 +80,7 @@ function setTimer(room, ms, fn) {
     room.timer = null;
     // ここで例外が出てもサーバ全体(ほかのゲームの部屋も)が落ちないようにする
     try { fn(); } catch (e) { console.error("ウソつき酒場 タイマー処理エラー:", e); }
-    broadcast(room);
+    try { broadcast(room); } catch (e) { console.error("ウソつき酒場 送信エラー:", e); } // 画面の状態づくりで例外が出ても、サーバ全体は止めない
   }, ms);
 }
 

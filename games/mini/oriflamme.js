@@ -381,7 +381,7 @@ function view(c, me) {
     players: Object.fromEntries(g.order.map((id) => [id, { inf: g.P[id].inf, hand: g.P[id].hand.length, discard: g.P[id].discard }])),
     hand: g.P[me] ? g.P[me].hand : null,
     pending: g.pending ? { type: g.pending.type, by: g.pending.by, sid: g.pending.sid, as: g.pending.as || null, options: g.pending.options || null, tid: g.pending.tid || null, positions: g.pending.positions || null, rest: g.pending.rest || null } : null,
-    last: g.last, log: g.log.slice(-30),
+    last: g.last, log: g.log.slice(-30), cards: CARDS, // カード名と説明(大会の画面でも使う)
   };
 }
 

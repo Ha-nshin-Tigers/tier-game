@@ -298,6 +298,8 @@ button.liarbtn { background: var(--bad); color: #fff; border-color: var(--bad); 
 
 <script src="/js/draw.js"></script>
 <script src="/js/common.js"></script>
+<script src="/js/ori-ui.js"></script>
+<script src="/js/dt-ui.js"></script>
 <script>
 const { $, h, store, saveName, COLORS, player, nameOf, send } = TG; // 全ページ共通の部品(public/js/common.js)
 const GAME_INFO = {
@@ -318,6 +320,10 @@ const GAME_INFO = {
     rules: ["ショットガンに実弾と空砲が込められます。発数は公開、順番は秘密。", "自分の番に、ほかの人か自分を撃ちます。自分を撃って空砲なら、もう一度自分の番。", "実弾でライフ−1(ライフ4)。弾がなくなると込め直して、アイテムが2つずつ配られます。", "脱落が遅いほど上位、最後の1人が1位。"] },
   eshiri: { icon: "🎨", name: "絵しりとり", short: "絵だけでしりとりをつなぐ(大会は1本・1周)", extra: true,
     rules: ["順番に、前の人の絵を見て「何の絵か」を推理し、その最後の文字から始まる言葉を絵だけで描きます(60秒・文字は描かない)。", "最初の人はお題の言葉から。「ん」で終わる言葉はだめ。描いた言葉は答え合わせまで秘密。", "答え合わせで、前の絵を読み取れたら+2点、自分の絵を読み取ってもらえたら+1点。", "全員が1回ずつ描いたら答え合わせ(90秒)。点数の順で順位が決まります。"] },
+  oriflamme: { orig: "Oriflamme", icon: "👑", name: "オリフラム", short: "伏せカードの読み合い(6ラウンド・長め約25分)", extra: true,
+    rules: ["同じ10種類のカードから7枚が手札。毎ラウンド1枚ずつ伏せて、列の左端か右端(または自分のカードの上)に置きます。", "列の端から順に、伏せたカードを「公開して能力を使う」か「伏せたまま影響力をためる」か選びます。", "弓兵・兵士・暗殺はカードを排除(+1)、待ち伏せは排除されると+4…。表向きのカードは毎ラウンド能力を使います。", "6ラウンド後、影響力の多い順に順位が決まります。"] },
+  dantier: { orig: "みんなでダンダンティアー！", icon: "🏆", name: "ダンダンティアー", short: "じぶんのティアー表の並びを当て合う", extra: true,
+    rules: ["順番に1人ずつ、お題で自分のティアー表を作ります(3〜10個の言葉を好きなランクに置く・120秒)。", "ほかの人には言葉だけが見えます。言葉ごとに、どのランクに置いたかを当てます(90秒)。", "ぴったり2点・1つずれ1点。作った人には、当てた人たちの平均点が入ります。", "全員が作り終えたら、合計点の順で順位が決まります。"] },
 };
 const ALL_GAMES = Object.keys(GAME_INFO);
 // 参考にした元のゲームの名前(かっこで小さく出す)
@@ -519,6 +525,13 @@ function render() {
   // 文字を入力中に作り直すと入力が消えるので、その間はゲーム部分を描き直さない
   // (絵しりとりは描いている画面を作り直さない仕組みがあるので対象外)
   const ae = document.activeElement;
+  // ダンダンティアーは言葉を置くたびに表を見せたいので、入力中の文字とカーソル位置を残したまま描き直す
+  if (S.game?.key === "dantier" && ae && ae.id && $("main").contains(ae) && ae.tagName === "INPUT") {
+    const keep = { id: ae.id, v: ae.value, s: ae.selectionStart };
+    local.mainStale = false; renderMain();
+    const el = $(keep.id); if (el) { el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} }
+    return;
+  }
   if (S.game?.key !== "eshiri" && ae && $("main").contains(ae) && ae.tagName === "INPUT") { local.mainStale = true; return; }
   local.mainStale = false;
   renderMain();
@@ -589,6 +602,8 @@ function renderMain() {
   else if (g.key === "liar") renderLiarMini(main, g);
   else if (g.key === "shotgun") renderShotgunMini(main, g);
   else if (g.key === "eshiri") renderEshiriMini(main, g, isGM);
+  else if (g.key === "oriflamme") OriUI.render(main, g, miniEnv(g));
+  else if (g.key === "dantier") DtUI.render(main, g, { ...miniEnv(g), isGM: () => S.gameHostId === me, isMember: () => g.order.includes(me), inParty: true });
 }
 
 function renderLobby(main, isGM) {
@@ -750,6 +765,11 @@ function tierPicker(words, done) {
     onclick: () => { const t = TIERS.find((x) => !local.tarr[x]); if (t) { local.tarr[t] = w; Sound.play("pick"); render(); } } }, w)));
   return [slots, ws, h("div", { class: "btns" }, h("button", { class: "primary big", type: "button", disabled: filled < 5, onclick: () => done({ ...local.tarr }) },
     filled < 5 ? `あと ${5 - filled} つ` : "これで決定"))];
+}
+// 共通部品(オリフラム・ダンダンティアー)に渡す窓口。大会のミニゲームの操作は t: "mini" で送る
+function miniEnv(g) {
+  return { me, nameOf, colorOf, cards: g.cards, act: (a, x = {}) => send({ t: "mini", a, ...x }), rerender: render, flash, again: () => {},
+    remaining: () => { const ms = remainingMs(); return ms == null ? null : Math.ceil(ms / 1000); } };
 }
 function renderTierMini(main, g) {
   const key = `${g.round}|${g.step}`;
@@ -987,7 +1007,7 @@ function rankTable(rows, cols) {
 }
 function renderResult(main, isGM) {
   const R = S.result, info = GAME_INFO[R.key];
-  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "", shotgun: "", eshiri: "絵の点" }[R.key];
+  const rawLabel = { bridge: "橋の点", bomb: "", memory: "料理の点", tier: "予想の点", number: "得点", liar: "", shotgun: "", eshiri: "絵の点", oriflamme: "影響力", dantier: "点" }[R.key];
   main.append(h("div", { class: "say" }, `${info.icon} ${info.name} の結果`));
   const cols = [["順位", (r) => h("td", { class: "pl" }, r.rank + "位")], ["名前", (r) => h("td", {}, chip(r.id))]];
   if (rawLabel) cols.push([rawLabel, (r) => h("td", { class: "n" }, r.raw)]);

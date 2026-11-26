@@ -74,36 +74,7 @@ input[type=text] { font-family: var(--body); font-size: 16px; padding: 7px 10px;
 .say.good { color: var(--good); } .say.red { color: var(--bad); }
 .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .cd { font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; } .cd.low { color: var(--bad); }
-.theme { font-family: var(--display); font-size: clamp(18px, 4.5vw, 24px); line-height: 1.3; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--gold) 30%, var(--surface)); border: 2px solid var(--fg); overflow-wrap: anywhere; }
-.theme small { display: block; font-family: var(--body); font-size: 12px; font-weight: 700; color: var(--muted); }
-.word { display: inline-block; font-family: var(--display); font-size: clamp(22px, 6vw, 32px); padding: 4px 14px; border-radius: 8px; background: var(--fg); color: var(--surface); overflow-wrap: anywhere; }
-.secret { display: inline-grid; place-items: center; min-width: 74px; height: 74px; padding: 0 10px; border-radius: 12px; font-family: var(--display); font-size: 40px; color: #181b23; border: 3px solid #181b23; }
-.meter { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
-.meter i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--fg); }
-.meter i.on { background: var(--gold); }
-/* ティアー表 */
-.tier { display: grid; gap: 3px; border-radius: 10px; overflow: hidden; border: 2px solid var(--fg); background: var(--fg); }
-.trow { display: grid; grid-template-columns: 64px minmax(0, 1fr); min-height: 52px; background: var(--surface); }
-.trow .lab { display: grid; place-items: center; font-family: var(--display); font-size: 22px; color: #181b23; }
-.trow .cells { display: flex; flex-wrap: wrap; gap: 5px; align-content: center; padding: 6px; min-width: 0; }
-.trow.can { cursor: pointer; } .trow.can .cells { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); }
-.trow.new .lab { animation: pop 0.6s ease-out; }
-.item { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; background: var(--bg); border: 1.5px solid var(--line); font-weight: 700; font-size: 14px; overflow-wrap: anywhere; max-width: 100%; }
-button.item { cursor: pointer; font-family: var(--body); min-height: 34px; }
-.item.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.item .ng { color: var(--bad); font-size: 12px; } /* はずれたラウンドの言葉(置き場所は正しいランク) */
-.item .by { font-size: 11px; color: var(--muted); font-weight: 500; }
-/* ランクを選ぶボタン */
-.ranks { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
-.ranks button { padding: 8px 4px; display: grid; gap: 2px; justify-items: center; font-family: var(--display); font-size: 20px; color: #181b23; border-width: 2px; }
-.ranks button.mine { box-shadow: 0 0 0 3px var(--accent); }
-.ranks button.gone { opacity: .25; text-decoration: line-through; }
-.ranks button .who { font-family: var(--body); font-size: 10.5px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ranks.sm button { font-size: 15px; padding: 4px 2px; } .ranks.sm { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
-.gitem { display: grid; gap: 4px; padding: 8px; border: 1.5px solid var(--line); border-radius: 8px; }
-.res { width: 100%; border-collapse: collapse; font-size: 13px; } .res td, .res th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } /* スマホで見出しが縦に折れないように(はみ出す分は横にスクロール) */ .res .ok { color: var(--good); font-weight: 700; } .res .near { color: #b7791f; font-weight: 700; } .res .ng { color: var(--bad); }
-.verdict { padding: 10px 14px; border-radius: 8px; border: 2px solid var(--fg); font-family: var(--display); font-size: 20px; }
-.verdict.ok { background: color-mix(in srgb, var(--good) 20%, var(--surface)); } .verdict.ng { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
+/* ティアー表・出題・相談の見た目は /js/dt-ui.js(大会と共通) */
 .addrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
 /* プレイヤー */
 .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -128,9 +99,6 @@ button.item { cursor: pointer; font-family: var(--body); min-height: 34px; }
   body.playing .top h1 { font-size: 16px; }
   .panel { padding: 10px; gap: 8px; }
   .say { font-size: 17px; }
-  .trow { grid-template-columns: 48px minmax(0, 1fr); min-height: 44px; }
-  .trow .lab { font-size: 18px; }
-  .ranks { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
   .addrow { grid-template-columns: minmax(0, 1fr) auto; } .addrow button { grid-column: 1 / -1; }
 }
 </style>
@@ -162,6 +130,7 @@ button.item { cursor: pointer; font-family: var(--body); min-height: 34px; }
 </div>
 
 <script src="/js/common.js"></script>
+<script src="/js/dt-ui.js"></script>
 <script>
 const { $, h, store, rnd, Sound, twoStep, saveName, COLORS, player, nameOf, isGM, remaining, send, chip } = TG; // 全ページ共通の部品(public/js/common.js)
 
@@ -231,10 +200,9 @@ $("lCreate").addEventListener("click", () => { const c = rnd(4, "ABCDEFGHJKLMNPQ
 // ---- 共通 ----
 const colorOf = (id) => { const o = S.game?.order; let i = o ? o.indexOf(id) : -1; if (i < 0) i = S.players.findIndex((p) => p.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
 const act = (a, x = {}) => send({ t: "game", a, ...x });
-// ランクの色(上ほど赤く、下ほど青〜灰色)
-const RCOL = { SSS: "#ff4d79", SS: "#ff6b57", S: "#ff9a48", A: "#f7cf4a", B: "#b5dc5f", C: "#5ccf91", D: "#52b9e8", E: "#7b96ff", F: "#a88af0", G: "#b3b8c2" };
 const MODE = { secret: "本編(秘密のランクを当てる)", together: "みんなでティアー", mine: "じぶんのティアー" };
-let local = { sel: null, draft: "", rank: null, clue: "" };
+// 遊んでいる画面は /js/dt-ui.js(大会と共通)
+const env = () => ({ me, nameOf, act, remaining, rerender: render, isGM, isMember, flash, again: () => send({ t: "again" }), ranking: S.ranking });
 const isMember = () => !!S.game?.order.includes(me);
 
 function onTransition(prev, cur) {
@@ -245,9 +213,8 @@ function onTransition(prev, cur) {
   if (g.step !== pg.step) {
     if ((g.step === "clue" && g.cur?.giver === me) || (g.step === "make" && g.cur?.maker === me) || (g.step === "guess" && (g.mode === "secret" ? g.cur?.giver !== me : g.cur?.maker !== me))) Sound.play("turn");
     if (g.step === "result" || g.step === "reveal" || g.step === "end") Sound.play(g.mode === "secret" && g.cur && !g.cur.ok && g.step !== "end" ? "tap" : "reveal");
-    local.sel = null;
+    DtUI.state.sel = null;
   }
-  if (g.step === "clue" && pg.step !== "clue") local.clue = "";
 }
 function render() {
   if (!S) return;
@@ -303,54 +270,6 @@ function renderSide() {
   side.append(btns, h("p", { class: "small muted" }, h("a", { href: "/" }, "← ゲームを選ぶ")), h("p", { class: "status", id: "flashMsg" }));
 }
 
-// ティアー表。items: [{id,text,rank,by,ok}]。opt.onRow(rank) で行を押せる、opt.onItem(it) で言葉を押せる
-function tierEl(g, items, opt = {}) {
-  const box = h("div", { class: "tier", role: "list", "aria-label": "ティアー表" });
-  for (let r = g.lo; r <= g.hi; r++) {
-    const L = g.ladder[r], can = opt.onRow && !(opt.skip || []).includes(r);
-    const row = h("div", { class: "trow" + (can ? " can" : "") + (opt.grew === L ? " new" : ""), role: "listitem", "data-rank": L,
-      onclick: can ? (e) => { if (!e.target.closest(".item")) opt.onRow(r); } : undefined },
-      h("div", { class: "lab", style: `background:${RCOL[L]}` }, L),
-      h("div", { class: "cells" }, ...items.filter((x) => x.rank === r).map((x) => opt.onItem
-        ? h("button", { type: "button", class: "item" + (local.sel === x.id ? " sel" : ""), onclick: () => opt.onItem(x) }, x.text)
-        : h("span", { class: "item", title: (x.by ? nameOf(x.by) + "さんの言葉" : "") + (x.ok === false ? "(このラウンドははずれ)" : "") }, x.text, x.ok === false ? h("span", { class: "ng", "aria-label": "はずれ" }, "✗") : null, opt.showBy && x.by ? h("span", { class: "by" }, nameOf(x.by)) : null))));
-    box.append(row);
-  }
-  return box;
-}
-// 完成したティアー表を1枚の画像にして保存
-function saveImage(g, items, title) {
-  const W = 960, LAB = 110, PAD = 14, LH = 34, FONT = '700 20px "Zen Kaku Gothic New", "Hiragino Sans", sans-serif';
-  const cv = document.createElement("canvas"), ctx = cv.getContext("2d");
-  ctx.font = FONT;
-  // 行ごとに言葉を折り返して高さを決める
-  const rows = [];
-  for (let r = g.lo; r <= g.hi; r++) {
-    const lines = [[]]; let x = 0;
-    for (const it of items.filter((y) => y.rank === r)) { const w = ctx.measureText(it.text).width + 26; if (x + w > W - LAB - PAD * 2 && lines[lines.length - 1].length) { lines.push([]); x = 0; } lines[lines.length - 1].push([it.text, w]); x += w + 8; }
-    rows.push({ r, lines, hgt: Math.max(70, lines.length * (LH + 8) + 18) });
-  }
-  const top = 76, H = top + rows.reduce((a, x) => a + x.hgt + 4, 0) + 30;
-  cv.width = W; cv.height = H;
-  ctx.fillStyle = "#181b23"; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#ffffff"; ctx.font = '400 28px "Dela Gothic One", sans-serif'; ctx.textBaseline = "middle";
-  ctx.fillText(title.slice(0, 36), PAD, 38);
-  let y = top;
-  for (const row of rows) {
-    const L = g.ladder[row.r];
-    ctx.fillStyle = RCOL[L]; ctx.fillRect(0, y, LAB, row.hgt);
-    ctx.fillStyle = "#181b23"; ctx.font = '400 34px "Dela Gothic One", sans-serif'; ctx.textAlign = "center"; ctx.fillText(L, LAB / 2, y + row.hgt / 2);
-    ctx.textAlign = "left"; ctx.fillStyle = "#2a2e38"; ctx.fillRect(LAB, y, W - LAB, row.hgt);
-    ctx.font = FONT;
-    row.lines.forEach((ln, i) => { let x = LAB + PAD; const yy = y + 12 + i * (LH + 8); for (const [t, w] of ln) { ctx.fillStyle = "#eef0f6"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, yy, w, LH, 6) : ctx.rect(x, yy, w, LH); ctx.fill(); ctx.fillStyle = "#181b23"; ctx.fillText(t, x + 13, yy + LH / 2 + 1); x += w + 8; } });
-    y += row.hgt + 4;
-  }
-  ctx.fillStyle = "#a1a7b6"; ctx.font = '500 14px "Zen Kaku Gothic New", sans-serif'; ctx.fillText("みんなのあそびば・ダンダンティアー", PAD, H - 15);
-  const a = document.createElement("a"); a.download = "tier-" + Date.now() + ".png"; a.href = cv.toDataURL("image/png"); document.body.append(a); a.click(); a.remove();
-}
-const themeEl = (g) => h("div", { class: "theme" }, h("small", {}, "お題"), g.theme);
-const cdEl = () => remaining() != null && S.game?.step !== "end" ? h("span", { class: "cd", id: "cdText" }, remaining() + "秒") : null;
-
 function renderMain() {
   const main = $("main"); main.replaceChildren();
   if (S.phase === "lobby") return renderLobby(main);
@@ -358,133 +277,7 @@ function renderMain() {
   // 切断したままの人がいると、その人の番のたびに待つことになるので、ホストに目立つ形で知らせる
   const offs = g.step !== "end" && isGM() ? g.order.filter((id) => id !== me && player(id) && !player(id).connected) : [];
   if (offs.length) main.append(h("div", { class: "offnote", role: "status" }, ...offs.map((id) => h("div", { class: "btns" }, h("span", {}, `${nameOf(id)} さんが切断中です(番が来るたびに少し待ちます)。戻らないときは → `), twoStep("退出させる", () => send({ t: "kick", id }), "danger")))));
-  if (g.mode === "secret") renderSecret(main, g);
-  else if (g.mode === "together") renderTogether(main, g);
-  else renderMine(main, g);
-}
-
-// ---------- 本編 ----------
-function renderSecret(main, g) {
-  const cur = g.cur, giver = cur?.giver === me, guesser = isMember() && !giver;
-  const meter = h("div", { class: "meter", "aria-label": `連続正解 ${g.streak}/${g.target}` }, h("b", { class: "small" }, "連続正解 "), ...Array.from({ length: g.target }, (_, i) => h("i", { class: i < g.streak ? "on" : "" })),
-    h("span", { class: "small muted" }, ` ${g.streak}/${g.target}・ヒント残り${g.hintsLeft}・最高${g.best}`));
-  let say = "";
-  if (g.step === "end") say = g.cleared ? `🎉 ${g.target}回連続正解でクリア！(${g.round}ラウンド)` : `ここで終了(${g.round}ラウンド・最高${g.best}回連続)`;
-  else if (g.step === "clue") say = giver ? "あなたが出題: 秘密のランクに合う言葉を考えて送ってください" : `${nameOf(cur.giver)} さんが言葉を考えています…`;
-  else if (g.step === "guess") say = giver ? "みんなが当てるのを見守りましょう(しゃべってヒントを出すのはなし)" : "この言葉は何ランク？ 相談して選び、だれか1人が「決定」";
-  else if (g.step === "result") say = cur.ok ? "⭕ 正解！" : "❌ はずれ…";
-  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" || (g.step === "result" && cur.ok) ? " good" : g.step === "result" ? " red" : "") }, say), cdEl()), themeEl(g), meter);
-
-  if (g.step === "clue" && giver) {
-    main.append(h("div", { class: "btns" }, h("span", {}, "あなたにだけ見える秘密のランク: "), h("span", { class: "secret", style: `background:${RCOL[g.ladder[cur.secret]]}` }, g.ladder[cur.secret])),
-      h("form", { class: "addrow", onsubmit: (e) => { e.preventDefault(); const v = $("clueIn").value.trim(); if (v) act("clue", { text: v }); } },
-        h("input", { type: "text", id: "clueIn", maxlength: "24", placeholder: `「${g.theme}」で ${g.ladder[cur.secret]} ランクっぽいもの`, autocomplete: "off" }),
-        h("button", { class: "primary", type: "submit" }, "この言葉で出題")),
-      h("p", { class: "small muted", style: "margin:0" }, `今の表は ${g.ladder[g.lo]}〜${g.ladder[g.hi]}。いちばん上が ${g.ladder[g.lo]}、いちばん下が ${g.ladder[g.hi]} です。`));
-  }
-  if ((g.step === "guess" || g.step === "result") && cur) {
-    main.append(h("div", { style: "text-align:center" }, h("div", { class: "small muted" }, `${nameOf(cur.giver)} さんの言葉`), h("div", { class: "word" }, cur.text)));
-  }
-  if (g.step === "guess") {
-    const counts = {}; for (const [p, r] of Object.entries(cur.picks)) (counts[r] || (counts[r] = [])).push(p);
-    const mine = cur.picks[me];
-    const btns = [];
-    for (let r = g.lo; r <= g.hi; r++) {
-      const L = g.ladder[r], gone = cur.removed.includes(r);
-      btns.push(h("button", { type: "button", class: (mine === r ? "mine" : "") + (gone ? " gone" : "") + (giver && cur.secret === r ? " mine" : ""), style: `background:${RCOL[L]}`, disabled: !guesser || gone, "aria-pressed": mine === r ? "true" : "false",
-        onclick: () => act("pick", { rank: mine === r ? null : r }) }, L, h("span", { class: "who" }, (counts[r] || []).map(nameOf).join("・") || " ")));
-    }
-    main.append(h("div", { class: "ranks", role: "group", "aria-label": "ランクを選ぶ" }, ...btns));
-    if (guesser) main.append(h("div", { class: "btns" },
-      mine != null ? twoStep(`「${g.ladder[mine]}」で決定`, () => act("decide", { rank: mine }), "primary big") : h("span", { class: "small muted" }, "ランクを選ぶと「決定」ボタンが出ます(みんなの選んだランクが見えます)"),
-      h("button", { type: "button", class: "ghost", disabled: cur.hinted || g.hintsLeft <= 0, onclick: () => act("hint") }, cur.hinted ? "ヒント使用済み" : `ヒント(正解ではないランクを2つ消す・残り${g.hintsLeft})`)));
-    else if (giver) main.append(h("p", { class: "small muted", style: "margin:0" }, "正解は ", h("b", {}, g.ladder[cur.secret]), "(あなたにだけ見えています)"));
-  }
-  if (g.step === "result") {
-    main.append(h("div", { class: "verdict " + (cur.ok ? "ok" : "ng") }, `正解は ${g.ladder[cur.secret]} ランク`, cur.answer != null ? `(答え: ${g.ladder[cur.answer]})` : "(答えなし)",
-      cur.grew ? h("div", { class: "small", style: "font-family:var(--body)" }, `端のランクだったので「${cur.grew}」ランクが増えました！`) : null),
-      h("div", { class: "btns" }, isMember() ? h("button", { type: "button", class: "primary", onclick: () => act("next") }, "次のラウンドへ") : null, h("span", { class: "small muted" }, "(しばらくすると自動で進みます)")));
-  }
-  main.append(h("h2", { style: "font-size:16px" }, "ティアー表"), tierEl(g, g.items, { grew: g.step === "result" ? cur?.grew : null }));
-  // クリアするまで終わらないので、ホストはここで終わりにして表を見られる
-  if (g.step !== "end" && isGM()) main.append(h("div", { class: "btns" }, twoStep("ここで終わりにして表を見る", () => act("giveup"), "ghost")));
-  if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => saveImage(g, g.items, g.theme) }, "表を画像で保存"), h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
-}
-
-// ---------- みんなでティアー ----------
-function editor(g, items, canEdit, extra) {
-  // 言葉を書いて、ランクの行を押すとそこに置ける。置いた言葉を押して選ぶと、ほかの行へ動かしたり消したりできる
-  const box = h("div", { style: "display:grid;gap:8px" });
-  if (canEdit) {
-    box.append(h("form", { class: "addrow", onsubmit: (e) => { e.preventDefault(); } },
-      h("input", { type: "text", id: "addIn", maxlength: "24", placeholder: "言葉を書いて、置きたいランクの行を押す", autocomplete: "off" }),
-      local.sel != null ? h("button", { type: "button", class: "danger", onclick: () => { act("remove", { id: local.sel }); local.sel = null; } }, "選んだ言葉を消す") : h("span"),
-      local.sel != null ? h("button", { type: "button", class: "ghost", onclick: () => { local.sel = null; render(); } }, "選ぶのをやめる") : h("span")),
-      h("p", { class: "small muted", style: "margin:0" }, local.sel != null ? "動かす先のランクの行を押してください。" : "書いた言葉は、ランクの行を押すとそこに置かれます。置いた言葉を押すと、選んで動かせます。"));
-  }
-  box.append(tierEl(g, items, canEdit ? {
-    onRow: (r) => {
-      // 入力欄に言葉があれば新しく置く(選んでいた言葉の選択はやめる)。なければ、選んだ言葉を動かす
-      const el = $("addIn"), v = el ? el.value.trim() : "";
-      if (!v && local.sel != null) { act("move", { id: local.sel, rank: r }); local.sel = null; return; }
-      local.sel = null;
-      if (!v) { flash("先に言葉を書いてください", true); el?.focus(); return; }
-      act("add", { text: v, rank: r }); el.value = ""; el.focus();
-    },
-    // 入力欄に言葉が書いてあるときは、置いてある言葉の上を押しても、その行に置く(言葉が増えても置きやすいように)
-    onItem: (x) => { const el = $("addIn"), v = el ? el.value.trim() : ""; if (v) { local.sel = null; act("add", { text: v, rank: x.rank }); el.value = ""; el.focus(); return; } local.sel = local.sel === x.id ? null : x.id; render(); },
-  } : {}));
-  if (extra) box.append(extra);
-  return box;
-}
-function renderTogether(main, g) {
-  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, g.step === "end" ? "ティアー表が完成！" : "みんなで1枚のティアー表を作ろう"), cdEl()), themeEl(g));
-  const edit = g.step === "build" && isMember();
-  main.append(editor(g, g.items, edit, edit ? h("div", { class: "btns" },
-    h("button", { type: "button", class: "ghost tiny", disabled: g.lo <= 0, onclick: () => act("expand", { side: "top" }) }, g.lo > 0 ? `上に「${g.ladder[g.lo - 1]}」を足す` : "上はSSSまで"),
-    h("button", { type: "button", class: "ghost tiny", disabled: g.hi >= g.ladder.length - 1, onclick: () => act("expand", { side: "bottom" }) }, g.hi < g.ladder.length - 1 ? `下に「${g.ladder[g.hi + 1]}」を足す` : "下はGまで"),
-    isGM() ? twoStep("これで完成", () => act("complete"), "primary") : h("span", { class: "small muted" }, "ホストが「これで完成」を押すと終わります")) : null));
-  if (g.step === "end") main.append(h("div", { class: "btns" }, h("button", { type: "button", onclick: () => saveImage(g, g.items, g.theme) }, "表を画像で保存"), h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
-}
-
-// ---------- じぶんのティアー ----------
-function renderMine(main, g) {
-  const cur = g.cur, maker = cur?.maker === me, guesser = isMember() && !maker;
-  let say = "";
-  if (g.step === "end") say = "ゲーム終了";
-  else if (g.step === "make") say = maker ? "あなたのティアー表を作ってください(3〜10個)" : `${nameOf(cur.maker)} さんがティアー表を作っています…(今${cur.count}個)`;
-  else if (g.step === "guess") say = maker ? "みんながあなたの表を当てています" : `${nameOf(cur.maker)} さんの表を当てよう: 言葉ごとにランクを選ぶ`;
-  else if (g.step === "reveal") say = `${nameOf(cur.maker)} さんの表の答え合わせ`;
-  main.append(h("div", { class: "head" }, h("div", { class: "say" + (g.step === "end" ? " good" : "") }, say), cdEl()), themeEl(g));
-  if (g.step === "make" && maker) {
-    main.append(editor(g, cur.items, true, h("div", { class: "btns" },
-      h("button", { type: "button", class: "primary", disabled: cur.items.length < 3, onclick: () => act("publish") }, `この表で出題(${cur.items.length}個)`),
-      h("span", { class: "small muted" }, "3〜10個。ほかの人は言葉だけを見て、それぞれのランクを当てます"))));
-  }
-  if (g.step === "guess" && guesser) {
-    const done = cur.done.includes(me);
-    main.append(h("div", { style: "display:grid;gap:6px" }, ...cur.items.map((x) => {
-      const sel = cur.myGuess[x.id];
-      const rb = []; for (let r = g.lo; r <= g.hi; r++) { const L = g.ladder[r]; rb.push(h("button", { type: "button", class: sel === r ? "mine" : "", style: `background:${RCOL[L]}`, disabled: done, "aria-pressed": sel === r ? "true" : "false", onclick: () => act("pick", { id: x.id, rank: r }) }, L)); }
-      return h("div", { class: "gitem" }, h("b", {}, x.text), h("div", { class: "ranks sm", role: "group", "aria-label": `${x.text}のランク` }, ...rb));
-    })), h("div", { class: "btns" }, done ? h("span", { class: "small muted" }, `回答しました。みんなを待っています(${cur.done.length}人)`) : h("button", { type: "button", class: "primary big", disabled: cur.items.some((x) => cur.myGuess[x.id] == null), onclick: () => act("gdone") }, "これで回答")));
-  } else if (g.step === "guess") main.append(h("p", { class: "muted" }, `回答した人: ${cur.done.map(nameOf).join("・") || "まだいません"}`), maker ? tierEl(g, cur.items) : null);
-  if ((g.step === "reveal" || g.step === "end") && cur && cur.guesses) {
-    main.append(h("h2", { style: "font-size:16px" }, `${nameOf(cur.maker)} さんのティアー表`), tierEl(g, cur.items));
-    const ps = g.order.filter((p) => p !== cur.maker);
-    main.append(h("div", { style: "overflow-x:auto" }, h("table", { class: "res" }, h("thead", {}, h("tr", {}, h("th", {}, "言葉"), h("th", {}, "答え"), ...ps.map((p) => h("th", {}, nameOf(p))))),
-      h("tbody", {}, ...cur.items.map((x) => h("tr", {}, h("td", {}, x.text), h("td", {}, h("b", {}, g.ladder[x.rank])), ...ps.map((p) => {
-        const gr = (cur.guesses[p] || {})[x.id]; const d = gr == null ? 9 : Math.abs(gr - x.rank);
-        return h("td", { class: d === 0 ? "ok" : d === 1 ? "near" : "ng" }, gr == null ? "—" : g.ladder[gr] + (d === 0 ? " ◎" : d === 1 ? " ○" : ""));
-      }))), h("tr", {}, h("td", {}, "点数"), h("td", {}, ""), ...ps.map((p) => h("td", {}, h("b", {}, `+${cur.pts?.[p] ?? 0}`))))))),
-      h("p", { class: "small muted", style: "margin:0" }, `ぴったり2点・1つずれ1点。作った ${nameOf(cur.maker)} さんは、当てた人の平均点 +${cur.pts?.[cur.maker] ?? 0}`));
-    if (g.step === "reveal") main.append(h("div", { class: "btns" }, isMember() ? h("button", { type: "button", class: "primary", onclick: () => act("next") }, "次へ") : null, h("button", { type: "button", class: "ghost", onclick: () => saveImage(g, cur.items, `${nameOf(cur.maker)}の「${g.theme}」`) }, "この表を画像で保存")));
-  }
-  if (g.step === "end") {
-    const rows = S.ranking || [];
-    main.append(h("h2", { style: "font-size:16px" }, "最終結果"), h("table", { class: "rank" }, h("tbody", {}, ...rows.map((r) => h("tr", { class: r.id === me ? "me" : "" }, h("td", {}, r.rank === 1 ? "🏆 1位" : `${r.rank}位`), h("td", {}, r.name), h("td", { class: "n" }, `${r.raw}点`))))),
-      h("div", { class: "btns" }, h("button", { class: "primary", type: "button", onclick: () => send({ t: "again" }) }, "待機画面に戻る")));
-  }
+  DtUI.render(main, g, env());
 }
 
 function renderLobby(main) {
